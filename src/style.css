@@ -484,7 +484,18 @@ body.presentation-mode .presentation-btn:hover { opacity: 0.9; }
   padding: 10px;
   cursor: pointer;
   text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+.embed-chevron { color: var(--gray-light); font-size: 0.9rem; }
+
+/* Streaming-brand icons (3d) */
+.brand-spotify svg, .brand-youtube svg { width: 16px; height: 16px; display: block; }
+.brand-spotify svg { fill: #1db954; }
+.brand-youtube svg { fill: #ff0000; }
+.brand-spotify.active { background: rgba(5, 5, 16, 0.7); border-color: #1db954; }
+.brand-youtube.active { background: rgba(5, 5, 16, 0.7); border-color: #ff0000; }
 .embed-body { padding: 0 10px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 .embed-input {
   flex: 1;
