@@ -245,6 +245,14 @@ html, body {
   letter-spacing: 0.08em;
   color: var(--gray-light);
 }
+.alt-readout {
+  font-family: var(--font-body);
+  color: var(--blue-light);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+}
 .ins-scale {
   display: flex;
   justify-content: space-between;

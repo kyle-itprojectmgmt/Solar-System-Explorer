@@ -7,7 +7,7 @@
 
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS } from './physics.js';
-import { KOFI_URL } from '../config.js';
+import { KOFI_URL, KM_PER_UNIT } from '../config.js';
 
 const CAMERA_MODES = [
   { id: 'cinematic', label: 'Cinematic', key: 'C', targeted: false },
@@ -152,15 +152,39 @@ export class UI {
       b.onclick = () => { this.cam.focusBody(n); this.showInfo(n); };
     }
 
-    // Altitude presets — shown once a body is targeted.
+    // Altitude — continuous logarithmic slider (replaces the old presets).
+    // Equal slider travel = equal zoom factor; readout tracks the camera live.
+    const ALT_MIN = 50, ALT_MAX = 500000;
+    this._altT = (km) => Math.log10(km / ALT_MIN) / Math.log10(ALT_MAX / ALT_MIN);
+    this._altKm = (t) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, t);
     this.altSec = section(this.side, 'Altitude');
-    const altGrid = el('div', 'btn-grid', this.altSec);
-    for (const [label, km] of [['Distant', 100000], ['Near', 10000], ['Low Orbit', 500], ['Skim', 50]]) {
-      const b = el('button', 'btn btn-small', altGrid);
-      b.textContent = `${label} · ${km.toLocaleString()} km`;
-      b.onclick = () => this.cam.flyToAltitude(km);
-    }
+    this.mcAltReadout = el('div', 'alt-readout', this.altSec);
+    this.mcAltSlider = el('input', 'slider', this.altSec);
+    Object.assign(this.mcAltSlider, { type: 'range', min: 0, max: 1, step: 0.001, value: 0.5 });
+    const altScale = el('div', 'ins-scale', this.altSec);
+    altScale.innerHTML = '<span>50 km</span><span>500,000 km</span>';
+    // While dragging, the slider drives the camera; otherwise the camera
+    // drives the slider (see update()).
+    this.mcAltSlider.addEventListener('pointerdown', () => { this._altDragging = true; });
+    window.addEventListener('pointerup', () => { this._altDragging = false; });
+    this.mcAltSlider.oninput = () => {
+      const km = this._altKm(+this.mcAltSlider.value);
+      this.mcAltReadout.textContent = `ALT: ${Math.round(km).toLocaleString()} km`;
+      if (this.cam.mode === 'insertion') this.cam.setInsertion({ altitudeKm: km });
+      else this.cam.flyToAltitude(km);
+    };
     this.altSec.style.display = 'none';
+
+    // Quick-access inclination — mirrors the Orbit Insertion panel control.
+    this.incSecMC = section(this.side, 'Inclination');
+    this.mcIncLabel = el('div', 'ins-label', this.incSecMC);
+    this.mcIncSlider = el('input', 'slider', this.incSecMC);
+    Object.assign(this.mcIncSlider, { type: 'range', min: -90, max: 90, step: 1, value: this.cam.ins.incDeg });
+    this.mcIncSlider.oninput = () => this.cam.setInsertion({ incDeg: +this.mcIncSlider.value });
+    const mcIncScale = el('div', 'ins-scale', this.incSecMC);
+    mcIncScale.innerHTML = '<span>-90° retro</span><span>0° equatorial</span><span>90° polar</span>';
+    this.mcIncLabel.textContent = incText(this.cam.ins.incDeg);
+    this.incSecMC.style.display = 'none';
 
     // Orbit mode tuning — how fast the camera sweeps along its orbital path,
     // independent of the time multiplier.
@@ -273,6 +297,10 @@ export class UI {
       altLabel.textContent = `Altitude: ${Math.round(ins.altitudeKm).toLocaleString()} km`;
       incSlider.value = ins.incDeg;
       incLabel.textContent = incText(ins.incDeg);
+      if (this.mcIncSlider) {
+        this.mcIncSlider.value = ins.incDeg;
+        this.mcIncLabel.textContent = incText(ins.incDeg);
+      }
       lockToggle.checked = ins.locked;
       this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
     };
@@ -380,9 +408,9 @@ export class UI {
       ['2 finger drag', 'Pan'], ['Double tap', 'Focus body'],
       ['Long press', 'Body info panel'], ['Swipe up', 'Mission Control'],
     ]);
-    sec(right, 'ALTITUDE PRESETS', [
-      ['Distant', '100,000 km'], ['Near', '10,000 km'],
-      ['Low Orbit', '500 km'], ['Skim', '50 km'],
+    sec(right, 'ALTITUDE', [
+      ['Slider', 'Mission Control — log scale'],
+      ['Range', '50 km – 500,000 km'],
     ]);
 
     el('p', 'help-tip', card).textContent =
@@ -574,8 +602,20 @@ export class UI {
       this.altEl.style.display = 'none';
     }
 
-    // Altitude presets appear once any body has been targeted.
-    this.altSec.style.display = (this.cam.target || this.cam.lastTarget) ? '' : 'none';
+    // Altitude + inclination sliders appear once any body has been targeted.
+    // Outside a drag, the slider follows the camera's actual altitude.
+    const tgt = this.cam.target || this.cam.lastTarget;
+    this.altSec.style.display = tgt ? '' : 'none';
+    this.incSecMC.style.display = tgt ? '' : 'none';
+    if (tgt && !this._altDragging) {
+      const entry = this.r.bodyMeshes.get(tgt);
+      if (entry) {
+        const altKm = Math.max(0,
+          (this.r.bodyWorldPos(tgt).distanceTo(this.r.camera.position) - entry.radiusUnits) * KM_PER_UNIT);
+        this.mcAltSlider.value = Math.min(1, Math.max(0, this._altT(Math.max(altKm, 50))));
+        this.mcAltReadout.textContent = `ALT: ${Math.round(altKm).toLocaleString()} km`;
+      }
+    }
 
     // Orbit insertion live readout.
     if (this.cam.mode === 'insertion') this._updateInsertionInfo();
