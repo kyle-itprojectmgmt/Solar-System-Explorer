@@ -556,6 +556,16 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
   per-step view roll < 2°, body centered (< 0.6 NDC), scene-graph
   rotation exactly zero, polar sweep ±90°, retrograde preserved, both
   inclination sliders in sync (tests/incroll.mjs).
+- Hotfix 2 (pole snap on entry, 917e46f): with a stale high inclination
+  stored, entering insertion snapped the camera to the pole — the entry
+  derivation reused the camera's equatorial longitude as phase on the
+  inclined circle (phase ≈ ±90° = max latitude; measured 13.7°→-82.2°,
+  421 u). Fix: entry now SOLVES the line of nodes so the inclined plane
+  passes through the camera's bearing; the node is set only at entry,
+  never on INC drags (the roll fix holds). Entering at 0° parks the
+  node 90° behind the camera so inclination drags arc up the camera's
+  own meridian — no jump, no roll. nodePhase captured in presets.
+  tests/polesnap.mjs guards entry/drag/return/sync.
 
 ---
 
