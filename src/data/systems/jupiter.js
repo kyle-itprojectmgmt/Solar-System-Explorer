@@ -201,14 +201,14 @@ export default {
     },
 
     // Inner moons — ring sources, simplified Keplerian orbits.
-    { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 },
+    { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 }, geometrySegments: 64,
       facts: ['Metis orbits inside Jupiter\'s main ring and supplies it with dust'], stats: { 'Radius': '~22 km', 'Orbital period': '7.1 hours' } },
-    { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 },
+    { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 }, geometrySegments: 64,
       facts: ['Adrastea is one of the smallest known moons, discovered by Voyager 2'], stats: { 'Radius': '~8 km', 'Orbital period': '7.2 hours' } },
-    { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 },
+    { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 }, geometrySegments: 64,
       radii: { x: 125, y: 73, z: 64 }, // real irregular body: 250 x 146 x 128 km
       facts: ['Amalthea is the reddest object in the solar system', 'It sheds the dust that forms the Amalthea gossamer ring'], stats: { 'Dimensions': '250 × 146 × 128 km', 'Orbital period': '12 hours' } },
-    { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 },
+    { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 }, geometrySegments: 64,
       facts: ['Thebe feeds the outermost, faintest gossamer ring'], stats: { 'Radius': '~49 km', 'Orbital period': '16.2 hours' } },
   ],
 

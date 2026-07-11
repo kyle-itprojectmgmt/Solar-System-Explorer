@@ -38,7 +38,10 @@ export class SceneRenderer {
 
     // FOV 48: wide FOVs perspective-stretch spheres near the frame edge,
     // which reads as an "oval" planet.
-    this.camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.05, 4e6);
+    // Near plane 0.01 units = 10 km: inner-moon zoom floors put the surface
+    // ~20 km from the camera — a 50 km near plane clipped a hole through
+    // them (bug #14). The logarithmic depth buffer keeps precision fine.
+    this.camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.01, 4e6);
     this.camera.position.set(0, 60, 260);
     this.camera.updateProjectionMatrix();
 
@@ -301,7 +304,10 @@ export class SceneRenderer {
       const group = new THREE.Group();
       group.name = cfg.name;
 
-      const detail = cfg.textures ? 96 : 24;
+      // Untextured inner moons need explicit segments (cfg.geometrySegments):
+      // at their zoom floors the default 24x12 sphere shows visible facets.
+      const detail = cfg.geometrySegments ?? (cfg.textures ? 96 : 24);
+      const heightSegs = cfg.geometrySegments ?? detail / 2;
       const matOpts = { shininess: 6, specular: new THREE.Color(0x0a0a0a) };
       if (cfg.textures?.diffuse) {
         matOpts.map = this._prepSurfaceTexture(
@@ -316,7 +322,7 @@ export class SceneRenderer {
         const ns = cfg.normalScale ?? 1;
         mat.normalScale = new THREE.Vector2(ns, ns);
       }
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, detail, detail / 2), mat);
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, detail, heightSegs), mat);
       if (cfg.radii) mesh.scale.set(1, cfg.radii.y / cfg.radii.x, cfg.radii.z / cfg.radii.x);
       group.add(mesh);
 
