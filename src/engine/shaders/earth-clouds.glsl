@@ -136,5 +136,7 @@ float ec_polar   = smoothstep(0.88, 0.96, ec_ay);
   vec3 cloudCol = mix(vec3(0.973, 0.973, 1.0), vec3(0.80, 0.82, 0.86), ec_grey) * lit;
   float op = clamp(ec_cloud, 0.0, 0.92);
   detail = mix(detail, cloudCol, op);
-  gDetailHeight += op * (0.25 + 0.15 * (1.0 - ec_grey)); // convective tops taller
+  // Height kept subtle: at low altitude + grazing sun the relief shading
+  // turned cloud decks into big black lumps (V5b, measured at 382 km).
+  gDetailHeight += op * 0.10;
 }

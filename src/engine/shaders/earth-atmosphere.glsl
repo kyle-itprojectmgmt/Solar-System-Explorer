@@ -29,9 +29,16 @@ void main() {
   // Grazing-angle fresnel: sharp exponential falloff, pow ~2.8 for thin limb.
   float fresnel = pow(1.0 - abs(dot(viewDir, n)), 2.8);
 
-  // Lit-side gating: atmosphere only glows on dayside, with generous terminator bleed.
+  // Lit-side gating with a wide terminator bleed (V5b: was -0.18..0.2 —
+  // widened so the limb glow fades gradually over ~300 km instead of
+  // cutting off at the geometric shadow line).
   float sunDot = dot(n, normalize(uSunW));
-  float lit = smoothstep(-0.18, 0.2, sunDot);
+  float lit = smoothstep(-0.25, 0.15, sunDot);
+
+  // Faint blue-grey scatter keeps the night limb from going pure black —
+  // earthglow / residual atmospheric scattering (V5b).
+  float nightAmbient = (1.0 - lit) * 0.08;
+  vec3 nightColor = vec3(0.05, 0.08, 0.15);
 
   // Rayleigh scattering color: deep vivid blue (#3D7EFF) to bright cyan-white (#BFE3FF).
   // Edge is more saturated blue, inner falloff is bright white-cyan.
@@ -58,6 +65,10 @@ void main() {
   float alpha = fresnel * lit * terminatorGlow;
   alpha = mix(alpha, alpha * 1.2, horizonBoost); // boost alpha when close
   alpha = clamp(alpha, 0.0, 0.85) * uIntensity;
+
+  // Blend toward the night scatter color where the day glow has faded.
+  rayleighColor = mix(nightColor, rayleighColor, clamp(lit, 0.0, 1.0));
+  alpha = max(alpha, fresnel * nightAmbient * uIntensity);
 
   gl_FragColor = vec4(rayleighColor, alpha);
 }

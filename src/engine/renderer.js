@@ -120,8 +120,14 @@ export class SceneRenderer {
     this.root.add(this.sunLight);
     this.root.add(this.sunLight.target);
 
-    // Faint fill so night sides aren't pure black on screens.
-    this.scene.add(new THREE.AmbientLight(0x223344, 0.06));
+    // Faint fill so night sides aren't pure black on screens. Config-driven
+    // per system (V5b): Earth's night side keeps faint terrain silhouettes
+    // (earthglow / atmospheric scatter); Jupiter stays at the calibrated dim
+    // default. Accepts a number (intensity) or { color, intensity }.
+    const amb = this.system.nightAmbient;
+    this.scene.add(new THREE.AmbientLight(
+      typeof amb === 'object' ? amb.color : 0x223344,
+      (typeof amb === 'object' ? amb.intensity : amb) ?? 0.06));
 
     // "Planet-shine": reflected light from the primary softly lights the
     // moons' primary-facing sides.

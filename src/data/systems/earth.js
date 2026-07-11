@@ -58,8 +58,15 @@ export default {
     // disk, not yet wired: night.jpg (Black Marble 8K — lights stay
     // procedural for now, see earth-lights.glsl), clouds.jpg (8K layer),
     // specular.jpg (8K ocean mask, converted from the SSS .tif).
+    // Land hue note (V5b, measured): midwest olive-green comes from the
+    // SOURCE texture (Wisconsin samples rgb(79,97,49)) — July Blue Marble
+    // greens, faithfully rendered. For tan/brown farmland swap a different
+    // BMNG monthly variant (e.g. world.topo.bathy.200409 = September).
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
-    normalScale: 2.0,   // terrain relief depth (drives procedural detail)
+    // On Earth this drives ONLY the procedural cloud relief (no normal map;
+    // ocean/lights/aurora add no height). 2.0 turned cloud-system flanks
+    // into black lumps at grazing sun from 382 km (V5b, measured).
+    normalScale: 0.8,
     detailFloor: { softKm: 400, hardKm: 200 }, // ISS altitude experience — 408 km reference
     // Van Allen belts + reentry band (V5b) — unlike Jupiter, most of
     // Earth's orbital space is benign; warn only inside real zones.
