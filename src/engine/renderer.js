@@ -270,7 +270,9 @@ export class SceneRenderer {
 
   _buildBodies() {
     for (const cfg of this.system.bodies) {
-      const r = Math.max(cfg.radiusKm * K, 0.02);
+      // Irregular bodies carry explicit half-dimensions (km) in cfg.radii;
+      // the X half-dimension is the reference radius, Y/Z become mesh scale.
+      const r = Math.max((cfg.radii?.x ?? cfg.radiusKm) * K, 0.02);
       const group = new THREE.Group();
       group.name = cfg.name;
 
@@ -286,7 +288,7 @@ export class SceneRenderer {
       }
       const mat = new THREE.MeshPhongMaterial(matOpts);
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, detail, detail / 2), mat);
-      if (cfg.elongated) mesh.scale.set(1.55, 0.95, 1.1);
+      if (cfg.radii) mesh.scale.set(1, cfg.radii.y / cfg.radii.x, cfg.radii.z / cfg.radii.x);
       group.add(mesh);
 
       const entry = {
@@ -454,6 +456,11 @@ export class SceneRenderer {
 
   /** Sync scene graph to physics state. */
   update(physics, dt, elapsed) {
+    // Catch missed/late resize events (mobile rotation, devtools, fullscreen):
+    // a stale aspect ratio renders every sphere as an oval.
+    const aspect = window.innerWidth / window.innerHeight;
+    if (Math.abs(this.camera.aspect - aspect) > 0.001) this.onResize();
+
     const p = this.system.primary;
     this.primaryMesh.rotation.y = physics.primaryRotation;
     this._updateDetailShaders(physics);
