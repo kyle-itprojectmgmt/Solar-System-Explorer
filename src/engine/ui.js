@@ -379,9 +379,13 @@ export class UI {
       // ins state, which would clobber the value being dragged.
       const incDeg = +this.mcIncSlider.value;
       // Dragging inclination outside Orbit Insertion auto-switches (bug #23)
-      // — the intent is clearly "orbit at this angle".
+      // — the intent is clearly "orbit at this angle". The new inclination
+      // is applied BEFORE setMode so the entry phase derives in the target
+      // plane (otherwise a stale stored inclination could snap the camera
+      // toward the pole on entry).
       if (this.cam.mode !== 'insertion') {
         const target = this.cam.target || this.cam.lastTarget || this.system.primary.name;
+        this.cam.ins.incDeg = incDeg;
         this.cam.setMode('insertion', target);
         this.notify('Switched to Orbit Insertion for inclination');
       }
@@ -627,7 +631,8 @@ export class UI {
     if (cam.mode === 'insertion') {
       Object.assign(base, {
         altitudeKm: cam.ins.altitudeKm, incDeg: cam.ins.incDeg,
-        phase: cam.ins.phase, yaw: cam.ins.yaw, pitch: cam.ins.pitch,
+        phase: cam.ins.phase, nodePhase: cam.ins.nodePhase,
+        yaw: cam.ins.yaw, pitch: cam.ins.pitch,
         locked: cam.ins.locked,
       });
     } else if (cam.mode === 'free') {
@@ -653,6 +658,7 @@ export class UI {
         incDeg: cam.incDeg ?? 0, locked: !!cam.locked,
       });
       if (cam.phase != null) this.cam.ins.phase = cam.phase;
+      if (cam.nodePhase != null) this.cam.ins.nodePhase = cam.nodePhase;
       if (cam.yaw != null) this.cam.ins.yaw = cam.yaw;
       if (cam.pitch != null) this.cam.ins.pitch = cam.pitch;
     } else if (cam.mode === 'free') {

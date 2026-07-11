@@ -58,6 +58,7 @@ export class CameraController {
     this.ins = {
       body: null, altitudeKm: 10000, incDeg: 0, locked: false,
       phase: 0, yaw: 0, pitch: -1.31, // default view: nadir + 15° forward tilt
+      nodePhase: 0,                   // line of nodes longitude — set ONLY on mode entry
       lockOffset: 0,                  // geosync: phase − body rotation angle
       velKmS: 0, periodS: 0, surfaceKmS: 0, // computed each frame for the HUD
     };
@@ -111,17 +112,42 @@ export class CameraController {
       this.ins.body = target || this.ins.body || this.lastTarget || this.r.system.primary.name;
       this.target = this.ins.body;
       this.lastTarget = this.ins.body;
-      // Start the orbit at the camera's current bearing for continuity.
+      // Start the orbit AT the camera (no pole snap, no jump): orient the
+      // orbit plane — i.e. choose the line of nodes — so the inclined
+      // circle passes through the camera's current bearing. The node is
+      // set ONLY here, never during INC drags (re-anchoring it while
+      // dragging is what made the view roll — "the scene rotates").
       const entry = this.r.bodyMeshes.get(this.ins.body);
       if (entry) {
         const center = entry.group.getWorldPosition(new THREE.Vector3());
         const local = this.camera.position.clone().sub(center)
           .applyQuaternion(this.r.root.quaternion.clone().invert());
-        this.ins.phase = Math.atan2(-local.z, local.x);
-        this.ins.altitudeKm = Math.max(
-          this._minInsertionAltKm(this.ins.body),
-          Math.min(500000, (local.length() - entry.radiusUnits) * KM_PER_UNIT)
-        );
+        if (local.lengthSq() > 1e-6) {
+          const u = local.clone().normalize();
+          const lon = Math.atan2(-u.z, u.x);
+          const lat = Math.asin(THREE.MathUtils.clamp(u.y, -1, 1));
+          const inc = THREE.MathUtils.degToRad(Math.abs(this.ins.incDeg));
+          if (inc < 1e-4) {
+            // Equatorial: camera longitude is the phase. Park the node 90°
+            // behind so a future inclination drag arcs the camera up its
+            // own meridian — no jump, no roll (tangent ∥ node axis there).
+            this.ins.phase = lon;
+            this.ins.nodePhase = lon - Math.PI / 2;
+          } else {
+            // sin(lat) = sin(phase − node)·sin(inc) on the inclined circle;
+            // clamp handles |lat| > inc (plane can't reach the camera —
+            // enter at the max-latitude point on the camera's longitude).
+            const rel = Math.asin(THREE.MathUtils.clamp(Math.sin(lat) / Math.sin(inc), -1, 1));
+            // Longitude offset of that point from the node.
+            const dLon = Math.atan2(Math.sin(rel) * Math.cos(inc), Math.cos(rel));
+            this.ins.nodePhase = lon - dLon;
+            this.ins.phase = this.ins.nodePhase + rel;
+          }
+          this.ins.altitudeKm = Math.max(
+            this._minInsertionAltKm(this.ins.body),
+            Math.min(500000, (local.length() - entry.radiusUnits) * KM_PER_UNIT)
+          );
+        }
       }
       this.ins.yaw = 0; this.ins.pitch = -1.31;
       if (this.ins.locked) {
@@ -785,27 +811,19 @@ export class CameraController {
       : Math.abs(orbitSign * omega - this._bodyRotationRateRadS(ins.body)) * entry.radiusUnits * KM_PER_UNIT;
 
     // Orbit plane: a great circle inclined by |incDeg| from the equator,
-    // tilted about a FIXED line of nodes (the +X axis of the body's
-    // equatorial frame). Written out explicitly — position only, nothing
-    // in the scene is ever rotated:
-    //   x = r·cosφ, y = r·sinφ·sinI, z = -r·sinφ·cosI
-    // At 0° the camera rides the equator; at 90° y sweeps ±r — a true
-    // polar orbit over both poles. The body stays at the circle's center
-    // (and centered in view) at every inclination.
+    // tilted about the line of nodes fixed at entry (radial direction at
+    // ins.nodePhase). Camera position only — nothing in the scene is ever
+    // rotated. At 90° the path passes over both poles; the body stays at
+    // the circle's center (and centered in view) at every inclination.
     const inc = THREE.MathUtils.degToRad(Math.abs(ins.incDeg));
-    const cosP = Math.cos(ins.phase), sinP = Math.sin(ins.phase);
-    const cosI = Math.cos(inc), sinI = Math.sin(inc);
-    const local = new THREE.Vector3(
-      rUnits * cosP,
-      rUnits * sinP * sinI,
-      -rUnits * sinP * cosI
-    );
+    const nodeAxis = new THREE.Vector3(
+      Math.cos(ins.nodePhase || 0), 0, -Math.sin(ins.nodePhase || 0));
+    const local = new THREE.Vector3(Math.cos(ins.phase), 0, -Math.sin(ins.phase))
+      .multiplyScalar(rUnits).applyAxisAngle(nodeAxis, inc);
     // Travel direction = d(position)/dφ, reversed for retrograde traversal.
-    const tangent = new THREE.Vector3(
-      -sinP,
-      cosP * sinI,
-      -cosP * cosI
-    ).multiplyScalar(orbitSign);
+    const tangent = new THREE.Vector3(-Math.sin(ins.phase), 0, -Math.cos(ins.phase))
+      .multiplyScalar(orbitSign)
+      .applyAxisAngle(nodeAxis, inc);
     local.applyQuaternion(this.r.root.quaternion);
     tangent.applyQuaternion(this.r.root.quaternion).normalize();
 
