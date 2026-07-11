@@ -55,6 +55,26 @@ All planetary system data lives in config files, never in engine code.
 - A future developer can drop in `saturn.js` and it renders with no
   engine changes
 
+### Domain
+Registered via Cloudflare Registrar (at-cost, zero markup, native DNS
+integration with Pages). Target domain: a *.co extension — final name
+TBD. DNS connection to Cloudflare Pages is two clicks once registered.
+
+### Hosting Stack Decision
+Cloudflare Pages (unlimited bandwidth) + Cloudflare R2 (zero egress)
+on existing $5/mo Workers paid plan. Total extra cost at 100,000
+visitors: $0. Chose over GitHub Pages (100GB soft cap), Vercel
+(100GB/mo free then expensive), Netlify (surprise overage billing).
+
+### Multi-Agent / Cost Strategy
+Orchestrator: Claude Sonnet/Opus for architecture, integration, review.
+Workers: Claude Haiku for isolated implementational tasks (single shader,
+config entry, documentation, UI copy). Worker file ownership must be
+exclusive — no two workers touch the same file. Shared infrastructure
+always built by orchestrator and committed before workers spawn.
+Run /compact after each completed major feature to manage context.
+Standing instructions in .claude/instructions.md (auto-read by Claude Code).
+
 ### Texture Architecture
 - Development: loads from `/public/textures/{body-slug}/`
 - Production: loads from Cloudflare R2 via `TEXTURE_BASE_URL` in
@@ -196,6 +216,8 @@ Blurred Jupiter background, progress bar, rotating Jupiter facts.
 
 Appear below activation altitude as 3D billboard sprites.
 Fade in below threshold, fade out above.
+**Note: labels must be parented to moon mesh (not scene) so they
+rotate with the surface. Same fix required as volcanic plumes (Bug #4).**
 
 | Moon | Altitude | Features |
 |------|----------|---------|
@@ -249,42 +271,64 @@ Commit: b1fcdf2 (26 files)
 - Added: Controls help overlay (? key)
 - Created: FUTURE_ENHANCEMENTS.md
 
-### v3 — Procedural Detail Shaders (Complete — deployed 2026-07-10)
-Commits: 2091c7a (infra), 9be0608 (Jupiter), 193093c (Io), 5a971a5
-(Europa), 7729be3 (Ganymede), 1317e3a (Callisto)
-- Shared GLSL Simplex noise library (2D/3D, ridged, fBm 2–4 octaves,
-  cellular/crater helpers; mobile tier drops one octave)
-- onBeforeCompile injection into MeshPhongMaterial; bodies opt in via
-  config `detail: { style, activationKm, fullKm, params }`; blend is 0
-  above activation altitude (no visual cost when far)
-- Jupiter: zone/belt cloud turbulence with altitude-staged octaves,
-  latitude-stretched wisps, GRS spiral vortex (anchored to scanned map
-  UV, differs between 2K and 4K maps), blue-grey limb haze <10,000 km
-- Io: sulfur palette zones, stretched lava flows, cellular calderas
-  with sulfur rims, pulsing hot-spot emissive <200 km, SO2 frost
-- Europa: domain-warped 3-scale crack network, ice-plain flexing,
-  Voronoi chaos rafts, near-subliminal pulsing ocean glow <1,000 km
-- Ganymede: luminance-split dark regolith/craters vs grooved bands,
-  polar aurora emissive <2,000 km; added Osiris + Gilgamesh labels
-- Callisto: 4-octave crater-on-crater fields, bright ice crater
-  floors, Valhalla multi-ring basin anchored to scanned map UV;
-  added Lofn + Burr labels
-- Green "Surface Detail Active" dot in body info panel
-- Fixed: DoF focused on body center, blurring every low-altitude view
-  (now focuses on the near surface)
-- Fixed: quality tier used maxTouchPoints, demoting touchscreen
-  laptops to tablet tier (now uses pointer:coarse media query)
-- Verified per body at spec altitudes; ~50–60 fps at full detail even
-  in software GL; all v1/v2 regression checks passing
+### v3 — Procedural Detail Shaders (Complete — commits 2091c7a → 7359a7d)
+- Shared GLSL Simplex noise library: 2D/3D Simplex, ridged, fBm 2-4
+  octaves, cellular noise, crater-profile helper. Mobile tier drops
+  one octave via define. Bodies opt in through config — no body-specific
+  code in engine. uDetailBlend exactly 0 above activation altitude.
+- Jupiter: banded turbulence with altitude-staged octaves, 4:1 latitude
+  wisps, GRS spiral vortex (anchored to scanned pixel position in both
+  texture resolutions), blue-grey horizon haze below 10,000 km
+- Io: sulfur palette modulation, lava flows, calderas (thinned by cell
+  hash to avoid uniform density), hot spot glow below 200 km
+- Europa: fractal ice crack network (domain warping fixed fingerprint
+  loop artifact), chaos terrain, subsurface ocean glow
+- Ganymede: grooved terrain ridges, dark cratered terrain (crater
+  lattice gated below 3,000 km to fix tiling artifact), polar auroras
+- Callisto: multi-scale fractal cratering, Valhalla rings anchored to
+  scanned basin position at 18°N
+- Bonus fixes caught during descent testing: DoF now focuses on near
+  surface not body center (sharpened all low-altitude views), quality
+  tier detection fixed from maxTouchPoints to pointer:coarse media
+  query (fixed touchscreen laptops being demoted to tablet tier)
+- Surface Detail Active green dot working in body info panel
+- All bodies screenshot-tested at spec altitudes, 50-61 FPS confirmed
+- Zero console errors in production
 
-### v3b — Orbit Surface Movement Fix (In Progress)
-- Fixed: Orbit mode — camera advances along path, surface sweeps beneath
-- Fixed: Orbit Insertion non-geosync — camera moves at orbital velocity
-- Fixed: GeoSync synchronization — texture and camera locked to same timer
-- Fixed: Chase mode angle — surface visible below, Jupiter ahead
-- Added: Surface speed HUD readout
-- Added: Orbital Speed slider (Orbit mode)
-- Added: Chase Height slider (Chase mode)
+### v3b — Orbit Surface Movement Fix (Complete — 2026-07-10)
+Commits: 7e69fa4 (orbit), ffc3fe8 (insertion + geosync), 9e09060 (chase),
+abbd3a9 (UI controls). Per V3b_ORBIT_FIX.md.
+- Fixed: Orbit mode — camera advances along its orbital path, surface
+  sweeps beneath. Visual period 60 s of sim time per revolution (scales
+  with time multiplier, freezes on pause), × Orbital Speed slider,
+  capped at one rev per 5 wall-seconds so high multipliers sweep
+  dramatically instead of strobing. Low-altitude 15° tilt now leans
+  toward the direction of travel (was camera-right axis).
+- Fixed: Orbit Insertion non-geosync — phase advances from the shared
+  sim-time accumulator (physics.simSeconds delta), camera moves at the
+  true orbital rate; surface sweeps at |orbital − rotation| rate.
+- Fixed: GeoSync — camera phase pinned directly to the rotation angle
+  the renderer applied this frame (primaryRotation for Jupiter,
+  mesh.rotation.y for tidally locked moons) plus a lock offset captured
+  when the lock engages: drift is exactly zero by construction.
+  Verified zero drift over 2,000 sim-seconds at 10,000x (Jupiter + Io).
+- Fixed: Chase mode — camera 3R behind / 1.5R above (both × scroll
+  zoom), height along the orbital plane's north (root Y, carries axial
+  tilt), looking 2R ahead of the moon along travel: surface below,
+  horizon and Jupiter ahead.
+- Added: Surface speed readout in Orbit Insertion HUD — ground-track
+  rate; reads "0.0 km/s (Geosynchronous)" when locked
+- Added: Orbital Speed slider (Orbit mode, 0–4×, Mission Control)
+- Added: Chase Height slider (Chase mode, 0.2–4× radius, Mission Control)
+- Changed: default insertion view is nadir + 15° forward tilt
+  (pitch −1.31 rad; GeoSync preset keeps its wider −0.8 view)
+- Verified: 51-check headless smoke test, all passing — orbit sweep
+  rate/cap/pause, insertion rate, geosync zero-drift, chase geometry,
+  sliders, HUD, across Jupiter + all four Galilean moons. Testing note:
+  headless Chrome renders this scene at ~4 fps (0.6 fps under
+  SwiftShader), so smoke tests must measure rates against
+  physics.simSeconds — never wall clock — and settle transitions by
+  calling cameraCtl.update(dt) in a loop.
 
 ---
 
@@ -293,8 +337,11 @@ Commits: 2091c7a (infra), 9be0608 (Jupiter), 193093c (Io), 5a971a5
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Backlog | — |
-| 2 | Surface stationary during orbit (camera doesn't advance along path) | Queued (v3b, not started) | V3b_ORBIT_FIX.md |
-| 3 | ~~Texture resolution exhaustion on zoom~~ | RESOLVED in v3 — procedural detail shaders | V3_DETAIL_SHADERS.md |
+| 2 | Surface stationary during orbit (camera doesn't advance along path) | Resolved v3b | V3b_ORBIT_FIX.md |
+| 3 | Texture resolution exhaustion on zoom | Resolved v3 | V3_DETAIL_SHADERS.md |
+| 4 | Io volcanic plumes not parented to moon — float over surface during rotation | Backlog | — |
+| 5 | GRS vortex detail not discoverable — no way to navigate directly to GRS longitude | Backlog | — |
+| 6 | instructions.md in Docs/ not .claude/ — move to .claude/instructions.md for auto-read | Fix needed | — |
 
 ---
 
@@ -303,10 +350,13 @@ Commits: 2091c7a (infra), 9be0608 (Jupiter), 193093c (Io), 5a971a5
 | # | Feature | Notes |
 |---|---------|-------|
 | 1 | Full screen mode | TV/presentation mode, hide all UI |
-| 2 | Hide all text / clean display mode | Big screen / screenshot mode |
+| 2 | Hide all text / clean display mode | Big screen / screenshot mode, combine with fullscreen |
 | 3 | Jupiter limb glow fix | Replace solid halo with proper atmospheric scattering shader — feathered, lit-side only, color transitions warm orange to transparent |
 | 4 | KTX2 compressed textures | Add Basis encoder to build pipeline for faster mobile loading |
 | 5 | WebGPU renderer upgrade | When postprocessing library adds WebGPU support |
+| 6 | Orbit Insertion inclination range fix | Extend inclination slider from 0–90° to -90°–90°. Slider center = 0° (equatorial). Negative = retrograde orbit. Label: "-90° (retrograde)" left, "0° (equatorial)" center, "90° (polar)" right. Physics: negative inclination reverses orbital direction. |
+| 7 | GRS navigation preset | Add "Jump to Great Red Spot" button in Jupiter body info panel and/or Orbit Insertion panel. Rotates camera longitude to align with GRS position (23°S, current simulated longitude). Solves discoverability — GRS vortex detail exists but user has no way to find it without knowing Jupiter's rotation state. |
+| 8 | Detail-aware zoom floor | Minimum zoom altitude adapts to where procedural detail + texture resolution runs out. Resistance zoom: quadratic taper below soft floor, hard stop at floor. Per-body floors stored in body config (not engine). Floors: Jupiter 1,500 km, Io 150 km, Europa 150 km, Ganymede 200 km, Callisto 300 km, inner moons 50 km. HUD feedback: "Maximum surface detail reached" fades in at soft floor, ALT readout pulses once at hard floor. |
 
 ---
 
