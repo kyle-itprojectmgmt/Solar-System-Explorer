@@ -131,7 +131,7 @@ DETAIL_STYLES.volcanic = {
 
     // LAYER 1 — sulfur compound zones at several noise frequencies.
     float zoneN = fbmN(vObjPos * 28.0 + vec3(t1), dOct);
-    float zoneN2 = snoise(vObjPos * 84.0 - vec3(t1, 0.0, t1));
+    float zoneN2 = snoise(vObjPos * 84.0 - vec3(t1, 0.0, t1)) * dtlFreqFade(vObjPos, 84.0);
     vec3 sulfurY = vec3(0.910, 0.831, 0.302); // #E8D44D SO2 frost yellow
     vec3 sulfurO = vec3(0.831, 0.329, 0.102); // #D4541A mid-temp allotropes
     vec3 sulfurR = vec3(0.545, 0.102, 0.102); // #8B1A1A high-temp sulfur
@@ -158,7 +158,8 @@ DETAIL_STYLES.volcanic = {
     // LAYER 5 — SO2 frost in topographic lows between flows.
     float frost = snoise(vObjPos * 260.0);
     detail = mix(detail, vec3(0.961, 0.961, 0.878),                                   // #F5F5E0
-                 smoothstep(0.55, 0.9, frost) * (1.0 - flowMask) * 0.18);
+                 smoothstep(0.55, 0.9, frost) * (1.0 - flowMask) * 0.18
+                 * dtlFreqFade(vObjPos, 260.0));
 
     // Relief height (0g): flows sit low, caldera rims high, floors deep.
     gDetailHeight = zoneN * 0.12 - flowMask * 0.4 + clamp(calderas, -1.0, 1.0) * 0.55;
@@ -166,7 +167,7 @@ DETAIL_STYLES.volcanic = {
     // LAYER 4 — hot spot glow, below 200 km only; slow breathing pulse.
     float hotAct = 1.0 - smoothstep(80.0, 200.0, uAltitude);
     if (hotAct > 0.001) {
-      float hot = smoothstep(0.78, 0.95, snoise(vObjPos * 120.0 + 17.3));
+      float hot = dtlAAstep(0.78, 0.95, snoise(vObjPos * 120.0 + 17.3));
       float pulse = sin(uTime * 0.2) * 0.3 + 0.7;
       gDetailEmissive += vec3(1.0, 0.267, 0.0) * hot * pulse * hotAct * uDetailBlend; // #FF4400
     }
@@ -196,9 +197,9 @@ DETAIL_STYLES.ice = {
     // Domain-warp the crack field so ridged zero-sets meander like real
     // lineae instead of closing into concentric loops.
     vec2 wUv = sUv + 0.06 * vec2(fbm2(vObjPos * 7.0 + t1), fbm2(vObjPos * 7.0 + 27.3));
-    float c1 = smoothstep(0.90, 0.985, ridged(vec3(wUv * 68.0, 1.7)));
-    float c2 = smoothstep(0.92, 0.990, ridged(vec3(wUv * 220.0, 5.1)));
-    float c3 = smoothstep(0.94, 0.995, ridged(vec3(wUv * 320.0, 9.3)));
+    float c1 = dtlAAstep(0.90, 0.985, ridged(vec3(wUv * 68.0, 1.7))) * dtlFreqFade2(wUv, 68.0);
+    float c2 = dtlAAstep(0.92, 0.990, ridged(vec3(wUv * 220.0, 5.1))) * dtlFreqFade2(wUv, 220.0);
+    float c3 = dtlAAstep(0.94, 0.995, ridged(vec3(wUv * 320.0, 9.3))) * dtlFreqFade2(wUv, 320.0);
     float cracks = clamp(c1 * 0.6 + c2 * 0.4 + c3 * 0.25, 0.0, 1.0);
     detail = mix(detail, crackCol, cracks * 0.55);
 
@@ -208,11 +209,13 @@ DETAIL_STYLES.ice = {
       vec2 w = worley2(dUv * 150.0);
       float block = 0.94 + 0.12 * (w.y - 0.5);            // per-raft brightness
       float edge = 0.85 + 0.15 * smoothstep(0.0, 0.12, w.x); // soft seams
-      detail = mix(detail, detail * block * edge, chaosZone * 0.55);
+      detail = mix(detail, detail * block * edge,
+                   chaosZone * 0.55 * dtlFreqFade2(dUv, 150.0));
     }
 
     // LAYER 5 — fresh impact sites: bright exposed water ice.
-    float fresh = smoothstep(0.86, 0.97, snoise(vObjPos * 70.0 + 41.2));
+    float fresh = dtlAAstep(0.86, 0.97, snoise(vObjPos * 70.0 + 41.2))
+      * dtlFreqFade(vObjPos, 70.0);
     detail = mix(detail, vec3(1.0), fresh * 0.5);
 
     // Relief height (0g): crack troughs cut into gently flexing plains.
@@ -254,7 +257,8 @@ DETAIL_STYLES.grooved = {
       darkDetail = mix(darkDetail, vec3(0.290, 0.220, 0.157), clamp(dc, 0.0, 1.0) * 0.35);  // #4A3828 rims
       darkDetail = mix(darkDetail, vec3(0.102, 0.063, 0.031), clamp(-dc, 0.0, 1.0) * 0.5);  // #1A1008 floors
       // Impact gardening — billions of years of micrometeorite powder.
-      darkDetail *= 0.94 + 0.12 * snoise(vObjPos * 900.0);
+      darkDetail *= 1.0 + (0.12 * snoise(vObjPos * 900.0) - 0.06)
+        * dtlFreqFade(vObjPos, 900.0);
       ghDark = clamp(dc, -1.0, 1.0) * 0.5; // dust is too fine for relief
     }
 
@@ -265,12 +269,13 @@ DETAIL_STYLES.grooved = {
       float gAng = snoise(vObjPos * 2.6 + 5.0) * 1.8;
       vec2 gUv = mat2(cos(gAng), -sin(gAng), sin(gAng), cos(gAng)) * dUv;
       // Vinyl-record parallel bands with a little waviness.
-      float bands = sin(gUv.y * 1350.0 + snoise(vObjPos * 30.0) * 4.0);
+      float bands = sin(gUv.y * 1350.0 + snoise(vObjPos * 30.0) * 4.0)
+        * dtlFreqFade2(gUv, 1350.0);
       vec3 ridgeCol = vec3(0.784, 0.831, 0.753);  // #C8D4C0
       vec3 grooveCol = vec3(0.502, 0.565, 0.627); // #8090A0
       lightDetail = mix(lightDetail, mix(grooveCol, ridgeCol, 0.5 + 0.5 * bands), 0.30);
       // Fresh crater ejecta rays.
-      float ray = smoothstep(0.88, 0.98, snoise(vObjPos * 55.0 + 23.0));
+      float ray = dtlAAstep(0.88, 0.98, snoise(vObjPos * 55.0 + 23.0));
       lightDetail = mix(lightDetail, vec3(0.910, 0.933, 0.878), ray * 0.5);   // #E8EEE0
       ghLight = bands * 0.2; // ridge-and-groove relief catches directional light
     }
@@ -334,11 +339,13 @@ DETAIL_STYLES.cratered = {
     // Medium: brighter floors (less shadow), overlapping everywhere.
     detail = mix(detail, vec3(0.09), clamp(-c2, 0.0, 1.0) * 0.4 * (0.4 + 0.6 * crAct));
     detail = mix(detail, vec3(0.220, 0.176, 0.125), clamp(c2, 0.0, 1.0) * 0.3 * (0.4 + 0.6 * crAct));
-    // Small: covering floors and rims alike.
-    detail = mix(detail, vec3(0.10), clamp(-c3, 0.0, 1.0) * 0.5 * crAct);
-    detail = mix(detail, vec3(0.27, 0.23, 0.17), clamp(c3, 0.0, 1.0) * 0.32 * crAct);
+    // Small: covering floors and rims alike (faded before sub-pixel).
+    float c3Fade = dtlFreqFade2(dUv, 340.0);
+    detail = mix(detail, vec3(0.10), clamp(-c3, 0.0, 1.0) * 0.5 * crAct * c3Fade);
+    detail = mix(detail, vec3(0.27, 0.23, 0.17), clamp(c3, 0.0, 1.0) * 0.32 * crAct * c3Fade);
     // Micro-cratering / powdery regolith.
-    detail *= 1.0 + (clamp(c4, -1.0, 1.0) * 0.18 + snoise(vObjPos * 1100.0) * 0.05) * crAct;
+    detail *= 1.0 + (clamp(c4, -1.0, 1.0) * 0.18 * dtlFreqFade2(dUv, 1040.0)
+      + snoise(vObjPos * 1100.0) * 0.05 * dtlFreqFade(vObjPos, 1100.0)) * crAct;
 
     // Relief height (0g): rims lit, floors shadowed, at every crater scale.
     gDetailHeight = clamp(c1, -1.0, 1.0) * 0.45
@@ -401,14 +408,15 @@ DETAIL_STYLES.gasGiant = {
     float fineAct = 1.0 - smoothstep(800.0, 4000.0, uAltitude);
     if (fineAct > 0.001) {
       float turb3 = snoise(vObjPos * 1125.0 + vec3(3.0 * t1, 0.0, -t1));
-      detail *= 1.0 + 0.10 * turb3 * fineAct; // color only: too fine for relief
+      // color only: too fine for relief; faded before going sub-pixel
+      detail *= 1.0 + 0.10 * turb3 * fineAct * dtlFreqFade(vObjPos, 1125.0);
     }
 
     // LAYER 2 — thin wisps stretched 4:1 along latitude lines.
     float wisp = snoise(vec3(dUv.x * 82.0, dUv.y * 330.0, 4.2 + t1 * 2.0));
-    detail *= 1.0 + 0.07 * wisp;
+    detail *= 1.0 + 0.07 * wisp * dtlFreqFade2(dUv, 330.0);
     float wisp2 = snoise(vec3(dUv.x * 450.0, dUv.y * 1800.0, 7.7 + t1));
-    detail *= 1.0 + 0.05 * wisp2 * midAct;
+    detail *= 1.0 + 0.05 * wisp2 * midAct * dtlFreqFade2(dUv, 1800.0);
 
     // LAYER 3 — Great Red Spot internal vortex (within 20,000 km).
     float grsAct = 1.0 - smoothstep(5000.0, 20000.0, uAltitude);

@@ -120,17 +120,42 @@ float fbm4(vec3 p) {
 #endif
 }
 
+// Anti-shimmer fade: 1 while a noise layer of frequency `freq` (per unit
+// of p) spans multiple pixels, 0 once it is sub-pixel. Sub-pixel noise
+// decorrelates between frames under camera motion and reads as flicker.
+float dtlFreqFade(vec3 p, float freq) {
+  return clamp(1.5 - length(fwidth(p)) * freq, 0.0, 1.0);
+}
+float dtlFreqFade2(vec2 p, float freq) {
+  return clamp(1.5 - length(fwidth(p)) * freq, 0.0, 1.0);
+}
+
+// Derivative-widened smoothstep: expands the transition window by the
+// per-pixel footprint of the input so thresholded features (crack lines,
+// bright speckles) can never get thinner than ~a pixel — the other source
+// of temporal shimmer besides sub-pixel noise frequency.
+float dtlAAstep(float lo, float hi, float v) {
+  float w = fwidth(v);
+  return smoothstep(lo - w, hi + w, v);
+}
+
 // Dynamic-octave fBm — octave count chosen per fragment from altitude, so
 // each zoom level reveals genuinely new detail (SpaceEngine-style staging).
 // WebGL2 / GLSL ES 3.00 permits the non-constant loop exit; 9 is the cap.
+// Octaves finer than the pixel footprint are faded out (anti-shimmer) and
+// the result renormalized over the weights actually applied.
 float fbmN(vec3 p, int octaves) {
+  float fw = length(fwidth(p));
   float f = 0.0, a = 0.5, norm = 0.0;
   for (int i = 0; i < 9; i++) {
     if (i >= octaves) break;
-    f += a * snoise(p);
-    norm += a;
+    float fade = clamp(1.5 - fw, 0.0, 1.0);
+    if (fade <= 0.0) break;
+    f += a * fade * snoise(p);
+    norm += a * fade;
     a *= 0.5;
     p *= 2.0;
+    fw *= 2.0;
   }
   return f / max(norm, 1e-4);
 }
