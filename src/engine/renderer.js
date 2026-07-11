@@ -156,6 +156,92 @@ export class SceneRenderer {
   // -- Starfield ---------------------------------------------------------------
 
   _buildStarfield() {
+    // Photographic Milky Way (V5 1b): ESO eso0932a equirectangular panorama
+    // (ESO/S. Brunier, CC BY 4.0 — https://www.eso.org/public/images/eso0932a/),
+    // rendered inside-out on a distant sphere, fixed in inertial space.
+    // Falls back to the procedural field if the texture is missing.
+    const tex = new THREE.TextureLoader().load(
+      this.texUrl('starfield', 'milkyway.jpg'),
+      undefined, undefined,
+      () => { sky.visible = false; this._buildProceduralStarfield(); }
+    );
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(1.8e6, 64, 32),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false })
+    );
+    sky.material.toneMapped = false;
+    // Orient the galactic band like the old procedural field (tilted).
+    sky.rotation.z = 0.35;
+    sky.rotation.x = 0.2;
+    sky.renderOrder = -2;
+    this.scene.add(sky);
+
+    this._buildBrightStars();
+  }
+
+  /** HYG bright-star overlay (V5 1c): the ~9k naked-eye stars as spectrally
+   *  colored point sprites over the panorama; names kept for labels. */
+  _buildBrightStars() {
+    this.starLabels = [];
+    fetch(`${TEXTURE_BASE_URL.replace('/textures', '')}/data/brightstars.json`)
+      .then((r) => r.json())
+      .then((data) => {
+        const R = 1.6e6;
+        const n = data.count;
+        const pos = new Float32Array(n * 3);
+        const col = new Float32Array(n * 3);
+        const size = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          pos[i * 3] = data.dirs[i * 3] * R;
+          pos[i * 3 + 1] = data.dirs[i * 3 + 1] * R;
+          pos[i * 3 + 2] = data.dirs[i * 3 + 2] * R;
+          const c = bvToColor(data.cis[i]);
+          col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+          size[i] = Math.max(0.5, 3.0 - data.mags[i] * 0.4);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+        const mat = new THREE.ShaderMaterial({
+          vertexShader: /* glsl */ `
+            attribute float aSize;
+            varying vec3 vColor;
+            void main() {
+              vColor = color;
+              gl_PointSize = aSize;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: /* glsl */ `
+            varying vec3 vColor;
+            void main() {
+              vec2 d = gl_PointCoord - 0.5;
+              float a = smoothstep(0.5, 0.15, length(d));
+              gl_FragColor = vec4(vColor, a);
+            }
+          `,
+          vertexColors: true,
+          transparent: true,
+          depthWrite: false,
+        });
+        mat.toneMapped = false;
+        const points = new THREE.Points(geo, mat);
+        points.renderOrder = -1;
+        this.scene.add(points);
+        for (const [idx, name] of data.names) {
+          this.starLabels.push({
+            name,
+            pos: new THREE.Vector3(
+              pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2]),
+          });
+        }
+      })
+      .catch(() => { /* catalog optional — sky still renders */ });
+  }
+
+  _buildProceduralStarfield() {
     const COUNT = 10000;
     const R = 1.8e6;
     const pos = new Float32Array(COUNT * 3);
@@ -935,6 +1021,17 @@ function makeFlareTexture(size, color, ring = false) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+/** Approximate spectral color from the B-V color index (HYG `ci` column):
+ *  blue-white O/B stars (ci < 0) through white, yellow, to orange-red M. */
+function bvToColor(bv) {
+  const t = Math.max(-0.4, Math.min(2.0, bv));
+  let r, g, b;
+  if (t < 0.4) { r = 0.62 + 0.6 * (t + 0.4) / 0.8; g = 0.72 + 0.3 * (t + 0.4) / 0.8; b = 1.0; }
+  else if (t < 0.8) { r = 1.0; g = 0.94 - 0.15 * (t - 0.4) / 0.4; b = 1.0 - 0.4 * (t - 0.4) / 0.4; }
+  else { r = 1.0; g = 0.79 - 0.35 * (t - 0.8) / 1.2; b = 0.6 - 0.45 * (t - 0.8) / 1.2; }
+  return { r: Math.min(1, r), g: Math.max(0, g), b: Math.max(0, b) };
 }
 
 function mulberry32(a) {

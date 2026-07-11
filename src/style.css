@@ -876,6 +876,11 @@ body.presentation-mode .bottom-tray > *:not([data-tray="presentation"]) { displa
   padding: 2px 6px;
 }
 .body-label:hover { color: var(--white); }
+.star-label {
+  font-size: 0.58rem;
+  color: rgba(217, 217, 217, 0.75);
+  pointer-events: none;
+}
 
 /* -- Mobile ------------------------------------------------------------------------------------------ */
 

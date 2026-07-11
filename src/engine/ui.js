@@ -1530,6 +1530,31 @@ export class UI {
         elm.style.top = `${(-sp.y * 0.5 + 0.5) * window.innerHeight - 14}px`;
       }
     }
+
+    // Named-star labels (V5 1c): the brightest stars (mag < 1.5), shown when
+    // labels are on and the camera is in System View or Surface mode.
+    const showStars = this.labelsVisible
+      && (this.cam.mode === 'system' || this.cam.mode === 'surface')
+      && this.r.starLabels?.length;
+    if (showStars && !this.starLabelEls) {
+      this.starLabelEls = this.r.starLabels.map((s) => {
+        const l = el('div', 'body-label star-label', this.labelLayer);
+        l.textContent = s.name;
+        return l;
+      });
+    }
+    if (this.starLabelEls) {
+      const cam = this.r.camera;
+      this.r.starLabels.forEach((s, i) => {
+        const elm = this.starLabelEls[i];
+        if (!showStars) { elm.style.display = 'none'; return; }
+        const sp = s.pos.clone().project(cam);
+        if (sp.z > 1 || sp.z < -1) { elm.style.display = 'none'; return; }
+        elm.style.display = '';
+        elm.style.left = `${(sp.x * 0.5 + 0.5) * window.innerWidth}px`;
+        elm.style.top = `${(-sp.y * 0.5 + 0.5) * window.innerHeight - 12}px`;
+      });
+    }
   }
 
 }
