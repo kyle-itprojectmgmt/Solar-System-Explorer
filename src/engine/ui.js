@@ -78,6 +78,16 @@ export class UI {
     // Altitude readout — top center, shown within 50,000 km of any body.
     this.altEl = el('div', 'hud-altitude', this.hud);
     this.altEl.style.display = 'none';
+
+    // Detail-floor feedback (4a): one-time message below the ALT readout.
+    this.floorMsg = el('div', 'detail-floor-msg', this.hud);
+    this.floorMsg.textContent = 'Maximum surface detail reached';
+  }
+
+  _bodyCfg(name) {
+    return name === this.system.primary.name
+      ? this.system.primary
+      : this.system.bodies.find((b) => b.name === name);
   }
 
   _updateModeHUD(mode, target, hint = '') {
@@ -658,6 +668,30 @@ export class UI {
       this.altEl.textContent = `ALT: ${Math.max(0, Math.round(near.altKm)).toLocaleString()} km`;
     } else {
       this.altEl.style.display = 'none';
+    }
+
+    // Detail-floor feedback: message fades in once when crossing the soft
+    // floor; the ALT readout pulses once when the hard floor is reached.
+    const df = near && this._bodyCfg(near.name)?.detailFloor;
+    if (df) {
+      if (near.altKm <= df.softKm && !this._softShown) {
+        this._softShown = true;
+        this.floorMsg.classList.add('show');
+        clearTimeout(this._floorMsgT);
+        this._floorMsgT = setTimeout(() => this.floorMsg.classList.remove('show'), 3000);
+      } else if (near.altKm > df.softKm * 1.15) {
+        this._softShown = false;
+      }
+      // Resistance is asymptotic: the camera converges on (not exactly to)
+      // the hard floor, so the pulse fires within 10% of it.
+      if (near.altKm <= df.hardKm * 1.1 && !this._hardPulsed) {
+        this._hardPulsed = true;
+        this.altEl.classList.remove('pulse');
+        void this.altEl.offsetWidth; // restart the animation
+        this.altEl.classList.add('pulse');
+      } else if (near.altKm > df.softKm) {
+        this._hardPulsed = false;
+      }
     }
 
     // Altitude + inclination sliders appear once any body has been targeted.

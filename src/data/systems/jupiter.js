@@ -34,6 +34,7 @@ export default {
     axialTiltDeg: 3.13,
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
     normalScale: 2.0,   // cloud band depth (drives procedural relief lighting)
+    detailFloor: { softKm: 3000, hardKm: 1500 }, // zoom resistance / hard stop
     atmosphere: {
       glowColor: 0xffb877,    // warm orange-tan limb scattering
       thickness: 0.045,       // fraction of radius
@@ -90,6 +91,7 @@ export default {
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
       normalScale: 3.0, // extreme volcanic relief
+      detailFloor: { softKm: 300, hardKm: 150 },
       color: 0xd8c060,
       features: {
         volcanicPlumes: true,
@@ -121,6 +123,7 @@ export default {
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
       normalScale: 2.5, // ice crack depth
+      detailFloor: { softKm: 300, hardKm: 150 },
       color: 0xc8d0d8,
       features: { iceCracks: true, subsurfaceGlow: true },
       surfaceFeatures: [
@@ -143,6 +146,7 @@ export default {
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
       normalScale: 2.5, // grooved terrain relief
+      detailFloor: { softKm: 400, hardKm: 200 },
       color: 0x9a8f80,
       features: { magnetosphereGlow: true },
       surfaceFeatures: [
@@ -167,6 +171,7 @@ export default {
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
       normalScale: 2.0, // ancient crater depth
+      detailFloor: { softKm: 600, hardKm: 300 },
       color: 0x6b6258,
       features: {},
       surfaceFeatures: [
@@ -189,14 +194,14 @@ export default {
     },
 
     // Inner moons — ring sources, simplified Keplerian orbits.
-    { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078, normalScale: 1.5,
+    { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 },
       facts: ['Metis orbits inside Jupiter\'s main ring and supplies it with dust'], stats: { 'Radius': '~22 km', 'Orbital period': '7.1 hours' } },
-    { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c, normalScale: 1.5,
+    { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 },
       facts: ['Adrastea is one of the smallest known moons, discovered by Voyager 2'], stats: { 'Radius': '~8 km', 'Orbital period': '7.2 hours' } },
-    { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540, normalScale: 1.5,
+    { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 },
       radii: { x: 125, y: 73, z: 64 }, // real irregular body: 250 x 146 x 128 km
       facts: ['Amalthea is the reddest object in the solar system', 'It sheds the dust that forms the Amalthea gossamer ring'], stats: { 'Dimensions': '250 × 146 × 128 km', 'Orbital period': '12 hours' } },
-    { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a, normalScale: 1.5,
+    { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 },
       facts: ['Thebe feeds the outermost, faintest gossamer ring'], stats: { 'Radius': '~49 km', 'Orbital period': '16.2 hours' } },
   ],
 

@@ -265,12 +265,28 @@ export class CameraController {
 
   // -- Altitude helpers ----------------------------------------------------------
 
-  /** Minimum permitted camera distance from a body's center (scene units). */
+  /** Minimum permitted camera distance from a body's center (scene units).
+   *  The hard floor comes from the body config's detailFloor (data-driven)
+   *  — the altitude where procedural detail + texture resolution run out. */
   _floorDist(name) {
     const entry = this.r.bodyMeshes.get(name);
     if (!entry) return 0;
-    const minAltKm = entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5;
+    const minAltKm = entry.cfg?.detailFloor?.hardKm
+      ?? (entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5);
     return entry.radiusUnits + minAltKm / 1000;
+  }
+
+  /**
+   * Zoom resistance approaching a body's detail floor: 1 above the soft
+   * floor, quadratic taper between soft and hard, 0 (hard stop) at hardKm.
+   */
+  _zoomResistance(name, altKm) {
+    const df = this.r.bodyMeshes.get(name)?.cfg?.detailFloor;
+    if (!df) return 1;
+    if (altKm > df.softKm) return 1;
+    if (altKm <= df.hardKm) return 0;
+    const t = (altKm - df.hardKm) / (df.softKm - df.hardKm);
+    return t * t;
   }
 
   _nearestBodyName() {
@@ -285,19 +301,27 @@ export class CameraController {
    */
   _pinch(delta) {
     if (this.mode === 'surface') return; // standing on the ground
-    const f = Math.exp(-delta * 0.0016);
+    // Zooming in (delta > 0) meets quadratic resistance below the target
+    // body's soft detail floor and a hard stop at its hard floor (4a).
+    const resist = (name, altKm) =>
+      delta > 0 ? this._zoomResistance(name, altKm) : 1;
 
     if (this.mode === 'orbit' || this.mode === 'system') {
       const name = this.mode === 'system' ? this.r.system.primary.name : this.target;
       const floor = this._floorDist(name);
+      const entry = this.r.bodyMeshes.get(name);
+      const altKm = entry ? (this.orbDist - entry.radiusUnits) * KM_PER_UNIT : 1e9;
+      const f = Math.exp(-delta * 0.0016 * resist(name, altKm));
       this.distTween = null;
       // Seed a small epsilon so zooming out from exactly the floor works.
       const above = Math.max(this.orbDist - floor, floor * 0.002);
       this.orbDist = Math.min(floor + above * f, 3e5);
     } else if (this.mode === 'chase') {
+      const f = Math.exp(-delta * 0.0016);
       this.chaseDistMult = THREE.MathUtils.clamp(this.chaseDistMult * f, 1, 60);
     } else if (this.mode === 'insertion') {
       const min = this._minInsertionAltKm(this.ins.body);
+      const f = Math.exp(-delta * 0.0016 * resist(this.ins.body, this.ins.altitudeKm));
       this.ins.altitudeKm = THREE.MathUtils.clamp(
         Math.max(this.ins.altitudeKm, min * 1.001) * f, min, 500000);
       this.onInsertionChange?.(this.ins);
@@ -309,6 +333,9 @@ export class CameraController {
       const center = this.r.bodyWorldPos(name, new THREE.Vector3());
       const cur = this.camera.position.distanceTo(center);
       const floor = this._floorDist(name);
+      const entry = this.r.bodyMeshes.get(name);
+      const altKm = entry ? (cur - entry.radiusUnits) * KM_PER_UNIT : 1e9;
+      const f = Math.exp(-delta * 0.0016 * resist(name, altKm));
       const next = Math.min(floor + Math.max(cur - floor, floor * 0.002) * f, 3e5);
       const dir = center.clone().sub(this.camera.position).normalize();
       this.camera.position.addScaledVector(dir, cur - next);
@@ -573,7 +600,8 @@ export class CameraController {
   _minInsertionAltKm(name) {
     const entry = this.r.bodyMeshes.get(name);
     if (!entry) return 10;
-    return entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5;
+    return entry.cfg?.detailFloor?.hardKm
+      ?? (entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5);
   }
 
   _bodyRotationRateRadS(name) {

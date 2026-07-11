@@ -120,6 +120,27 @@ html, body {
   color: var(--blue-light);
   text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
 }
+.hud-altitude.pulse { animation: altPulse 0.8s ease-out 1; }
+@keyframes altPulse {
+  0% { transform: translateX(-50%) scale(1.18); text-shadow: 0 0 14px rgba(102, 178, 255, 0.95); }
+  100% { transform: translateX(-50%) scale(1); text-shadow: 0 0 8px rgba(5, 5, 16, 0.9); }
+}
+.detail-floor-msg {
+  position: fixed;
+  top: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+  text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.detail-floor-msg.show { opacity: 1; }
 .hud-mode { font-family: var(--font-head); font-weight: 600; letter-spacing: 0.1em; color: var(--blue-light); }
 .hud-target { color: var(--white); margin-top: 2px; }
 .hud-hint { color: var(--gray-light); font-size: 0.7rem; margin-top: 2px; font-style: italic; }
