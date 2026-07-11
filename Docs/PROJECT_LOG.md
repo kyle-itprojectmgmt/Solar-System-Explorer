@@ -566,6 +566,15 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
   node 90° behind the camera so inclination drags arc up the camera's
   own meridian — no jump, no roll. nodePhase captured in presets.
   tests/polesnap.mjs guards entry/drag/return/sync.
+- Hotfix 3 (framing): "camera looks sideways, rings fill the screen" —
+  the orientation math was already correct (up = radial, nadir + 15°);
+  the problem was framing at distance: System View entry clamped
+  altitude to 500,000 km where the fixed 15° tilt parks a small planet
+  at NDC -0.6 under the ring arc. Now the forward tilt adapts to the
+  body's apparent size (15° skimming → smaller when far, planet stays
+  centered) and far entries arrive at a framing distance (3.7 radii,
+  ~264,500 km for Jupiter — planet fills ~half the view); in-range
+  altitudes still preserved. tests/lookdir.mjs (13 checks).
 
 ---
 

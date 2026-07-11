@@ -143,13 +143,31 @@ export class CameraController {
             this.ins.nodePhase = lon - dLon;
             this.ins.phase = this.ins.nodePhase + rel;
           }
+          // Preserve the camera's altitude within the working range; when
+          // arriving from very far (e.g. System View), enter at a distance
+          // where the planet fills about half the view instead of the old
+          // 500,000 km ceiling — otherwise the planet sat small and low
+          // with the rings arcing across the whole frame.
+          const derivedKm = (local.length() - entry.radiusUnits) * KM_PER_UNIT;
+          const frameKm = entry.radiusUnits * KM_PER_UNIT * 3.7;
           this.ins.altitudeKm = Math.max(
             this._minInsertionAltKm(this.ins.body),
-            Math.min(500000, (local.length() - entry.radiusUnits) * KM_PER_UNIT)
+            derivedKm > 500000 ? frameKm : derivedKm
           );
         }
       }
-      this.ins.yaw = 0; this.ins.pitch = -1.31;
+      // Default view: nadir plus a forward tilt that adapts to how large
+      // the body appears — 15° when skimming the surface (horizon ahead),
+      // shrinking with distance so the planet stays centered in view
+      // instead of dropping toward the frame edge.
+      {
+        const e2 = this.r.bodyMeshes.get(this.ins.body);
+        const distU = (e2?.radiusUnits ?? 1) + this.ins.altitudeKm / KM_PER_UNIT;
+        const angRad = Math.asin(Math.min(1, (e2?.radiusUnits ?? 1) / distU));
+        const tilt = Math.min(THREE.MathUtils.degToRad(15), angRad * 0.5);
+        this.ins.yaw = 0;
+        this.ins.pitch = -(Math.PI / 2 - tilt);
+      }
       if (this.ins.locked) {
         this.ins.lockOffset = this.ins.phase - this._bodyRotationAngle(this.ins.body);
       }
