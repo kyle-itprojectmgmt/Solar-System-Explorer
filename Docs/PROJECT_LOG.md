@@ -127,6 +127,21 @@ Each system's config then only downloads when the user travels to it.
 Textures are already fully on-demand (load only when scene builds).
 GPU memory management: dispose current system before loading new one.
 
+### Multi-User Architecture — Purely Client-Side
+The simulator is entirely stateless on the server. Each user gets their
+own independent browser instance — Three.js renders on their GPU, physics
+runs in their tab, localStorage saves to their device only. No user data
+touches the server. Scales to unlimited simultaneous users at $0 cost
+because Cloudflare serves static files only.
+
+Preset sharing uses URL encoding (base64 query parameter) — no database
+needed. "Share View" generates a URL containing the full preset state.
+Anyone clicking the link arrives at the exact same view. This is the
+Google Maps model — coordinates in the URL, not a database.
+
+Community preset gallery (shared/voted presets) would require Cloudflare
+D1 database — deferred to V6+ as a future enhancement.
+
 ---
 
 ## Bodies in Simulation
@@ -470,6 +485,9 @@ session end.
 | 13 | Moon atmosphere halos uniform regardless of sun direction (Ganymede, Io; Europa had none) | Resolved v4b | V4b_PROMPT.md |
 | 14 | Hole in Metis/Adrastea at close zoom (real causes: 24×12-segment spheres + camera near plane at 50 km clipping bodies whose zoom floors sit 20 km up) | Resolved v4b | V4b_PROMPT.md |
 | 15 | Inclination slider discoverability — slider appears in Mission Control at all times but only works in Orbit Insertion mode (I key). Users in Orbit/Chase/Free Fly get no response and assume it's broken. Fix: auto-switch to Orbit Insertion mode when inclination slider is dragged (best UX — implies intent to orbit). | UX Bug — next batch | — |
+| 16 | No free look while orbiting — camera is locked nadir-pointing in Orbit, Chase, and Orbit Insertion modes. Cannot look sideways or behind while maintaining orbital position. Fix: hold Alt key (or middle mouse button) to temporarily unlock camera orientation while keeping orbital position fixed. Release to restore nadir. Touch: two-finger rotate for free look. Essential for seeing moons passing by, looking at Jupiter from the side, watching stars overhead. | UX Bug — next batch | — |
+| 17 | UI layout — controls scattered across screen causing distraction and discoverability issues. Time display too prominent. Hide-text icon moves unpredictably. No single intuitive home for all controls. See backlog items 7-12 for full redesign spec. | UX — next batch | — |
+| 18 | Ring rendering depth sort bug — rings appear as flat disc cutting through Jupiter's dark side on certain camera angles rather than correctly wrapping around the planet. Rings should render behind Jupiter on far side, in front on near side. Fix: correct renderOrder on ring meshes + depth sorting relative to Jupiter sphere. Visible especially from low orbital inclinations. | Bug — next batch | — |
 
 ---
 
@@ -483,6 +501,23 @@ session end.
 | 4 | Release preparation — supporting pages | Add About page (project story, AI-built in 48hrs narrative, tech stack, author bio linking to ITprojectMGMT.com and LinkedIn), Contact page (kyle@itprojectmgmt.com), Legal/Disclaimer page (NASA texture credits and CC BY 4.0 attribution, Solar System Scope CC BY 4.0, Björn Jónsson public domain credits, no warranty disclaimer, not affiliated with NASA or any space agency), Privacy Policy (no tracking, no user data collected, localStorage only for user preferences, no cookies, no analytics). All pages accessible from a minimal persistent footer. Style matches brand. Mobile-friendly. |
 | 5 | Release preparation — security hardening | Before any public promotion or LinkedIn post: (1) Content Security Policy headers via Cloudflare Worker — restrict script-src to self, block inline scripts and eval; (2) Add /.well-known/security.txt with contact info; (3) Subresource Integrity (SRI) on Google Fonts CDN links; (4) Security response headers: X-Frame-Options SAMEORIGIN, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy restricting unused browser APIs; (5) Audit all source code for exposed secrets, API keys, or tokens before public release; (6) Review localStorage usage — confirm no sensitive data stored; (7) Rate limiting on ISS position API endpoint when built; (8) HTTPS-only already enforced by Cloudflare. Run Mozilla Observatory scan and target A+ rating before launch. |
 | 6 | Sharpness calibration eyeball pass | Bug #9 — review relief/crater/speckle strength on real hardware; knobs: normalScale in jupiter.js, gDetailHeight weights in detailShaders.js |
+| 7 | UI — Time display too prominent | Reduce to subtle ghost text: smaller font, 50% opacity, no panel background. Keep time multiplier slightly more visible (it's actionable). Date is reference only — should recede into background. |
+| 8 | UI — Date picker + real clock toggle | Click date to open familiar calendar UI with year spinner (easy decade switching). Pick any date 1950-2050, moons jump to correct orbital positions. 🔴 LIVE toggle switches between simulated and real current clock. |
+| 9 | UI — Complete Mission Control redesign — vertical icon stack | Replace current right-side panel with vertical stack of icon buttons on right edge. Click icon → panel flies out left. Click again or elsewhere → collapses. One panel open at a time. Icons top to bottom: 🎥 Camera, ⏱ Time, 🪐 Bodies, ⭐ Presets, 👁 Display, ❓ Help. |
+| 10 | UI — Camera panel | Vertical list: icon + label + keyboard shortcut per mode. All 7 modes listed. Active mode highlighted in Primary Blue. Replaces current button grid. |
+| 11 | UI — Time panel | Speed buttons (‖ 1x 10x 100x 1,000x 10,000x) + speed slider + date picker (calendar UI, year spinner) + 🔴 LIVE toggle. All time controls consolidated here. |
+| 12 | UI — Bodies panel — full solar system hierarchy | All planets listed in order from Sun. Current system highlighted. Sun at top with solar feature stub. Hover planet with moons → dropdown of its moons. Click moon → navigate there. Unbuilt planets show "Coming Soon" tooltip. Two-level hierarchy: planet → moons. Clicking a built system triggers cinematic hyperjump when inter-system navigation is built. |
+| 13 | UI — Body labels split Local vs System-wide | Local = current system bodies only (Jupiter + its moons). System-wide = all planets + Sun visible across the scene. Two separate toggles in Display panel. |
+| 14 | UI — Presets panel with curated + user-saved views | Two sections: CURATED (built-in dramatic moments) and MY PRESETS (user-saved). Curated: Io Volcano Flyby, Triple Moon Shadow, GRS Close Pass, Voyager 1979, Moon Alignment. My Presets: "Save Current View" button captures full state (see item #18). Manage: rename, delete. Max 20 saved. Remove Voyager preset from old Mission Control location. |
+| 15 | UI — Display panel | LABELS section: ☑ Local labels, ☐ System-wide labels. VISUAL section: ☑ Rings, ☑ Orbital paths, ☐ Resonance lines, ☐ Velocity vectors. Clean checkbox list, no clutter. |
+| 16 | UI — Upcoming Events as toast notifications | Remove from Mission Control entirely. Implement as subtle toast at bottom center: "🔔 Io eclipse in 4m 32s [Watch →]". Appears ~5 minutes before event at current time multiplier. [Watch] button auto-navigates to optimal viewing position and camera angle for the event. Dismissable with ✕. |
+| 17 | UI — Unified bottom center tray | Fixed pill at bottom center. Never moves. Low opacity until hovered. Contains left to right: 🎵 Music (click to expand upward), ─── volume slider ───, 📷 Screenshot, 👁 Presentation mode, ☕ Ko-fi. All persistent controls in one place. |
+| 18 | UI — Audio redesign in bottom tray | Music icon in tray. Click → expands upward panel: mute toggle, volume slider, then three rows: (1) generative modes dropdown (Voyager Radio / Deep Space Ambient / Psychedelic Journey / Cosmic Electronic — tracks TBD, placeholders for now), (2) Spotify icon + URL input, (3) YouTube icon + URL input. Collapse chevron. Much less visual weight than current Player panel. |
+| 19 | Preset capture data structure + URL sharing | Save state as JSON: { name, sim: {date, timeMultiplier}, camera: {mode, target, altitudeKm, incDeg, phase, yaw, pitch, locked}, display: {rings, orbitalPaths, localLabels, systemLabels} }. Store array in localStorage 'sse-presets'. "Share View" button encodes preset as base64 URL parameter — anyone clicking the link arrives at exact same view. Copy to clipboard + "Link copied!" confirmation. No server needed — URL contains everything. |
+| 20 | Sun — add to Bodies panel with basic visuals | Sun listed at top of Bodies panel. Basic visuals: intense point light (already exists), add subtle corona glow shader, slow-moving sunspot texture, occasional solar flare particle burst. From Jupiter: Sun is small but intensely bright. Full Solar Observatory mode = future build (V6+). Stub with basic visual now. |
+| 21 | Ring depth sorting bug | Rings appear as flat disc cutting through Jupiter's dark side on certain angles — depth sort issue with transparent geometry. Fix: correct renderOrder on ring meshes relative to Jupiter sphere. Rings must render behind planet on far side, in front on near side. |
+| 22 | Free look while orbiting (Bug #16) | Hold Alt (desktop) or two-finger drag (mobile) to temporarily unlock camera orientation while keeping orbital position fixed. Release Alt to restore nadir pointing. Essential for looking sideways at passing moons, watching stars overhead, seeing Jupiter from the side while orbiting a moon. |
+| 23 | Inclination auto-switch to Orbit Insertion (Bug #15) | Dragging inclination slider while NOT in Orbit Insertion mode silently does nothing. Fix: dragging inclination automatically switches camera to Orbit Insertion mode targeting the current or last body. Intent is clear — user wants to orbit at an angle. |
 
 Completed in v4 (removed from backlog): fullscreen, presentation mode,
 limb glow shader, retrograde inclination, GRS preset, zoom floor,
