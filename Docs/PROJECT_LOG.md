@@ -113,6 +113,20 @@ Altitude-based blend: `uDetailBlend = smoothstep(farDist, nearDist, uAltitude)`
 All shaders disabled above activation altitude — zero GPU cost when far.
 Uniforms: `uTime`, `uAltitude`, `uDetailBlend` passed every frame.
 
+### Per-System Lazy Loading (add before multi-system build)
+Currently all system configs (jupiter.js, saturn.js) are bundled at
+build time. Before adding Earth/Mars/Saturn, update vite.config.js
+manualChunks to lazy-load each system config separately:
+  manualChunks(id) {
+    if (id.includes('/data/systems/')) {
+      const name = id.split('/data/systems/')[1].replace('.js','');
+      return `system-${name}`;
+    }
+  }
+Each system's config then only downloads when the user travels to it.
+Textures are already fully on-demand (load only when scene builds).
+GPU memory management: dispose current system before loading new one.
+
 ---
 
 ## Bodies in Simulation
@@ -455,6 +469,7 @@ session end.
 | 12 | Io and Europa flickering artifacts (real cause: sub-pixel procedural noise shimmer from the v4 sharpness pass, not z-fighting — no separate detail mesh exists) | Resolved v4b | V4b_PROMPT.md |
 | 13 | Moon atmosphere halos uniform regardless of sun direction (Ganymede, Io; Europa had none) | Resolved v4b | V4b_PROMPT.md |
 | 14 | Hole in Metis/Adrastea at close zoom (real causes: 24×12-segment spheres + camera near plane at 50 km clipping bodies whose zoom floors sit 20 km up) | Resolved v4b | V4b_PROMPT.md |
+| 15 | Inclination slider discoverability — slider appears in Mission Control at all times but only works in Orbit Insertion mode (I key). Users in Orbit/Chase/Free Fly get no response and assume it's broken. Fix: auto-switch to Orbit Insertion mode when inclination slider is dragged (best UX — implies intent to orbit). | UX Bug — next batch | — |
 
 ---
 
@@ -480,18 +495,36 @@ brand icons, tooltips.
 
 ## Backlog — Future Systems
 
+### Priority Order
+```
+V5  — Earth + Moon (ISS mode, city lights, auroras, Apollo sites)
+V6  — Mars (solid surface, Olympus Mons, Valles Marineris, landing)
+V7  — Saturn + Rings + Titan + Enceladus + Iapetus
+V8  — Outer solar system (Uranus, Neptune, Triton, Pluto)
+```
+
+### Competitive Context
+NASA Eyes on the Solar System (eyes.nasa.gov) is the closest
+comparable — 150+ missions, full solar system, accurate JPL data.
+Our differentiator: cinematic immersion over breadth. NASA Eyes tells
+you where the planets are. Solar System Explorer puts you there.
+Their June 2026 release added embed options we already had. Our
+procedural detail shaders, GeoSync clouds-below experience, and
+generative audio have no equivalent in NASA Eyes.
+
 | # | Feature | Notes |
 |---|---------|-------|
 | 1 | Saturn System | saturn.js config, particle ring system, Titan atmosphere shader, Enceladus geysers |
 | 2 | Earth + Moon System | See full spec below. Binary system — Earth and Moon together. ISS altitude experience, procedural clouds, city lights, auroras, Earthrise, Apollo landing sites. |
 | 3 | Full Solar System Orrery | Camera Mode 8 (V key). All planets in correct orbital positions. Click any to travel. Scale-adjusted so all visible. Gateway to inter-system navigation. |
 | 4 | Inter-System Navigation | System selector UI in Mission Control. Cinematic hyperjump sequence (8-12s, skippable). Runtime system switching with GPU memory management. Floating origin / scale switching between AU and km coordinate systems. |
-| 5 | Historic mission trajectories | Voyager 1&2, Cassini, Juno, Galileo animated paths |
-| 6 | Time of day selector | Jump to specific simulated date/time |
-| 7 | Multiplayer shared view | URL encodes camera position + time |
-| 8 | VR support | WebXR for headset exploration |
-| 9 | Resonance visualizer | 1:2:4 Io/Europa/Ganymede animation in System View |
-| 10 | Io volcanic event notifications | Random eruption alerts when near Io |
+| 5 | Mars System | Best solid-surface planet for landing experience. MOLA elevation data, Olympus Mons (3x Everest height), Valles Marineris (length of USA), polar ice caps, dust storms, Phobos and Deimos moons. Surface landing with Earth as blue dot in sky. |
+| 6 | Historic mission trajectories | Voyager 1&2, Cassini, Juno, Galileo animated paths |
+| 7 | Time of day selector | Jump to specific simulated date/time |
+| 8 | Multiplayer shared view | URL encodes camera position + time |
+| 9 | VR support | WebXR for headset exploration |
+| 10 | Resonance visualizer | Enhanced — already implemented basic version in v4b |
+| 11 | Io volcanic event notifications | Random eruption alerts when near Io |
 
 ---
 
