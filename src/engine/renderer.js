@@ -780,8 +780,10 @@ function makeVolcanicPlume(moonRadius, volcano, tier) {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  // Soft circular sprite: raw points render as squares up close (bug #8).
   const mat = new THREE.PointsMaterial({
-    color: 0xf5eec8, size: moonRadius * 0.02, transparent: true, opacity: 0.5,
+    map: makeFlareTexture(64, 'rgba(255,225,150,1)'),
+    color: 0xffc878, size: moonRadius * 0.02, transparent: true, opacity: 0.55,
     blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
   });
   const points = new THREE.Points(geo, mat);
