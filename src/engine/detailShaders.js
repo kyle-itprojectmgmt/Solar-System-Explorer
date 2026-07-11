@@ -385,9 +385,10 @@ DETAIL_STYLES.cratered = {
 };
 
 // -- Terra (Earth) + Luna (Moon) — V5 worker shader chunks -------------------------
-// Worker files are fragment chunks; clouds carries helper functions above an
-// `// === APPLY ===` marker. Each chunk is brace-isolated so their local
-// variables can't collide; they share detail / gDetailEmissive / gDetailHeight.
+// Worker files are fragment chunks; clouds and lights carry helper functions
+// above an `// === APPLY ===` marker. Each chunk is brace-isolated so their
+// local variables can't collide; they share detail / gDetailEmissive /
+// gDetailHeight.
 
 function splitChunk(src) {
   const i = src.indexOf('// === APPLY ===');
@@ -397,14 +398,15 @@ function splitChunk(src) {
 }
 
 const terraClouds = splitChunk(TERRA_CLOUDS);
+const terraLights = splitChunk(TERRA_LIGHTS);
 
 DETAIL_STYLES.terra = {
-  fns: terraClouds.fns,
+  fns: terraClouds.fns + terraLights.fns,
   apply: /* glsl */ `
     ${DETAIL_PREAMBLE}
     { ${terraClouds.apply} }
     { ${TERRA_OCEAN} }
-    { ${TERRA_LIGHTS} }
+    { ${terraLights.apply} }
     { ${TERRA_AURORA} }
     ${DETAIL_FINAL}
   `,

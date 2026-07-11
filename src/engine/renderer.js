@@ -550,7 +550,44 @@ export class SceneRenderer {
           e.uniforms.uCamObj.value.copy(mesh.worldToLocal(this.camera.position.clone()));
         }
       }
+      // Hardware-calibration aid (v5a): log each detail shader as it fades
+      // in/out so tuning sessions can correlate what's on screen with the
+      // live uniform values. Dev builds only — stripped from production.
+      if (import.meta.env.DEV) {
+        const on = e.blend > 0.001;
+        if (on !== (e._logOn ?? false)) {
+          e._logOn = on;
+          console.info(
+            `[detail] ${e.name} ${on ? 'ACTIVE' : 'off'} — alt ${Math.round(altKm).toLocaleString()} km, ` +
+            `blend ${e.blend.toFixed(2)} (activation ${e.detail.activationKm.toLocaleString()} km, ` +
+            `full ${e.detail.fullKm.toLocaleString()} km). __sse.renderer.logShaderState() for a snapshot.`);
+        }
+      }
     }
+  }
+
+  /**
+   * Dev-mode calibration snapshot (v5a): dumps every detail entry's live
+   * uniforms plus where the tuning knobs live. Call from the console:
+   *   __sse.renderer.logShaderState()
+   */
+  logShaderState() {
+    if (!import.meta.env.DEV) return;
+    console.table(this.detailEntries.map((e) => ({
+      body: e.name,
+      style: e.detail.style,
+      blend: +e.blend.toFixed(3),
+      altKm: Math.round(e.uniforms.uAltitude.value),
+      sunObj: e.uniforms.uSunObj
+        ? [...'xyz'].map((k) => e.uniforms.uSunObj.value[k].toFixed(2)).join(', ')
+        : '—',
+      normalScale: this.bodyMeshes.get(e.name)?.mesh?.material.normalScale?.x ?? '—',
+    })));
+    console.info(
+      'Tuning knobs — clouds: zone coverage weights + threshold in earth-clouds.glsl LAYER 1; ' +
+      'city lights: region weights in el_population() + final 0.4 gain in earth-lights.glsl; ' +
+      'moon relief: crater amplitudes in moon-detail.glsl LAYER 3; ' +
+      'relief depth: normalScale per body in the system config.');
   }
 
   _makePicker(name, parent, radiusUnits) {

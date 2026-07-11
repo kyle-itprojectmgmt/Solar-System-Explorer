@@ -25,7 +25,7 @@ const check = (n, ok, d = '') => {
 await page.goto(`${BASE}/?system=earth`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction('window.__sse && window.__sse.physics', { timeout: 60000 });
 const ver = await page.$eval('#loading-version', (e) => e.textContent);
-check('loading screen shows Earth System v5.0.0', /Earth System — v5\.0\.0/.test(ver), ver);
+check('loading screen shows Earth System v5.1.0', /Earth System — v5.1.0/.test(ver), ver);
 await page.waitForFunction(
   'document.getElementById("loading-screen").classList.contains("done")', { timeout: 60000 });
 await new Promise((r) => setTimeout(r, 2500));

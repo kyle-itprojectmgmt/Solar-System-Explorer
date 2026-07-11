@@ -15,6 +15,9 @@
 //   https://earthobservatory.nasa.gov/features/NightLights
 // Moon color, normal, displacement: NASA CGI Moon Kit 8K
 //   https://svs.gsfc.nasa.gov/4720
+//   (v5a download failed — svs.gsfc.nasa.gov served an expired TLS
+//   certificate; retrieve manually once NASA fixes it. Shipped moon
+//   diffuse remains SSS 8k_moon, CC BY 4.0.)
 // ---------------------------------------------------------------------------
 
 export default {
@@ -46,10 +49,12 @@ export default {
     surfaceGravity: 9.81,       // m/s² at sea level
     surfaceTempRange: [-88, 58], // °C, coldest to hottest recorded
     axialTiltDeg: 23.44,
-    // diffuse: NASA Blue Marble (world.topo.bathy 5400×2700). An 8K
-    // diffuseHigh upgrade is a manual step — SSS 8k_earth_daymap download
-    // was blocked; see TEXTURE SOURCES above.
-    textures: { diffuse: 'diffuse.jpg' },
+    // diffuse: NASA Blue Marble (world.topo.bathy 5400×2700), upgraded
+    // progressively to the 8K SSS daymap (CC BY 4.0) after load. Also on
+    // disk, not yet wired: night.jpg (Black Marble 8K — lights stay
+    // procedural for now, see earth-lights.glsl), clouds.jpg (8K layer),
+    // specular.jpg (8K ocean mask, converted from the SSS .tif).
+    textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
     normalScale: 2.0,   // terrain relief depth (drives procedural detail)
     detailFloor: { softKm: 400, hardKm: 200 }, // ISS altitude experience — 408 km reference
     atmosphere: {
