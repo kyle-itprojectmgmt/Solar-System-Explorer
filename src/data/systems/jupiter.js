@@ -39,6 +39,13 @@ export default {
       intensity: 1.25,
     },
     features: { greatRedSpot: true, atmosphericGlow: true, equatorialBulge: true },
+    detail: {
+      style: 'gasGiant',
+      activationKm: 50000,
+      fullKm: 5000,
+      // GRS position differs between the 2K and 4K maps (scanned).
+      params: { grsUV: [0.375, 0.388], grsUVHigh: [0.881, 0.419] },
+    },
     facts: [
       'Jupiter is so large that 1,300 Earths could fit inside it',
       "Jupiter's Great Red Spot is a storm that has raged for over 350 years",

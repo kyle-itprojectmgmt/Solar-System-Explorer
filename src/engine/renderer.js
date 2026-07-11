@@ -188,6 +188,7 @@ export class SceneRenderer {
       specular: new THREE.Color(0x111111),
     });
     mat.map.colorSpace = THREE.SRGBColorSpace;
+    mat.map.minFilter = THREE.LinearMipmapLinearFilter; // trilinear
     mat.map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
 
     this.primaryMesh = new THREE.Mesh(geo, mat);
@@ -203,6 +204,7 @@ export class SceneRenderer {
     if (this.quality.highResPrimary && p.textures.diffuseHigh) {
       new THREE.TextureLoader().load(this.texUrl(p.slug, p.textures.diffuseHigh), (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
         tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
         mat.map?.dispose();
         mat.map = tex;

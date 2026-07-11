@@ -15,12 +15,14 @@ import { UI } from './engine/ui.js';
 // -- Quality tier detection ----------------------------------------------------
 
 function detectQuality() {
-  const touch = (navigator.maxTouchPoints || 0) > 0;
+  // Coarse primary pointer = touch-first device. Raw maxTouchPoints would
+  // wrongly demote touchscreen laptops (and headless Chrome) to tablet tier.
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   const mem = navigator.deviceMemory || 8;
   const cores = navigator.hardwareConcurrency || 8;
   let tier = 'desktop';
-  if (touch && (mem <= 4 || cores <= 4)) tier = 'mobile';
-  else if (touch) tier = 'tablet';
+  if (coarse && (mem <= 4 || cores <= 4)) tier = 'mobile';
+  else if (coarse) tier = 'tablet';
 
   const saved = localStorage.getItem('sse-quality-tier');
   if (saved && ['desktop', 'tablet', 'mobile'].includes(saved)) tier = saved;
@@ -128,7 +130,10 @@ async function boot() {
   if (postfx) renderer.resizeHooks.push((w, h) => postfx.setSize(w, h));
 
   // Dev-only handle for automated smoke tests.
-  if (import.meta.env.DEV) window.__sse = { physics, renderer, cameraCtl };
+  if (import.meta.env.DEV) {
+    const THREE = await import('three');
+    window.__sse = { physics, renderer, cameraCtl, THREE };
+  }
 
   // -- Render loop ----------------------------------------------------------------
 
@@ -141,9 +146,11 @@ async function boot() {
     ui.update(dt);
 
     if (postfx) {
-      // Keep DoF focused on the current target (or the primary).
+      // Keep DoF focused on the current target's near surface, not its center
+      // — at low altitude the surface is the subject.
       const focusName = cameraCtl.target || system.primary.name;
-      postfx.setFocusDistanceWorld(renderer.bodyWorldPos(focusName).distanceTo(renderer.camera.position));
+      const centerDist = renderer.bodyWorldPos(focusName).distanceTo(renderer.camera.position);
+      postfx.setFocusDistanceWorld(Math.max(centerDist - renderer.bodyRadius(focusName), 0.05));
       postfx.render(dt);
     } else {
       renderer.renderer.render(renderer.scene, renderer.camera);
