@@ -52,8 +52,9 @@ export class CameraController {
     // Orbit insertion state (mode 7)
     this.ins = {
       body: null, altitudeKm: 10000, incDeg: 0, locked: false,
-      phase: 0, yaw: 0, pitch: -0.5,
-      velKmS: 0, periodS: 0, // computed each frame for the HUD
+      phase: 0, yaw: 0, pitch: -1.31, // default view: nadir + 15° forward tilt
+      lockOffset: 0,                  // geosync: phase − body rotation angle
+      velKmS: 0, periodS: 0, surfaceKmS: 0, // computed each frame for the HUD
     };
     this.onInsertionChange = null; // UI sync hook
 
@@ -116,7 +117,10 @@ export class CameraController {
           Math.min(500000, (local.length() - entry.radiusUnits) * KM_PER_UNIT)
         );
       }
-      this.ins.yaw = 0; this.ins.pitch = -0.5;
+      this.ins.yaw = 0; this.ins.pitch = -1.31;
+      if (this.ins.locked) {
+        this.ins.lockOffset = this.ins.phase - this._bodyRotationAngle(this.ins.body);
+      }
       this.onInsertionChange?.(this.ins);
     }
     if (mode === 'free') {
@@ -525,12 +529,29 @@ export class CameraController {
     return (Math.PI * 2) / (entry.cfg.periodDays * 86400);
   }
 
+  /**
+   * The body's current rotation angle — the exact value the renderer applied
+   * to the mesh this frame. GeoSync pins the camera phase to this, so camera
+   * and texture share one time accumulator and cannot drift apart.
+   */
+  _bodyRotationAngle(name) {
+    const entry = this.r.bodyMeshes.get(name);
+    if (!entry) return 0;
+    return entry.isPrimary ? this.physics.primaryRotation : entry.mesh.rotation.y;
+  }
+
   /** Update insertion parameters from the UI (body/altitude/inclination/lock). */
   setInsertion(params) {
+    const wasLocked = this.ins.locked;
     Object.assign(this.ins, params);
     if (params.body) { this.target = params.body; this.lastTarget = params.body; }
     const min = this._minInsertionAltKm(this.ins.body);
     this.ins.altitudeKm = THREE.MathUtils.clamp(this.ins.altitudeKm, min, 500000);
+    // (Re)anchor the geosync lock at the camera's current longitude when the
+    // lock engages or the locked body changes — no jump, just hold station.
+    if (this.ins.locked && (!wasLocked || params.body)) {
+      this.ins.lockOffset = this.ins.phase - this._bodyRotationAngle(this.ins.body);
+    }
     this.onInsertionChange?.(this.ins);
   }
 
@@ -550,6 +571,7 @@ export class CameraController {
     });
     // Park over the subsolar longitude (daylit clouds below), looking down.
     this.ins.phase = Math.atan2(-this.r.sunDir.z, this.r.sunDir.x);
+    this.ins.lockOffset = this.ins.phase - this._bodyRotationAngle(this.ins.body);
     this.ins.pitch = -0.8;
     this._startTransition();
   }
@@ -569,12 +591,19 @@ export class CameraController {
     if (ins.locked) {
       omega = this._bodyRotationRateRadS(ins.body);
       ins.velKmS = omega * rKm;
+      // Exact lock: same accumulator as the mesh rotation, so the surface
+      // below cannot drift no matter the multiplier or frame timing.
+      ins.phase = ins.lockOffset + this._bodyRotationAngle(ins.body);
     } else {
       ins.velKmS = Math.sqrt((G * mass) / rKm);
       omega = ins.velKmS / rKm;
+      ins.phase += omega * this._simDelta; // advance along the orbital path
     }
     ins.periodS = omega > 0 ? (Math.PI * 2) / omega : 0;
-    ins.phase += omega * dt * this.physics.timeMultiplier;
+    // Ground-track sweep rate: relative angular velocity × surface radius.
+    ins.surfaceKmS = ins.locked
+      ? 0
+      : Math.abs(omega - this._bodyRotationRateRadS(ins.body)) * entry.radiusUnits * KM_PER_UNIT;
 
     // Orbit plane: equatorial, inclined about X by incDeg (root frame).
     const inc = THREE.MathUtils.degToRad(ins.incDeg);
