@@ -97,17 +97,124 @@ html, body {
 
 /* -- HUD ------------------------------------------------------------------------ */
 
-.hud-topleft, .hud-topright {
+.hud-topright {
   position: fixed;
   top: 16px;
   padding: 10px 14px;
   font-size: 0.78rem;
+  right: 16px;
+  text-align: right;
 }
-.hud-topleft { left: 16px; }
-.hud-topright { right: 16px; text-align: right; }
-.hud-date { font-family: var(--font-head); color: var(--gray-light); letter-spacing: 0.06em; }
-.hud-mult { color: var(--blue-light); font-weight: 700; margin-top: 2px; }
-.hud-delay { color: var(--gray-light); font-size: 0.7rem; margin-top: 2px; font-weight: 300; }
+
+/* Zone 1 (V4c): ghost time text — no panel, no border, no box. */
+.hud-ghost {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  pointer-events: auto;
+  transition: opacity 0.3s;
+}
+.hud-ghost.dimmed { opacity: 0.2; }
+.ghost-daterow { display: flex; align-items: center; gap: 8px; }
+.ghost-date {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+  opacity: 0.5;
+  padding: 0;
+  text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
+}
+.ghost-date:hover { opacity: 1; color: var(--white); }
+.ghost-live {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-head);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--gray-light);
+  opacity: 0.4;
+  padding: 0;
+}
+.ghost-live:hover { opacity: 1; }
+.ghost-live.on { opacity: 1; color: #ff5555; animation: livePulse 2s ease-in-out infinite; }
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.ghost-line2 { margin-top: 2px; }
+.ghost-mult {
+  font-family: var(--font-head);
+  font-size: 13px;
+  color: var(--blue-light);
+  opacity: 0.8;
+  font-weight: 600;
+}
+.ghost-sep { color: var(--gray-light); opacity: 0.4; font-size: 10px; }
+.ghost-delay {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 300;
+  color: var(--gray-light);
+  opacity: 0.4;
+}
+
+/* -- Date picker (V4c G5) ------------------------------------------------------- */
+
+.date-picker {
+  position: fixed;
+  top: 56px;
+  left: 16px;
+  width: 280px;
+  padding: 12px 14px;
+  z-index: 60;
+}
+.dp-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.dp-title {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-head);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--blue-light);
+}
+.dp-nav {
+  background: rgba(0, 119, 204, 0.25);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  color: var(--white);
+  font-size: 0.62rem;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.dp-nav:hover { border-color: var(--blue-light); }
+.dp-yearrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dp-year { width: 80px; flex: none; }
+.dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.dp-wd {
+  text-align: center;
+  font-family: var(--font-head);
+  font-size: 0.58rem;
+  color: var(--gray-light);
+  padding: 2px 0;
+}
+.dp-day {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.dp-day:hover { background: rgba(0, 119, 204, 0.35); }
+.dp-day.today { border-color: var(--blue-light); color: var(--blue-light); font-weight: 700; }
 .hud-altitude {
   position: fixed;
   top: 16px;

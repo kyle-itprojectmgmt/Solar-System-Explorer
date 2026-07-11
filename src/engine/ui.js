@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { AUDIO_MODES } from './audio.js';
-import { TIME_STEPS } from './physics.js';
+import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
 import { KOFI_URL, KM_PER_UNIT } from '../config.js';
 
 const CAMERA_MODES = [
@@ -65,10 +65,22 @@ export class UI {
   _buildHUD() {
     this.hud = el('div', 'hud', this.rootEl);
 
-    const tl = el('div', 'hud-topleft panel', this.hud);
-    this.dateEl = el('div', 'hud-date', tl);
-    this.multEl = el('div', 'hud-mult', tl);
-    this.delayEl = el('div', 'hud-delay', tl);
+    // Zone 1 (V4c): pure ghost text — no panel, no box. The date is
+    // clickable (opens the date picker); 🔴 toggles LIVE real-time mode.
+    const tl = el('div', 'hud-ghost', this.hud);
+    this.hudGhost = tl;
+    const dateRow = el('div', 'ghost-daterow', tl);
+    this.dateEl = el('button', 'ghost-date', dateRow);
+    this.dateEl.onclick = () => this.toggleDatePicker();
+    this.liveBtn = el('button', 'ghost-live', dateRow);
+    this.liveBtn.onclick = () => this.setLive(!this.liveMode);
+    const line2 = el('div', 'ghost-line2', tl);
+    this.multEl = el('span', 'ghost-mult', line2);
+    el('span', 'ghost-sep', line2).textContent = ' · ';
+    this.delayEl = el('span', 'ghost-delay', line2);
+
+    this._buildDatePicker();
+    this.setLive(localStorage.getItem('sse-live-mode') === '1', true);
 
     const tr = el('div', 'hud-topright panel', this.hud);
     this.modeEl = el('div', 'hud-mode', tr);
@@ -91,6 +103,114 @@ export class UI {
     // 1:2:4 resonance alignment readout — visible while resonance lines are on.
     this.resEl = el('div', 'resonance-hud', this.hud);
     this.resEl.style.display = 'none';
+  }
+
+  // -- Date picker + LIVE mode (V4c Group 5) -------------------------------------
+
+  _buildDatePicker() {
+    const p = el('div', 'date-picker panel', this.rootEl);
+    this.datePicker = p;
+    p.style.display = 'none';
+
+    const head = el('div', 'dp-head', p);
+    const btn = (label, cls, fn) => {
+      const b = el('button', `dp-nav ${cls || ''}`, head);
+      b.textContent = label;
+      b.onclick = fn;
+      return b;
+    };
+    btn('◀◀', '', () => this._dpShift(-120)); // jump 10 years
+    btn('◀', '', () => this._dpShift(-1));
+    this.dpTitle = el('span', 'dp-title', head);
+    btn('▶', '', () => this._dpShift(1));
+    btn('▶▶', '', () => this._dpShift(120));
+
+    const yearRow = el('div', 'dp-yearrow', p);
+    el('span', 'af-label', yearRow).textContent = 'Year';
+    this.dpYear = el('input', 'dp-year embed-input', yearRow);
+    Object.assign(this.dpYear, { type: 'number', min: 1950, max: 2050 });
+    this.dpYear.onchange = () => {
+      const y = Math.max(1950, Math.min(2050, +this.dpYear.value || 1979));
+      this._dpY = y;
+      this._dpRender();
+    };
+
+    this.dpGrid = el('div', 'dp-grid', p);
+
+    // Close on click-away / Escape (Escape handled in _bindKeys).
+    document.addEventListener('pointerdown', (e) => {
+      if (this.datePicker.style.display !== 'none'
+        && !this.datePicker.contains(e.target) && e.target !== this.dateEl) {
+        this.toggleDatePicker(false);
+      }
+    });
+  }
+
+  toggleDatePicker(force) {
+    const show = force !== undefined ? force : this.datePicker.style.display === 'none';
+    if (show) {
+      const d = this.physics.simDate;
+      this._dpY = Math.max(1950, Math.min(2050, d.getUTCFullYear()));
+      this._dpM = d.getUTCMonth();
+      this._dpRender();
+    }
+    this.datePicker.style.display = show ? '' : 'none';
+  }
+
+  _dpShift(months) {
+    const total = this._dpY * 12 + this._dpM + months;
+    this._dpY = Math.max(1950, Math.min(2050, Math.floor(total / 12)));
+    this._dpM = ((total % 12) + 12) % 12;
+    this._dpRender();
+  }
+
+  _dpRender() {
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    this.dpTitle.textContent = `${MONTHS[this._dpM]} ${this._dpY}`;
+    this.dpYear.value = this._dpY;
+    this.dpGrid.innerHTML = '';
+    for (const wd of ['S', 'M', 'T', 'W', 'T', 'F', 'S']) {
+      el('span', 'dp-wd', this.dpGrid).textContent = wd;
+    }
+    const first = new Date(Date.UTC(this._dpY, this._dpM, 1));
+    const days = new Date(Date.UTC(this._dpY, this._dpM + 1, 0)).getUTCDate();
+    for (let i = 0; i < first.getUTCDay(); i++) el('span', '', this.dpGrid);
+    const sim = this.physics.simDate;
+    const isSimMonth = sim.getUTCFullYear() === this._dpY && sim.getUTCMonth() === this._dpM;
+    for (let d = 1; d <= days; d++) {
+      const b = el('button', 'dp-day', this.dpGrid);
+      b.textContent = d;
+      if (isSimMonth && sim.getUTCDate() === d) b.classList.add('today');
+      b.onclick = () => this._dpPick(d);
+    }
+  }
+
+  /** Jump the simulation to the picked date (time-of-day preserved). */
+  _dpPick(day) {
+    const sim = this.physics.simDate;
+    const pad = (n) => String(n).padStart(2, '0');
+    const iso = `${this._dpY}-${pad(this._dpM + 1)}-${pad(day)}`
+      + `T${pad(sim.getUTCHours())}:${pad(sim.getUTCMinutes())}:${pad(sim.getUTCSeconds())}Z`;
+    this.setLive(false);
+    this.physics.jumpToSimSeconds(dateToSimSeconds(iso, this.physics.epochMs));
+    this.notify(`Jumped to ${iso.slice(0, 10)}`);
+    this.toggleDatePicker(false);
+  }
+
+  /** 🔴 LIVE: track the real-world UTC clock at 1x. */
+  setLive(v, silent = false) {
+    this.liveMode = v;
+    localStorage.setItem('sse-live-mode', v ? '1' : '0');
+    this.liveBtn.textContent = v ? '🔴 LIVE' : '🔴';
+    this.liveBtn.classList.toggle('on', v);
+    if (v) {
+      this.physics.jumpToSimSeconds(
+        dateToSimSeconds(new Date().toISOString(), this.physics.epochMs));
+      this.physics.setTimeIndex(1);
+      this._liveSync = 0;
+      if (!silent) this.notify('LIVE — tracking real-world time');
+    }
   }
 
   _bodyCfg(name) {
@@ -768,7 +888,10 @@ export class UI {
         case 'Tab': e.preventDefault(); this.toggleSidePanel(); break;
         case 'KeyP': this.setPresentation(!this.presentationMode); break;
         case 'F11': e.preventDefault(); this.toggleFullscreen(); break;
-        case 'Escape': this.hideInfo(); this.toggleHelp(false); this.toggleAudioFlyout(false); break;
+        case 'Escape':
+          this.hideInfo(); this.toggleHelp(false);
+          this.toggleAudioFlyout(false); this.toggleDatePicker(false);
+          break;
         case 'KeyS':
           // S is both surface-mode select and free-fly backward; only treat
           // as surface select when not flying.
@@ -854,15 +977,31 @@ export class UI {
 
     // Mode indicator: free look hint (2b).
     t.attach(this.modeEl, 'Hold Alt to look around freely while maintaining orbital position');
+
+    // Ghost time display (G5).
+    t.attach(this.dateEl, 'Click to pick any date 1950–2050 — moons jump to their real positions');
+    t.attach(this.liveBtn, 'LIVE — track the real-world clock at 1×');
   }
 
   // -- Per-frame update ------------------------------------------------------------------------------
 
   update(dt) {
-    // Clock + multiplier.
-    const d = this.physics.simDate;
-    this.dateEl.textContent = d.toISOString().slice(0, 19).replace('T', '  ') + ' UTC';
-    this.multEl.textContent = this.physics.paused ? 'PAUSED' : `${this.physics.timeMultiplier.toLocaleString()}x`;
+    // LIVE mode: multiplier locked to 1x, gentle re-sync to the wall clock
+    // once a minute (frame-time drift correction).
+    if (this.liveMode) {
+      if (this.physics.timeIndex !== 1) this.physics.setTimeIndex(1);
+      this._liveSync = (this._liveSync ?? 0) + dt;
+      if (this._liveSync > 60) {
+        this._liveSync = 0;
+        this.physics.jumpToSimSeconds(
+          dateToSimSeconds(new Date().toISOString(), this.physics.epochMs));
+      }
+    }
+
+    // Clock + multiplier (all date formatting goes through the utility).
+    const iso = simSecondsToDate(this.physics.simSeconds, this.physics.epochMs);
+    this.dateEl.textContent = `${iso.slice(0, 10)}  ${iso.slice(11, 19)} UTC`;
+    this.multEl.textContent = this.physics.paused ? 'PAUSED' : `${this.physics.timeMultiplier.toLocaleString()}×`;
     this.timeSlider.value = this.physics.timeIndex;
     this.rootEl.querySelectorAll('[data-time-index]').forEach((b) => {
       b.classList.toggle('active', +b.dataset.timeIndex === this.physics.timeIndex);
