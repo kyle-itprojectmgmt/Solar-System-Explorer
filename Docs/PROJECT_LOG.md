@@ -598,6 +598,62 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
   pass (now always routed through orbit mode). tests/incmeasure.mjs +
   tests/ringfloor.mjs.
 
+### v5 — Earth + Moon System, Parallel Worker Build (Complete — 2026-07-11, commits a025bd5 → f83dbeb + docs)
+Per Docs/V5_PROMPT.md. Version 5.0.0. First multi-system release —
+the NAV panel now travels between Jupiter and Earth.
+
+**Phase 1 — shared infrastructure (orchestrator):**
+- 1a (a025bd5): `src/engine/ephemeris.js` — Keplerian circular-orbit
+  sun direction from config epoch; physics updates `sunDir` every tick
+  and on date jumps. Renderer follows it: sun light, anchor, lens
+  flare, and ring shader sun uniforms all track the ephemeris, so
+  Earth gets real seasons (sun-Y flips sign across half a year —
+  measured) and Jupiter's static sun is just the no-period case.
+- 1b+1c (53b0041): ESO Milky Way panorama (eso0932a, public domain) on
+  a background sphere replaces the procedural starfield (kept as
+  fallback); HYG bright-star catalog build script → 8,834 stars
+  (mag < 6.5) as point sprites with spectral B-V colors, named stars
+  labeled when body labels are on (backlog #12/#14 done).
+- 1d (18d85c7): system switching — `AVAILABLE_SYSTEMS` +
+  validated `?system=` URL param + `switchSystem()` full-reload
+  navigation (clean GPU disposal, loading screen as the transition,
+  correct lazy chunk); NAV panel planet rows become travel rows.
+
+**Phase 2 — 4 parallel Haiku workers, exclusive file ownership:**
+- W1: earth-clouds.glsl, earth-lights.glsl, earth-aurora.glsl
+- W2: earth-atmosphere.glsl (full Rayleigh ShaderMaterial), earth-ocean.glsl
+- W3: src/data/systems/earth.js (full config — Apollo 11 epoch
+  1969-07-20, 6 Apollo sites, ISS preset, texture sources)
+- W4: moon-detail.glsl
+- Workers ran in parallel (~40–46k tokens each) and never touched
+  engine files. Orchestrator review found real bugs to fix before
+  integration: clouds had out-of-scope variables and hurricane centers
+  that could never land in the tropics band (rewritten — vortices now
+  placed on-sphere with angular-distance falloff); ocean used
+  `normalize(v * k)` == `normalize(v)`, silently deleting the wave
+  amplitude, and passed pre-scaled positions to dtlFreqFade (double-
+  counts frequency); moon wrinkle ridges striped the entire mare
+  (now sparse regional patches) and fine-crater amplitudes read as
+  cobblestone (halved). Config referenced a texture that doesn't
+  exist yet (removed; 8K upgrade is a manual step).
+
+**Phase 3 — integration (f83dbeb):**
+- Worker chunks registered as `terra` / `luna` detail styles with
+  brace-isolated scopes; new always-present object-space uniforms
+  `uSunObj` / `uCamObj` updated per frame (day/night, glint,
+  opposition surge, earthshine all need them).
+- Rayleigh atmosphere path (`atmosphere.style === 'rayleigh'`) with
+  per-frame altitude; Apollo site markers + labels parented to the
+  Moon mesh, labels fade in below ~70 km.
+- Textures: NASA Blue Marble topo/bathy 5400px + SSS 8K Moon
+  (CC BY 4.0). ISS Mode (prompt item 3d, optional) deferred to V5.1.
+- Verified: tests/earthtest.mjs (14 checks — both shader styles
+  compile clean at close range, Moon at 384,400 km, seasons, Apollo
+  markers, NAV travel rows, date jumps move the Moon) + full Jupiter
+  regression (smoke 22, incmeasure 6, ringfloor 7) all green.
+  Deployed and live-verified in a fresh headless browser: both
+  systems load at v5.0.0 with zero console errors.
+
 ---
 
 ## Known Bugs / In Progress
@@ -628,6 +684,8 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
 | 23 | "Camera Speed" naming unclear | Resolved v4d (renamed Orbit Speed) | V4d_PROMPT.md |
 | 24 | Inclination plane change lurched the camera (planet appeared to shift sideways) | Resolved v4d (line-of-nodes anchored at current bearing) | V4d_PROMPT.md |
 | 25 | Polar orbit at 90° reported as not working — could not be reproduced; measured -89.7°..+90° latitude sweep both before and after the v4d change (verify on hardware) | Resolved v4d (verified) | V4d_PROMPT.md |
+| 27 | Earth/Moon shader calibration done from headless screenshots — cloud speckle density, city-light brightness, moon crater relief may need real-hardware tuning. Knobs: layer weights in earth-clouds/lights.glsl, crater amplitudes in moon-detail.glsl. | Needs review | V5_PROMPT.md |
+| 28 | Earth day texture is 5400px Blue Marble (topo/bathy) — 8K daymap download failed during build; manual upgrade step noted in earth.js texture comments. Black Marble night texture + cloud/specular/normal maps also not yet sourced (night lights are procedural for now). | Fix before launch | V5_PROMPT.md |
 | 26 | Replace Ko-fi with Stripe for donations — create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Optionally keep free Ko-fi page as secondary community presence with Saturn funding goal. | Fix before launch | — |
 
 ---
@@ -666,7 +724,7 @@ brand icons, tooltips.
 
 ### Priority Order
 ```
-V5  — Earth + Moon (ISS mode, city lights, auroras, Apollo sites)
+V5  — Earth + Moon — DONE (city lights, auroras, Apollo sites; ISS mode → V5.1)
 V6  — Mars (solid surface, Olympus Mons, Valles Marineris, landing)
 V7  — Saturn + Rings + Titan + Enceladus + Iapetus
 V8  — Outer solar system (Uranus, Neptune, Triton, Pluto)
@@ -684,7 +742,7 @@ generative audio have no equivalent in NASA Eyes.
 | # | Feature | Notes |
 |---|---------|-------|
 | 1 | Saturn System | saturn.js config, particle ring system, Titan atmosphere shader, Enceladus geysers |
-| 2 | Earth + Moon System | See full spec below. Binary system — Earth and Moon together. ISS altitude experience, procedural clouds, city lights, auroras, Earthrise, Apollo landing sites. |
+| 2 | Earth + Moon System | DONE v5 — see Version History. Remaining from spec: ISS Mode (live position API), 8K/seasonal/night textures, lightning particles beyond the shader flashes. |
 | 3 | Full Solar System Orrery | Camera Mode 8 (V key). All planets in correct orbital positions. Click any to travel. Scale-adjusted so all visible. Gateway to inter-system navigation. |
 | 4 | Inter-System Navigation | System selector UI in Mission Control. Cinematic hyperjump sequence (8-12s, skippable). Runtime system switching with GPU memory management. Floating origin / scale switching between AU and km coordinate systems. |
 | 5 | Mars System | Best solid-surface planet for landing experience. MOLA elevation data, Olympus Mons (3x Everest height), Valles Marineris (length of USA), polar ice caps, dust storms, Phobos and Deimos moons. Surface landing with Earth as blue dot in sky. |
@@ -694,13 +752,13 @@ generative audio have no equivalent in NASA Eyes.
 | 9 | VR support | WebXR for headset exploration |
 | 10 | Resonance visualizer | Enhanced — already implemented basic version in v4b |
 | 11 | Io volcanic event notifications | Random eruption alerts when near Io |
-| 12 | ESO photographic starfield cubemap | Replace current procedural random starfield with ESO public domain panoramic photograph mapped as skybox cubemap. Stars in correct positions, Milky Way photographically accurate, Southern Cross visible only when looking south. 30-minute swap. Add alongside Earth system (V5) where realistic starfield matters most for surface viewing. |
-| 13 | Re-enable Surface camera mode | Surface mode hidden in v4d — re-enable with V5 when realistic starfield (cubemap), HYG bright star catalog overlay, constellation lines, and proper ground-level rendering are in place. |
-| 14 | HYG bright star catalog overlay | 9,000 brightest stars (magnitude < 6.5) from HYG database as colored point sprites. Correct positions, spectral colors (O-class blue-white through M-class deep red), correct brightness. Named stars get labels when body labels enabled. Constellation line toggle. Add with V5 Earth system. |
+| 12 | ESO photographic starfield cubemap | DONE v5 — ESO eso0932a panorama on background sphere (procedural kept as fallback). |
+| 13 | Re-enable Surface camera mode | Starfield + HYG prerequisites landed in v5; still needs constellation lines and proper ground-level rendering before re-enabling. |
+| 14 | HYG bright star catalog overlay | DONE v5 — 8,834 stars (mag < 6.5), B-V spectral colors, named-star labels. Constellation line toggle still open. |
 
 ---
 
-## Earth + Moon System Spec (Future Build)
+## Earth + Moon System Spec (Built in v5 — kept as reference; unbuilt items noted in Known Bugs #28 and Backlog #2)
 
 ### Overview
 Earth and Moon treated as a binary system in earth.js config.

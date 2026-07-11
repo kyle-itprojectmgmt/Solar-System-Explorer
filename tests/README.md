@@ -59,3 +59,17 @@ node tests/toast.mjs      # event toasts + Watch navigation
 # v4d additions:
 node tests/incline.mjs    # inclination mechanics: latitude sweeps, centering, plane-change continuity
 node tests/v4d.mjs        # text labels, ALT/INC/SPD panels, Surface hidden (13 checks)
+
+# orbit-insertion hotfix guards:
+node tests/incroll.mjs    # INC drag: no view roll, no scene rotation (6 checks)
+node tests/polesnap.mjs   # insertion entry: no pole snap, node solved through camera (7 checks)
+node tests/lookdir.mjs    # adaptive forward tilt + far-entry framing (13 checks)
+node tests/bands.mjs      # orbit-plane-normal up: bands horizontal at all phases
+node tests/incmeasure.mjs # geometry table: lat = sin(phase)·sin(inc), both signs (6 checks)
+node tests/ringfloor.mjs  # minInsertionAltKm floor + GeoSync/GRS exemptions (7 checks)
+
+# v5 additions:
+SMOKE_URL=http://localhost:5173 node tests/earthtest.mjs
+# Earth+Moon end-to-end (14 checks): terra/luna shaders compile + blend,
+# Rayleigh shell, Apollo markers, ephemeris seasons, Moon orbit radius,
+# NAV travel rows, date jumps. Earth loads via ?system=earth.
