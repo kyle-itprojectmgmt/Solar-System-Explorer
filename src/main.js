@@ -125,7 +125,10 @@ async function boot() {
     }
   }, 45000);
 
-  window.addEventListener('resize', () => postfx?.setSize(window.innerWidth, window.innerHeight));
+  if (postfx) renderer.resizeHooks.push((w, h) => postfx.setSize(w, h));
+
+  // Dev-only handle for automated smoke tests.
+  if (import.meta.env.DEV) window.__sse = { physics, renderer, cameraCtl };
 
   // -- Render loop ----------------------------------------------------------------
 

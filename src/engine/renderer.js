@@ -35,8 +35,11 @@ export class SceneRenderer {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050510);
 
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.05, 4e6);
+    // FOV 48: wide FOVs perspective-stretch spheres near the frame edge,
+    // which reads as an "oval" planet.
+    this.camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.05, 4e6);
     this.camera.position.set(0, 60, 260);
+    this.camera.updateProjectionMatrix();
 
     this.loadingManager = new THREE.LoadingManager();
     if (onProgress) {
@@ -52,6 +55,7 @@ export class SceneRenderer {
 
     this.bodyMeshes = new Map(); // name -> { mesh, group, cfg, ... }
     this.pickables = [];
+    this.resizeHooks = []; // extra consumers (postfx) resize through here
 
     this._buildLights();
     this._buildStarfield();
@@ -63,12 +67,16 @@ export class SceneRenderer {
     this._buildResonanceLines();
 
     window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('orientationchange', () => this.onResize());
+    this.onResize(); // ensure aspect/size are coherent before first frame
   }
 
   onResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight;
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(w, h);
+    for (const hook of this.resizeHooks) hook(w, h);
   }
 
   texUrl(slug, file) {
