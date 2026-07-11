@@ -595,6 +595,13 @@ export class CameraController {
     const rKm = rUnits * KM_PER_UNIT;
     const mass = entry.isPrimary ? this.r.system.primary.massKg : entry.cfg.massKg;
 
+    // Negative inclination = retrograde: the plane tilts by the magnitude
+    // and the orbit is traversed in the opposite direction. (A negative
+    // axis-angle tilt alone only mirrors the plane — it does not reverse
+    // the direction of travel, so the sign drives the phase advance.)
+    const retro = ins.incDeg < 0 && !ins.locked;
+    const orbitSign = retro ? -1 : 1;
+
     // Circular orbital mechanics: v = sqrt(GM/r). Locked mode pins the
     // angular rate to the body's rotation instead (geosynchronous).
     let omega;
@@ -607,20 +614,22 @@ export class CameraController {
     } else {
       ins.velKmS = Math.sqrt((G * mass) / rKm);
       omega = ins.velKmS / rKm;
-      ins.phase += omega * this._simDelta; // advance along the orbital path
+      ins.phase += orbitSign * omega * this._simDelta; // advance along the orbital path
     }
     ins.periodS = omega > 0 ? (Math.PI * 2) / omega : 0;
     // Ground-track sweep rate: relative angular velocity × surface radius.
     ins.surfaceKmS = ins.locked
       ? 0
-      : Math.abs(omega - this._bodyRotationRateRadS(ins.body)) * entry.radiusUnits * KM_PER_UNIT;
+      : Math.abs(orbitSign * omega - this._bodyRotationRateRadS(ins.body)) * entry.radiusUnits * KM_PER_UNIT;
 
-    // Orbit plane: equatorial, inclined about X by incDeg (root frame).
-    const inc = THREE.MathUtils.degToRad(ins.incDeg);
+    // Orbit plane: equatorial, inclined about X by |incDeg| (root frame).
+    const inc = THREE.MathUtils.degToRad(Math.abs(ins.incDeg));
     const X = new THREE.Vector3(1, 0, 0);
     const local = new THREE.Vector3(Math.cos(ins.phase), 0, -Math.sin(ins.phase))
       .multiplyScalar(rUnits).applyAxisAngle(X, inc);
+    // Travel direction reverses with retrograde traversal.
     const tangent = new THREE.Vector3(-Math.sin(ins.phase), 0, -Math.cos(ins.phase))
+      .multiplyScalar(orbitSign)
       .applyAxisAngle(X, inc);
     local.applyQuaternion(this.r.root.quaternion);
     tangent.applyQuaternion(this.r.root.quaternion).normalize();

@@ -251,8 +251,10 @@ export class UI {
 
     const incLabel = el('div', 'ins-label', p);
     const incSlider = el('input', 'slider', p);
-    Object.assign(incSlider, { type: 'range', min: 0, max: 90, step: 1 });
+    Object.assign(incSlider, { type: 'range', min: -90, max: 90, step: 1, value: 0 });
     incSlider.oninput = () => this.cam.setInsertion({ incDeg: +incSlider.value });
+    const incHints = el('div', 'ins-scale', p);
+    incHints.innerHTML = '<span>-90° retrograde</span><span>0° equatorial</span><span>90° polar</span>';
 
     const lockToggle = toggle(p, 'Lock to body rotation (geosync)', false,
       (v) => this.cam.setInsertion({ locked: v }));
@@ -270,7 +272,7 @@ export class UI {
       altSlider.value = altToT(ins.altitudeKm);
       altLabel.textContent = `Altitude: ${Math.round(ins.altitudeKm).toLocaleString()} km`;
       incSlider.value = ins.incDeg;
-      incLabel.textContent = `Inclination: ${ins.incDeg}°${ins.incDeg < 10 ? ' (equatorial)' : ins.incDeg > 80 ? ' (polar)' : ''}`;
+      incLabel.textContent = incText(ins.incDeg);
       lockToggle.checked = ins.locked;
       this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
     };
@@ -650,6 +652,15 @@ function toggle(parent, label, initial, onChange) {
   input.onchange = () => onChange(input.checked);
   el('span', '', row).textContent = label;
   return input;
+}
+
+function incText(v) {
+  let tag = '';
+  if (v <= -80) tag = ' (retrograde polar)';
+  else if (v < 0) tag = ' (retrograde)';
+  else if (v >= 80) tag = ' (polar)';
+  else if (v < 10) tag = ' (equatorial)';
+  return `Inclination: ${v}°${tag}`;
 }
 
 function fmtDur(s) {

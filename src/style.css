@@ -245,6 +245,16 @@ html, body {
   letter-spacing: 0.08em;
   color: var(--gray-light);
 }
+.ins-scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-body);
+  font-size: 0.58rem;
+  font-weight: 300;
+  color: var(--gray-light);
+  letter-spacing: 0.04em;
+  margin-top: -3px;
+}
 .ins-info { margin-top: 8px; border-top: 1px solid rgba(217,217,217,0.12); padding-top: 8px; }
 .ins-row {
   display: flex;
