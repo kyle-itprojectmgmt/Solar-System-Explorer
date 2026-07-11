@@ -77,10 +77,12 @@ async function boot() {
   const postfx = createPostFX(renderer.renderer, renderer.scene, renderer.camera, quality);
   const audio = new AudioEngine();
 
-  // Screenshot: hide UI, render one clean frame, save, restore.
+  // Screenshot: enter presentation mode (all UI hidden), render one clean
+  // frame, save, then restore the previous presentation state.
   let ui;
   function screenshot() {
-    ui.setVisible(false);
+    const wasPresentation = ui.presentationMode;
+    ui.setPresentation(true);
     setTimeout(() => {
       renderFrame(0.016, performance.now() / 1000);
       renderer.renderer.domElement.toBlob((blob) => {
@@ -92,7 +94,7 @@ async function boot() {
           a.click();
           URL.revokeObjectURL(a.href);
         }
-        ui.setVisible(true);
+        ui.setPresentation(wasPresentation);
       });
     }, 350);
   }

@@ -338,6 +338,36 @@ html, body {
   font-size: 0.7rem;
 }
 
+/* -- Fullscreen + presentation mode ------------------------------------------------------------ */
+
+.fs-btn {
+  position: fixed;
+  top: 84px;
+  right: 16px;
+  background: var(--panel-bg);
+}
+/* Keep the fullscreen button reachable when Mission Control is open. */
+#ui-root:has(.side-panel.open) .fs-btn { right: 328px; }
+
+.presentation-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 132px;
+  background: var(--panel-bg);
+  opacity: 0.55;
+}
+.presentation-btn:hover { opacity: 1; }
+
+/* Presentation mode: pure 3D scene — only the subtle exit eye survives. */
+body.presentation-mode #ui-root > *:not(.presentation-btn) { display: none !important; }
+body.presentation-mode .presentation-btn {
+  bottom: 16px;
+  opacity: 0.22;
+  background: transparent;
+  border-color: transparent;
+}
+body.presentation-mode .presentation-btn:hover { opacity: 0.9; }
+
 /* -- Notifications --------------------------------------------------------------------------- */
 
 .notifications {

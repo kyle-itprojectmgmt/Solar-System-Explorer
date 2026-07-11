@@ -30,6 +30,7 @@ export class UI {
     this.onVoyagerPreset = onVoyagerPreset;
 
     this.labelsVisible = false;
+    this.presentationMode = false;
     this.labelEls = new Map();
     this.eclipseStates = new Map();
     this._eventTickTimer = 0;
@@ -45,6 +46,7 @@ export class UI {
     this._buildHelpOverlay();
     this._buildAudioControls();
     this._buildCornerButtons();
+    this._buildViewButtons();
     this._buildNotifications();
     this._buildEmbedDrawer();
     this._buildLabels();
@@ -397,6 +399,7 @@ export class UI {
     ]);
     sec(left, 'INTERFACE', [
       ['Tab', 'Mission Control panel'], ['?', 'This help screen'], ['Escape', 'Close panels'],
+      ['F11', 'Fullscreen'], ['P', 'Presentation mode (hide UI)'],
     ]);
 
     sec(right, 'MOUSE', [
@@ -461,6 +464,34 @@ export class UI {
     shot.textContent = '📷';
     shot.title = 'Screenshot';
     shot.onclick = () => this.onScreenshot?.();
+  }
+
+  // -- Fullscreen + presentation mode ---------------------------------------------------------
+
+  _buildViewButtons() {
+    // Fullscreen — always visible in the top-right, outside Mission Control.
+    this.fsBtn = el('button', 'btn btn-icon fs-btn', this.rootEl);
+    this.fsBtn.textContent = '⛶';
+    this.fsBtn.title = 'Fullscreen (F11)';
+    this.fsBtn.onclick = () => this.toggleFullscreen();
+
+    // Presentation mode — hides every UI element except this eye icon.
+    this.presBtn = el('button', 'btn btn-icon presentation-btn', this.rootEl);
+    this.presBtn.textContent = '👁';
+    this.presBtn.title = 'Presentation mode (P)';
+    this.presBtn.onclick = () => this.setPresentation(!this.presentationMode);
+  }
+
+  toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.();
+  }
+
+  /** Pure 3D scene: one class on <body> hides all UI except the exit eye. */
+  setPresentation(v) {
+    this.presentationMode = v;
+    document.body.classList.toggle('presentation-mode', v);
+    this.presBtn.title = v ? 'Exit presentation mode (P)' : 'Presentation mode (P)';
   }
 
   // -- Notifications ------------------------------------------------------------------------
@@ -566,6 +597,8 @@ export class UI {
         case 'Comma': this.physics.slower(); break;
         case 'Period': this.physics.faster(); break;
         case 'Tab': e.preventDefault(); this.toggleSidePanel(); break;
+        case 'KeyP': this.setPresentation(!this.presentationMode); break;
+        case 'F11': e.preventDefault(); this.toggleFullscreen(); break;
         case 'Escape': this.hideInfo(); this.toggleHelp(false); break;
         case 'KeyS':
           // S is both surface-mode select and free-fly backward; only treat
@@ -661,12 +694,6 @@ export class UI {
     }
   }
 
-  /** Hide/show all UI for clean screenshots. */
-  setVisible(v) {
-    this.rootEl.style.transition = 'opacity 0.3s';
-    this.rootEl.style.opacity = v ? '1' : '0';
-    this.rootEl.style.pointerEvents = v ? '' : 'none';
-  }
 }
 
 // -- tiny DOM helpers -----------------------------------------------------------
