@@ -95,6 +95,7 @@ export default {
         { name: 'Loki Patera',       latDeg: 12.6,  lonDeg: 308.8 },
         { name: 'Prometheus Volcano', latDeg: -1.5, lonDeg: 153.0 },
       ],
+      detail: { style: 'volcanic', activationKm: 10000, fullKm: 500 },
       facts: [
         'Io is the most volcanically active body in the solar system',
         'Its volcanoes are driven by tidal heating from Jupiter\'s immense gravity',

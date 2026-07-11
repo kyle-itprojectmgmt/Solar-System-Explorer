@@ -97,6 +97,55 @@ const DETAIL_FINAL = /* glsl */ `
   diffuseColor.rgb = mix(diffuseColor.rgb, detail * dTint, uDetailBlend);
 `;
 
+// -- Volcanic (Io): sulfur palette, lava flows, calderas, hot spots, frost --------
+
+DETAIL_STYLES.volcanic = {
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    float t1 = uTime * 0.0001;
+
+    // LAYER 1 — sulfur compound zones at several noise frequencies.
+    float zoneN = fbm3(vObjPos * 14.0 + vec3(t1));
+    float zoneN2 = snoise(vObjPos * 42.0 - vec3(t1, 0.0, t1));
+    vec3 sulfurY = vec3(0.910, 0.831, 0.302); // #E8D44D SO2 frost yellow
+    vec3 sulfurO = vec3(0.831, 0.329, 0.102); // #D4541A mid-temp allotropes
+    vec3 sulfurR = vec3(0.545, 0.102, 0.102); // #8B1A1A high-temp sulfur
+    vec3 basalt  = vec3(0.102, 0.102, 0.0);   // #1A1A00 fresh lava
+    vec3 palette = mix(sulfurY, sulfurO, smoothstep(-0.4, 0.4, zoneN));
+    palette = mix(palette, sulfurR, smoothstep(0.25, 0.75, zoneN2) * 0.6);
+    detail = mix(detail, detail * 0.4 + palette * 0.6, 0.35 + 0.2 * abs(zoneN));
+
+    // LAYER 2 — lava flows: elongated noise, direction rotated per region.
+    float flowAng = snoise(vObjPos * 3.0) * 1.6;
+    vec2 flowUv = mat2(cos(flowAng), -sin(flowAng), sin(flowAng), cos(flowAng)) * dUv;
+    float flow = fbm3(vec3(flowUv.x * 180.0, flowUv.y * 60.0, 2.5 + t1)); // 3:1 stretch
+    float flowMask = smoothstep(0.35, 0.7, flow);
+    detail = mix(detail, vec3(0.102, 0.071, 0.0), flowMask * 0.65);       // #1A1200
+
+    // LAYER 3 — calderas: cellular depressions, dark floors, sulfur rims.
+    float cal1Id; float cal1 = craterProfile(dUv * 24.0, cal1Id);
+    float cal2Id; float cal2 = craterProfile(dUv * 90.0 + 31.7, cal2Id);
+    // Not every cell hosts a caldera — thin them out by cell hash.
+    float calderas = cal1 * step(0.35, cal1Id) + cal2 * 0.5 * step(0.55, cal2Id);
+    detail = mix(detail, vec3(0.051, 0.051, 0.0), clamp(-calderas, 0.0, 1.0) * 0.8); // #0D0D00 floor
+    detail = mix(detail, vec3(1.0, 0.894, 0.302), clamp(calderas, 0.0, 1.0) * 0.5);  // #FFE44D rim
+
+    // LAYER 5 — SO2 frost in topographic lows between flows.
+    float frost = snoise(vObjPos * 260.0);
+    detail = mix(detail, vec3(0.961, 0.961, 0.878),                                   // #F5F5E0
+                 smoothstep(0.55, 0.9, frost) * (1.0 - flowMask) * 0.18);
+
+    // LAYER 4 — hot spot glow, below 200 km only; slow breathing pulse.
+    float hotAct = 1.0 - smoothstep(80.0, 200.0, uAltitude);
+    if (hotAct > 0.001) {
+      float hot = smoothstep(0.78, 0.95, snoise(vObjPos * 120.0 + 17.3));
+      float pulse = sin(uTime * 0.2) * 0.3 + 0.7;
+      gDetailEmissive += vec3(1.0, 0.267, 0.0) * hot * pulse * hotAct * uDetailBlend; // #FF4400
+    }
+    ${DETAIL_FINAL}
+  `,
+};
+
 // -- Gas giant: banded cloud turbulence + vortex + limb haze ---------------------
 
 DETAIL_STYLES.gasGiant = {
