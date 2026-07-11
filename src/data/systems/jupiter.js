@@ -43,6 +43,13 @@ export default {
     // (226,000 km from center − 71,492 km radius = 154,508 km; rounded up).
     // The geosync lock is exempt (geosync altitude is 88,508 km).
     minInsertionAltKm: 160000,
+    // Jupiter's entire inner magnetosphere is lethal — one blanket zone
+    // (V5b: the OI HUD warning is config-driven per body).
+    radiationWarning: {
+      zones: [
+        { minKm: 0, maxKm: 500000, label: '⚠️ Extreme radiation environment' },
+      ],
+    },
     atmosphere: {
       limbEdge: 0xc8824a,     // warm orange-tan at the very limb
       limbMid: 0xe8d4a0,      // pale yellow-white mid falloff

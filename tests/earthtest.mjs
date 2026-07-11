@@ -1,6 +1,8 @@
 // V5 3f: Earth + Moon system end-to-end.
 import puppeteer from 'puppeteer-core';
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync } from 'fs';
+
+const VERSION = JSON.parse(readFileSync('package.json', 'utf8')).version;
 
 const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const BASE = process.env.SMOKE_URL || 'http://localhost:5175';
@@ -25,7 +27,7 @@ const check = (n, ok, d = '') => {
 await page.goto(`${BASE}/?system=earth`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction('window.__sse && window.__sse.physics', { timeout: 60000 });
 const ver = await page.$eval('#loading-version', (e) => e.textContent);
-check('loading screen shows Earth System v5.1.0', /Earth System — v5.1.0/.test(ver), ver);
+check(`loading screen shows Earth System v${VERSION}`, ver.includes(`Earth System — v${VERSION}`), ver);
 await page.waitForFunction(
   'document.getElementById("loading-screen").classList.contains("done")', { timeout: 60000 });
 await new Promise((r) => setTimeout(r, 2500));

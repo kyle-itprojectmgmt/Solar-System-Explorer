@@ -27,6 +27,10 @@ export default {
   // Simulation epoch: Apollo 11 lunar landing — humanity's greatest reach.
   epoch: '1969-07-20T20:17:00Z',
 
+  // Night-side fill (V5b): terrain stays faintly visible (~5-10%) — real
+  // earthglow/scatter keeps the surface from pure black at ISS altitude.
+  nightAmbient: { color: 0x8899bb, intensity: 0.18 },
+
   star: {
     name: 'Sun',
     distanceAU: 1.0,          // distance from primary
@@ -57,6 +61,15 @@ export default {
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
     normalScale: 2.0,   // terrain relief depth (drives procedural detail)
     detailFloor: { softKm: 400, hardKm: 200 }, // ISS altitude experience — 408 km reference
+    // Van Allen belts + reentry band (V5b) — unlike Jupiter, most of
+    // Earth's orbital space is benign; warn only inside real zones.
+    radiationWarning: {
+      zones: [
+        { minKm: 1000, maxKm: 6000, label: '⚠️ Inner Van Allen belt' },
+        { minKm: 13000, maxKm: 60000, label: '⚠️ Outer Van Allen belt' },
+        { minKm: 0, maxKm: 400, label: '⚠️ Reentry altitude' },
+      ],
+    },
     atmosphere: {
       limbEdge: 0x3d7eff,     // vivid blue at the very limb (Rayleigh scattering)
       limbMid: 0xbfe3ff,      // pale cyan mid-falloff

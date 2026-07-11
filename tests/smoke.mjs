@@ -2,9 +2,11 @@
 // Headless Chrome renders this scene at ~4 fps: every assertion is made
 // against physics.simSeconds / direct cameraCtl.update() calls, never wall clock.
 import puppeteer from 'puppeteer-core';
+import { readFileSync } from 'fs';
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const URL = process.env.SMOKE_URL || 'http://localhost:5175';
+const VERSION = JSON.parse(readFileSync('package.json', 'utf8')).version;
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -34,7 +36,7 @@ await page.waitForFunction(
 
 // -- Group 1: version display ------------------------------------------------
 const ver = await page.$eval('#loading-version', (e) => e.textContent);
-check('loading screen shows v5.1.0', ver.includes('v5.1.0'), ver);
+check(`loading screen shows v${VERSION}`, ver.includes(`v${VERSION}`), ver);
 
 // -- Group 2a/2b: plume + label parenting -------------------------------------
 const parenting = await page.evaluate(() => {
