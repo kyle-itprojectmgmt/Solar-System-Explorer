@@ -7,7 +7,7 @@
 
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
-import { KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM } from '../config.js';
+import { KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
 
 const CAMERA_MODES = [
   { id: 'cinematic', label: 'Cinematic', key: 'C', targeted: false },
@@ -475,6 +475,13 @@ export class UI {
           m.textContent = `↳ ${b.name}`;
           m.onclick = () => this.cam.focusBody(b.name);
         }
+      } else if (AVAILABLE_SYSTEMS.includes(p.name.toLowerCase())) {
+        // Built system: travel there (V5 1d).
+        row.innerHTML = `<span>● ${p.name}</span><span class="body-chev">→</span>`;
+        row.onclick = () => {
+          this.notify(`Traveling to the ${p.name} system…`);
+          switchSystem(p.name.toLowerCase());
+        };
       } else {
         row.innerHTML = `<span>● ${p.name}</span>${p.moons?.length ? '<span class="body-chev">›</span>' : ''}`;
         row.onclick = () => this.notify(`Coming Soon — ${p.name} system launching soon`);

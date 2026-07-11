@@ -8,9 +8,25 @@ export const TEXTURE_BASE_URL = import.meta.env.DEV
   ? '/textures'
   : '/textures'; // e.g. 'https://pub-XXXX.r2.dev/textures' once R2 is set up
 
-// Active system. Must match a module in /src/data/systems/<name>.js.
-// Switching to Saturn (once its config exists) is a one-line change here.
-export const SYSTEM_CONFIG = 'jupiter';
+// Systems with a complete config in /src/data/systems/<name>.js.
+// Append new systems here as their configs land.
+export const AVAILABLE_SYSTEMS = ['jupiter'];
+
+// Active system: ?system= URL parameter, validated against the list.
+const requested = new URLSearchParams(window.location.search).get('system');
+export const SYSTEM_CONFIG = AVAILABLE_SYSTEMS.includes(requested) ? requested : 'jupiter';
+
+// Switch systems via a page navigation (V5 1d): the reload shows the
+// loading screen, disposes the GPU state cleanly, and pulls only the
+// target system's lazy chunk. A cinematic hyperjump is a future upgrade.
+export function switchSystem(name) {
+  if (!AVAILABLE_SYSTEMS.includes(name) || name === SYSTEM_CONFIG) return false;
+  const u = new URL(window.location.href);
+  u.searchParams.set('system', name);
+  u.searchParams.delete('view'); // shared views are system-specific
+  window.location.assign(u);
+  return true;
+}
 
 // Scene scale: 1 world unit = 1,000 km.
 export const KM_PER_UNIT = 1000;

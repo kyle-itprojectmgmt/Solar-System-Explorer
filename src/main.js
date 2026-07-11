@@ -62,10 +62,9 @@ function loadingScreen(facts) {
 // -- Boot ---------------------------------------------------------------------------
 
 async function boot() {
-  const verEl = document.getElementById('loading-version');
-  if (verEl) verEl.textContent = `Jupiter System — v${__APP_VERSION__}`;
-
   const { default: system } = await import(`./data/systems/${SYSTEM_CONFIG}.js`);
+  const verEl = document.getElementById('loading-version');
+  if (verEl) verEl.textContent = `${system.name} — v${__APP_VERSION__}`;
   const quality = detectQuality();
   const loader = loadingScreen(system.loadingFacts || []);
 
