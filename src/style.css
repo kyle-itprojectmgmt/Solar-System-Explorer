@@ -557,7 +557,11 @@ html, body {
   scrollbar-width: thin;
   scrollbar-color: var(--blue) transparent;
 }
-.info-panel.hidden { opacity: 0; pointer-events: none; }
+/* visibility:hidden (not just pointer-events) — `#ui-root > *` has ID
+   specificity and re-enables pointer-events on class rules, leaving an
+   invisible 420px panel that swallows camera drags bottom-center
+   ("can't pan over the ocean", v5b item 4). Third time this rule bites. */
+#ui-root .info-panel.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
 .info-head { display: flex; align-items: baseline; gap: 10px; }
 .info-badge {
   font-family: var(--font-head);
