@@ -87,6 +87,8 @@ export class UI {
       b.classList.toggle('active', b.dataset.camMode === mode);
     });
     if (this.insPanel) this.insPanel.style.display = mode === 'insertion' ? '' : 'none';
+    if (this.orbSec) this.orbSec.style.display = mode === 'orbit' ? '' : 'none';
+    if (this.chaseSec) this.chaseSec.style.display = mode === 'chase' ? '' : 'none';
   }
 
   _syncSystemViewExtras(mode) {
@@ -159,6 +161,30 @@ export class UI {
       b.onclick = () => this.cam.flyToAltitude(km);
     }
     this.altSec.style.display = 'none';
+
+    // Orbit mode tuning — how fast the camera sweeps along its orbital path,
+    // independent of the time multiplier.
+    this.orbSec = section(this.side, 'Orbit Camera');
+    const orbLabel = el('div', 'ins-label', this.orbSec);
+    const orbSlider = el('input', 'slider', this.orbSec);
+    Object.assign(orbSlider, { type: 'range', min: 0, max: 4, step: 0.05, value: this.cam.orbSpeedMult });
+    const syncOrb = () => { orbLabel.textContent = `Orbital Speed: ${this.cam.orbSpeedMult.toFixed(2)}×`; };
+    orbSlider.oninput = () => { this.cam.orbSpeedMult = +orbSlider.value; syncOrb(); };
+    syncOrb();
+    this.orbSec.style.display = 'none';
+
+    // Chase mode tuning — camera height above the chased moon.
+    this.chaseSec = section(this.side, 'Chase Camera');
+    const chaseLabel = el('div', 'ins-label', this.chaseSec);
+    const chaseSlider = el('input', 'slider', this.chaseSec);
+    Object.assign(chaseSlider, { type: 'range', min: 0.2, max: 4, step: 0.05, value: this.cam.chaseHeightMult });
+    const chaseDesc = (v) => (v <= 0.5 ? 'Low — surface skim' : v < 2.5 ? 'Medium' : 'High — wide view');
+    const syncChase = () => {
+      chaseLabel.textContent = `Chase Height: ${this.cam.chaseHeightMult.toFixed(2)}× radius (${chaseDesc(this.cam.chaseHeightMult)})`;
+    };
+    chaseSlider.oninput = () => { this.cam.chaseHeightMult = +chaseSlider.value; syncChase(); };
+    syncChase();
+    this.chaseSec.style.display = 'none';
 
     // Toggles
     const togSec = section(this.side, 'Display');
@@ -261,6 +287,9 @@ export class UI {
       <div class="ins-row"><span>Velocity</span><span>${ins.velKmS.toFixed(1)} km/s</span></div>
       <div class="ins-row"><span>Period</span><span>${h}h ${m}m ${s}s</span></div>
       <div class="ins-row"><span>Inc</span><span>${ins.incDeg}°</span></div>
+      <div class="ins-row"><span>Surface speed</span><span>${
+        ins.locked ? '0.0 km/s (Geosynchronous)' : `${ins.surfaceKmS.toFixed(1)} km/s`
+      }</span></div>
       ${isPrimary ? '<div class="ins-warn">⚠️ Extreme radiation environment</div>' : ''}`;
   }
 
