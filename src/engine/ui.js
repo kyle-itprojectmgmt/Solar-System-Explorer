@@ -42,6 +42,7 @@ export class UI {
     this._buildSidePanel();
     this._buildInsertionPanel();
     this._buildInfoPanel();
+    this._buildHelpOverlay();
     this._buildAudioControls();
     this._buildCornerButtons();
     this._buildNotifications();
@@ -109,7 +110,12 @@ export class UI {
     this.sideTab.title = 'Toggle panel (Tab)';
     this.sideTab.onclick = () => this.toggleSidePanel();
 
-    el('h2', 'side-title', this.side).textContent = 'MISSION CONTROL';
+    const head = el('div', 'side-head', this.side);
+    el('h2', 'side-title', head).textContent = 'MISSION CONTROL';
+    const helpBtn = el('button', 'btn btn-icon help-btn', head);
+    helpBtn.textContent = '?';
+    helpBtn.title = 'Controls (?)';
+    helpBtn.onclick = () => this.toggleHelp();
 
     // Camera modes
     const camSec = section(this.side, 'Camera');
@@ -296,6 +302,68 @@ export class UI {
 
   hideInfo() { this.info.classList.add('hidden'); }
 
+  // -- Help overlay -------------------------------------------------------------------
+
+  _buildHelpOverlay() {
+    this.help = el('div', 'help-overlay hidden', this.rootEl);
+    const card = el('div', 'help-card panel', this.help);
+    el('h2', 'help-title', card).textContent = 'CONTROLS';
+
+    const cols = el('div', 'help-cols', card);
+    const left = el('div', 'help-col', cols);
+    const right = el('div', 'help-col', cols);
+
+    const sec = (parent, title, rows) => {
+      el('h3', 'help-heading', parent).textContent = title;
+      const list = el('div', 'help-list', parent);
+      for (const [key, desc] of rows) {
+        const row = el('div', 'help-row', list);
+        el('span', 'help-key', row).textContent = key;
+        el('span', 'help-desc', row).textContent = desc;
+      }
+    };
+
+    sec(left, 'CAMERA MODES', [
+      ['C', 'Cinematic (auto)'], ['F', 'Free Fly'], ['O', 'Orbit (click body)'],
+      ['S', 'Surface (click body)'], ['H', 'Chase (click body)'],
+      ['G', 'System View'], ['I', 'Orbit Insertion'],
+    ]);
+    sec(left, 'NAVIGATION', [
+      ['W A S D', 'Move (Free Fly)'], ['Shift', 'Speed boost 5×'],
+      [',  .', 'Time slower / faster'], ['Space', 'Pause / Resume'],
+    ]);
+    sec(left, 'INTERFACE', [
+      ['Tab', 'Mission Control panel'], ['?', 'This help screen'], ['Escape', 'Close panels'],
+    ]);
+
+    sec(right, 'MOUSE', [
+      ['Drag', 'Look / rotate'], ['Scroll wheel', 'Zoom / altitude'],
+      ['Click body', 'Focus / info panel'],
+    ]);
+    sec(right, 'TOUCH', [
+      ['1 finger drag', 'Look / rotate'], ['2 finger pinch', 'Zoom'],
+      ['2 finger drag', 'Pan'], ['Double tap', 'Focus body'],
+      ['Long press', 'Body info panel'], ['Swipe up', 'Mission Control'],
+    ]);
+    sec(right, 'ALTITUDE PRESETS', [
+      ['Distant', '100,000 km'], ['Near', '10,000 km'],
+      ['Low Orbit', '500 km'], ['Skim', '50 km'],
+    ]);
+
+    el('p', 'help-tip', card).textContent =
+      'Pro tip: Press Space to pause, then drag to explore any moment in time.';
+
+    // Click outside the card closes.
+    this.help.addEventListener('pointerdown', (e) => {
+      if (e.target === this.help) this.toggleHelp(false);
+    });
+  }
+
+  toggleHelp(force) {
+    const show = force !== undefined ? force : this.help.classList.contains('hidden');
+    this.help.classList.toggle('hidden', !show);
+  }
+
   // -- Audio controls ----------------------------------------------------------------
 
   _buildAudioControls() {
@@ -423,6 +491,7 @@ export class UI {
   _bindKeys() {
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === '?') { this.toggleHelp(); return; }
       switch (e.code) {
         case 'KeyC': this.cam.setMode('cinematic'); break;
         case 'KeyF': this.cam.setMode('free'); break;
@@ -434,7 +503,7 @@ export class UI {
         case 'Comma': this.physics.slower(); break;
         case 'Period': this.physics.faster(); break;
         case 'Tab': e.preventDefault(); this.toggleSidePanel(); break;
-        case 'Escape': this.hideInfo(); break;
+        case 'Escape': this.hideInfo(); this.toggleHelp(false); break;
         case 'KeyS':
           // S is both surface-mode select and free-fly backward; only treat
           // as surface select when not flying.
