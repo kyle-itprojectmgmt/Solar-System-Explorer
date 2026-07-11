@@ -85,6 +85,25 @@ export class SceneRenderer {
     return `${TEXTURE_BASE_URL}/${slug}/${file}`;
   }
 
+  // Texture upgrade sources (checked 2026-07-11, see PROJECT_LOG backlog):
+  //   Jupiter 16K — not publicly available; Solar System Scope caps at 8K
+  //     (https://www.solarsystemscope.com/textures/download/8k_jupiter.jpg,
+  //     already shipped as jupiter/diffuse_8k.jpg).
+  //   Galilean moons 8K — candidates require GeoTIFF conversion:
+  //     Björn Jónsson: https://bjj.is/3d/planetary-maps (Io/Europa/Ganymede/Callisto)
+  //     USGS Astrogeology: https://astrogeology.usgs.gov/search (Voyager/Galileo mosaics)
+
+  /** Max-quality sampling on every surface texture — single highest-impact
+   *  sharpness change at orbital distances. */
+  _prepSurfaceTexture(tex) {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    tex.minFilter = THREE.LinearMipmapLinearFilter; // trilinear
+    tex.magFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
   // -- Lighting ---------------------------------------------------------------
 
   _buildLights() {
@@ -182,14 +201,20 @@ export class SceneRenderer {
     const rPol = (p.features?.equatorialBulge ? p.polarRadiusKm : p.radiusKm) * K;
 
     const geo = new THREE.SphereGeometry(1, 128, 96);
+    // Subtle warm specular: ammonia ice crystals in the upper atmosphere
+    // catch sunlight — a soft highlight, never plastic.
     const mat = new THREE.MeshPhongMaterial({
       map: this.texLoader.load(this.texUrl(p.slug, p.textures.diffuse)),
-      shininess: 4,
-      specular: new THREE.Color(0x111111),
+      shininess: 8,
+      specular: new THREE.Color(0x332211),
     });
-    mat.map.colorSpace = THREE.SRGBColorSpace;
-    mat.map.minFilter = THREE.LinearMipmapLinearFilter; // trilinear
-    mat.map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    this._prepSurfaceTexture(mat.map);
+    if (p.textures.normal) {
+      mat.normalMap = this._prepSurfaceTexture(
+        this.texLoader.load(this.texUrl(p.slug, p.textures.normal)));
+      const ns = p.normalScale ?? 1;
+      mat.normalScale = new THREE.Vector2(ns, ns);
+    }
 
     this.primaryMesh = new THREE.Mesh(geo, mat);
     this.primaryMesh.scale.set(rEq, rPol, rEq);
@@ -197,15 +222,13 @@ export class SceneRenderer {
     this.root.add(this.primaryMesh);
     this.pickables.push(this._makePicker(p.name, this.primaryMesh, rEq));
 
-    if (p.detail) this._registerDetail(p.name, this.primaryMesh, mat, p.detail, rEq);
+    if (p.detail) this._registerDetail(p.name, this.primaryMesh, mat, p.detail, rEq, p.normalScale);
 
     // Progressive high-res swap (outside the loading manager on purpose —
     // the app starts on the low-res map and upgrades silently).
     if (this.quality.highResPrimary && p.textures.diffuseHigh) {
       new THREE.TextureLoader().load(this.texUrl(p.slug, p.textures.diffuseHigh), (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
-        tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        this._prepSurfaceTexture(tex);
         mat.map?.dispose();
         mat.map = tex;
         mat.needsUpdate = true;
@@ -279,14 +302,18 @@ export class SceneRenderer {
       const detail = cfg.textures ? 96 : 24;
       const matOpts = { shininess: 6, specular: new THREE.Color(0x0a0a0a) };
       if (cfg.textures?.diffuse) {
-        const tex = this.texLoader.load(this.texUrl(cfg.slug, cfg.textures.diffuse));
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 8;
-        matOpts.map = tex;
+        matOpts.map = this._prepSurfaceTexture(
+          this.texLoader.load(this.texUrl(cfg.slug, cfg.textures.diffuse)));
       } else {
         matOpts.color = new THREE.Color(cfg.color || 0x888888);
       }
       const mat = new THREE.MeshPhongMaterial(matOpts);
+      if (cfg.textures?.normal) {
+        mat.normalMap = this._prepSurfaceTexture(
+          this.texLoader.load(this.texUrl(cfg.slug, cfg.textures.normal)));
+        const ns = cfg.normalScale ?? 1;
+        mat.normalScale = new THREE.Vector2(ns, ns);
+      }
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, detail, detail / 2), mat);
       if (cfg.radii) mesh.scale.set(1, cfg.radii.y / cfg.radii.x, cfg.radii.z / cfg.radii.x);
       group.add(mesh);
@@ -352,7 +379,7 @@ export class SceneRenderer {
         }
       }
 
-      if (cfg.detail) this._registerDetail(cfg.name, group, mat, cfg.detail, r);
+      if (cfg.detail) this._registerDetail(cfg.name, group, mat, cfg.detail, r, cfg.normalScale);
 
       this.root.add(group);
       this.bodyMeshes.set(cfg.name, entry);
@@ -360,9 +387,10 @@ export class SceneRenderer {
     }
   }
 
-  _registerDetail(name, anchor, material, detail, radiusUnits) {
+  _registerDetail(name, anchor, material, detail, radiusUnits, normalScale) {
     const uniforms = applyDetailShader(material, detail.style, detail.params, this.quality);
     if (!uniforms) return;
+    if (normalScale != null) uniforms.uNormalScale.value = normalScale;
     this.detailEntries.push({ name, anchor, uniforms, detail, radiusUnits, blend: 0 });
   }
 

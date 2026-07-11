@@ -33,6 +33,7 @@ export default {
     rotationPeriodHours: 9.925,
     axialTiltDeg: 3.13,
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
+    normalScale: 2.0,   // cloud band depth (drives procedural relief lighting)
     atmosphere: {
       glowColor: 0xffb877,    // warm orange-tan limb scattering
       thickness: 0.045,       // fraction of radius
@@ -88,6 +89,7 @@ export default {
       semiMajorAxisKm: 421700, periodDays: 1.769, phaseDeg: 0,
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
+      normalScale: 3.0, // extreme volcanic relief
       color: 0xd8c060,
       features: {
         volcanicPlumes: true,
@@ -118,6 +120,7 @@ export default {
       semiMajorAxisKm: 671100, periodDays: 3.551, phaseDeg: 105,
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
+      normalScale: 2.5, // ice crack depth
       color: 0xc8d0d8,
       features: { iceCracks: true, subsurfaceGlow: true },
       surfaceFeatures: [
@@ -139,6 +142,7 @@ export default {
       semiMajorAxisKm: 1070400, periodDays: 7.155, phaseDeg: 210,
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
+      normalScale: 2.5, // grooved terrain relief
       color: 0x9a8f80,
       features: { magnetosphereGlow: true },
       surfaceFeatures: [
@@ -162,6 +166,7 @@ export default {
       semiMajorAxisKm: 1882700, periodDays: 16.689, phaseDeg: 320,
       physics: 'nbody', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
+      normalScale: 2.0, // ancient crater depth
       color: 0x6b6258,
       features: {},
       surfaceFeatures: [
@@ -184,14 +189,14 @@ export default {
     },
 
     // Inner moons — ring sources, simplified Keplerian orbits.
-    { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078,
+    { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078, normalScale: 1.5,
       facts: ['Metis orbits inside Jupiter\'s main ring and supplies it with dust'], stats: { 'Radius': '~22 km', 'Orbital period': '7.1 hours' } },
-    { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c,
+    { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c, normalScale: 1.5,
       facts: ['Adrastea is one of the smallest known moons, discovered by Voyager 2'], stats: { 'Radius': '~8 km', 'Orbital period': '7.2 hours' } },
-    { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540,
+    { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540, normalScale: 1.5,
       radii: { x: 125, y: 73, z: 64 }, // real irregular body: 250 x 146 x 128 km
       facts: ['Amalthea is the reddest object in the solar system', 'It sheds the dust that forms the Amalthea gossamer ring'], stats: { 'Dimensions': '250 × 146 × 128 km', 'Orbital period': '12 hours' } },
-    { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a,
+    { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a, normalScale: 1.5,
       facts: ['Thebe feeds the outermost, faintest gossamer ring'], stats: { 'Radius': '~49 km', 'Orbital period': '16.2 hours' } },
   ],
 

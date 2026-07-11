@@ -19,10 +19,12 @@ export function createPostFX(renderer, scene, camera, quality) {
   });
   composer.addPass(new RenderPass(scene, camera));
 
+  // Tight bloom: only the very brightest pixels (sun, Io hotspots, Europa
+  // ocean glow) — cloud bands and surface detail must stay crisp.
   const bloom = new BloomEffect({
-    intensity: 0.85,
-    luminanceThreshold: 0.72,
-    luminanceSmoothing: 0.25,
+    intensity: 0.8,
+    luminanceThreshold: 0.85,
+    luminanceSmoothing: 0.1,
     kernelSize: KernelSize.LARGE,
     mipmapBlur: true,
   });

@@ -120,6 +120,21 @@ float fbm4(vec3 p) {
 #endif
 }
 
+// Dynamic-octave fBm — octave count chosen per fragment from altitude, so
+// each zoom level reveals genuinely new detail (SpaceEngine-style staging).
+// WebGL2 / GLSL ES 3.00 permits the non-constant loop exit; 9 is the cap.
+float fbmN(vec3 p, int octaves) {
+  float f = 0.0, a = 0.5, norm = 0.0;
+  for (int i = 0; i < 9; i++) {
+    if (i >= octaves) break;
+    f += a * snoise(p);
+    norm += a;
+    a *= 0.5;
+    p *= 2.0;
+  }
+  return f / max(norm, 1e-4);
+}
+
 float ridgedFbm3(vec3 p) {
   float f = 0.5 * ridged(p);
   f += 0.25 * ridged(p * 2.1);
@@ -154,6 +169,19 @@ vec2 worley2(vec2 p) {
     }
   }
   return vec2(f1, id);
+}
+
+// Screen-space bump perturbation (Blinn / Three.js perturbNormalArb form):
+// tilts the shading normal from the screen-space derivatives of a procedural
+// height value, so noise-driven relief also drives the lighting.
+vec3 dtlPerturbNormal(vec3 surfPos, vec3 surfNorm, float dHdx, float dHdy, float scale) {
+  vec3 sigmaX = dFdx(surfPos);
+  vec3 sigmaY = dFdy(surfPos);
+  vec3 r1 = cross(sigmaY, surfNorm);
+  vec3 r2 = cross(surfNorm, sigmaX);
+  float det = dot(sigmaX, r1);
+  vec3 grad = sign(det) * (dHdx * r1 + dHdy * r2);
+  return normalize(abs(det) * surfNorm - scale * grad);
 }
 
 // Circular crater profile from a cellular field: 0 = untouched surface,
