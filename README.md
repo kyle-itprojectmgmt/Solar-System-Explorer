@@ -2,12 +2,14 @@
 
 A photorealistic, first-person 3D explorer of the solar system — v1 covers the **Jupiter system**, seen as Voyager saw it in March 1979. Built with Three.js + Vite, deployed on Cloudflare Pages.
 
-**Live demo:** _Cloudflare Pages URL goes here after first deploy_
+**Live demo:** https://solar-system-explorer.kyle-d06.workers.dev
 
 ## Features
 
 - **N-body physics** — velocity-Verlet integration of the Galilean moons with mutual perturbations (the 1:2:4 Io–Europa–Ganymede Laplace resonance emerges naturally); inner ring moons ride Keplerian orbits
-- **Six camera modes** — Cinematic auto-pilot (`C`), Free Fly (`F`, WASD + mouse), Orbit (`O` + click), Surface (`S` + click), Chase (`H` + click), System View (`G`)
+- **Seven camera modes** — Cinematic auto-pilot (`C`), Free Fly (`F`, WASD + mouse), Orbit (`O` + click), Surface (`S` + click), Chase (`H` + click), Orbit Insertion (`I`, physically accurate orbits incl. Jupiter GeoSync), System View (`G`)
+- **Altitude control** — scroll-wheel zoom with minimum safe altitude floors, ALT readout, one-click presets down to a 50 km skim, named surface-feature labels at low altitude
+- **In-app help** — press `?` for the full controls reference
 - **Time control** — pause to 10,000× (`Space`, `,`, `.`), simulation clock starts at the Voyager 1 flyby (March 5, 1979)
 - **Eclipses & transits** — moons darken dramatically in Jupiter's shadow cone; transit shadows track across the cloud tops; upcoming events tick down in the side panel
 - **Jupiter's four rings** — halo torus, main ring, and both gossamer rings, with forward-scattering shaders that light up when backlit

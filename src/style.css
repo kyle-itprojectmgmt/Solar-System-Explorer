@@ -386,7 +386,7 @@ html, body {
   z-index: 50;
   transition: opacity 0.25s;
 }
-.help-overlay.hidden { opacity: 0; pointer-events: none; }
+#ui-root .help-overlay.hidden { opacity: 0; pointer-events: none; }
 .help-card {
   width: min(680px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
