@@ -136,7 +136,10 @@ export default {
         { name: 'Galileo Regio',   latDeg: 35,   lonDeg: 133 },
         { name: 'Nicholson Regio', latDeg: -20,  lonDeg: 356 },
         { name: 'Uruk Sulcus',     latDeg: 0.8,  lonDeg: 160.3 },
+        { name: 'Osiris Crater',   latDeg: -38,  lonDeg: 166 },
+        { name: 'Gilgamesh Basin', latDeg: -62,  lonDeg: 125 },
       ],
+      detail: { style: 'grooved', activationKm: 10000, fullKm: 500 },
       facts: [
         'Ganymede is larger than the planet Mercury',
         'It is the only moon in the solar system with its own magnetic field',

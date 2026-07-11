@@ -199,6 +199,67 @@ DETAIL_STYLES.ice = {
   `,
 };
 
+// -- Grooved (Ganymede): two-tone tectonic terrain + polar aurora ----------------
+
+DETAIL_STYLES.grooved = {
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    float t1 = uTime * 0.00003;
+    float dLum = dot(dBase, vec3(0.299, 0.587, 0.114));
+
+    // DARK TERRAIN — ancient cratered silicate regolith.
+    vec3 darkDetail = detail;
+    {
+      float dust = fbm3(vObjPos * 220.0 + vec3(t1));
+      darkDetail = mix(darkDetail,
+        mix(vec3(0.165, 0.122, 0.055), vec3(0.239, 0.169, 0.102),      // #2A1F0E -> #3D2B1A
+            0.5 + 0.5 * dust), 0.45);
+      // Crater micro-detail eases in below ~3,000 km so the global view
+      // isn't tiled with rim rings.
+      float crAct = 1.0 - smoothstep(500.0, 3000.0, uAltitude);
+      float dcId; float dc = craterProfile(dUv * 60.0, dcId);
+      dc *= step(0.45, dcId) * crAct;
+      darkDetail = mix(darkDetail, vec3(0.290, 0.220, 0.157), clamp(dc, 0.0, 1.0) * 0.35);  // #4A3828 rims
+      darkDetail = mix(darkDetail, vec3(0.102, 0.063, 0.031), clamp(-dc, 0.0, 1.0) * 0.5);  // #1A1008 floors
+      // Impact gardening — billions of years of micrometeorite powder.
+      darkDetail *= 0.94 + 0.12 * snoise(vObjPos * 900.0);
+    }
+
+    // LIGHT TERRAIN — younger grooved ice, parallel ridge-and-groove bands.
+    vec3 lightDetail = detail;
+    {
+      // Groove orientation rotates slowly by region (separate tectonic episodes).
+      float gAng = snoise(vObjPos * 2.6 + 5.0) * 1.8;
+      vec2 gUv = mat2(cos(gAng), -sin(gAng), sin(gAng), cos(gAng)) * dUv;
+      // Vinyl-record parallel bands with a little waviness.
+      float bands = sin(gUv.y * 900.0 + snoise(vObjPos * 30.0) * 4.0);
+      vec3 ridgeCol = vec3(0.784, 0.831, 0.753);  // #C8D4C0
+      vec3 grooveCol = vec3(0.502, 0.565, 0.627); // #8090A0
+      lightDetail = mix(lightDetail, mix(grooveCol, ridgeCol, 0.5 + 0.5 * bands), 0.30);
+      // Fresh crater ejecta rays.
+      float ray = smoothstep(0.88, 0.98, snoise(vObjPos * 55.0 + 23.0));
+      lightDetail = mix(lightDetail, vec3(0.910, 0.933, 0.878), ray * 0.5);   // #E8EEE0
+    }
+
+    // Terrain split by base luminance with a smooth transition zone.
+    float split = smoothstep(0.35, 0.45, dLum);
+    detail = mix(darkDetail, lightDetail, split);
+
+    // POLAR AURORA — Ganymede's own magnetosphere, below 2,000 km.
+    float aurAct = 1.0 - smoothstep(600.0, 2000.0, uAltitude);
+    if (aurAct > 0.001) {
+      float lat = abs(vObjPos.y);
+      float polar = smoothstep(0.866, 0.94, lat); // above ~60 deg latitude
+      if (polar > 0.001) {
+        float dance = 0.5 + 0.5 * sin(uTime * 0.3 + vObjPos.y * 6.0 + snoise(vObjPos * 40.0 + t1 * 40.0) * 3.0);
+        gDetailEmissive += vec3(0.267, 1.0, 0.533)                     // #44FF88
+          * 0.03 * polar * dance * aurAct * uDetailBlend;
+      }
+    }
+    ${DETAIL_FINAL}
+  `,
+};
+
 // -- Gas giant: banded cloud turbulence + vortex + limb haze ---------------------
 
 DETAIL_STYLES.gasGiant = {
