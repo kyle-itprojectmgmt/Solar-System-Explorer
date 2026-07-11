@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { TEXTURE_BASE_URL, KM_PER_UNIT, AU_KM } from '../config.js';
+import { applyDetailShader, detailBlend } from './detailShaders.js';
 
 const K = 1 / KM_PER_UNIT; // km -> scene units
 
@@ -56,6 +57,7 @@ export class SceneRenderer {
     this.bodyMeshes = new Map(); // name -> { mesh, group, cfg, ... }
     this.pickables = [];
     this.resizeHooks = []; // extra consumers (postfx) resize through here
+    this.detailEntries = []; // bodies with procedural detail shaders
 
     this._buildLights();
     this._buildStarfield();
@@ -194,6 +196,8 @@ export class SceneRenderer {
     this.root.add(this.primaryMesh);
     this.pickables.push(this._makePicker(p.name, this.primaryMesh, rEq));
 
+    if (p.detail) this._registerDetail(p.name, this.primaryMesh, mat, p.detail, rEq);
+
     // Progressive high-res swap (outside the loading manager on purpose —
     // the app starts on the low-res map and upgrades silently).
     if (this.quality.highResPrimary && p.textures.diffuseHigh) {
@@ -203,6 +207,12 @@ export class SceneRenderer {
         mat.map?.dispose();
         mat.map = tex;
         mat.needsUpdate = true;
+        // The high-res map may have a different longitude origin — retarget
+        // any UV-anchored detail features (e.g. the Great Red Spot).
+        const entry = this.detailEntries.find((e) => e.name === p.name);
+        if (entry?.uniforms.uGrsUV && p.detail?.params?.grsUVHigh) {
+          entry.uniforms.uGrsUV.value.set(...p.detail.params.grsUVHigh);
+        }
       });
     }
 
@@ -336,9 +346,34 @@ export class SceneRenderer {
         }
       }
 
+      if (cfg.detail) this._registerDetail(cfg.name, group, mat, cfg.detail, r);
+
       this.root.add(group);
       this.bodyMeshes.set(cfg.name, entry);
       this.pickables.push(this._makePicker(cfg.name, group, r));
+    }
+  }
+
+  _registerDetail(name, anchor, material, detail, radiusUnits) {
+    const uniforms = applyDetailShader(material, detail.style, detail.params, this.quality);
+    if (!uniforms) return;
+    this.detailEntries.push({ name, anchor, uniforms, detail, radiusUnits, blend: 0 });
+  }
+
+  /** Current procedural-detail blend (0..1) for a body — for the UI indicator. */
+  getDetailBlend(name) {
+    return this.detailEntries.find((e) => e.name === name)?.blend ?? 0;
+  }
+
+  _updateDetailShaders(physics) {
+    const t = physics.simSeconds % 1e6; // keep float32-precision-friendly
+    const v = this._tmpV ??= new THREE.Vector3();
+    for (const e of this.detailEntries) {
+      const altKm = (e.anchor.getWorldPosition(v).distanceTo(this.camera.position) - e.radiusUnits) * KM_PER_UNIT;
+      e.blend = detailBlend(altKm, e.detail.activationKm, e.detail.fullKm);
+      e.uniforms.uTime.value = t;
+      e.uniforms.uAltitude.value = altKm;
+      e.uniforms.uDetailBlend.value = e.blend;
     }
   }
 
@@ -417,6 +452,7 @@ export class SceneRenderer {
   update(physics, dt, elapsed) {
     const p = this.system.primary;
     this.primaryMesh.rotation.y = physics.primaryRotation;
+    this._updateDetailShaders(physics);
 
     for (const b of physics.bodies) {
       const entry = this.bodyMeshes.get(b.name);

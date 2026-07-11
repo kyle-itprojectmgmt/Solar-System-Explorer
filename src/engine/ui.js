@@ -281,7 +281,11 @@ export class UI {
       : this.system.bodies.find((b) => b.name === name);
     if (!cfg) return;
     this.info.innerHTML = '';
+    this.infoBody = name;
     el('h2', 'info-title', this.info).textContent = cfg.name;
+    this.detailDot = el('div', 'detail-indicator', this.info);
+    this.detailDot.textContent = '● Surface Detail Active';
+    this.detailDot.style.display = 'none';
     const stats = el('dl', 'info-stats', this.info);
     for (const [k, v] of Object.entries(cfg.stats || {})) {
       el('dt', '', stats).textContent = k;
@@ -544,6 +548,12 @@ export class UI {
 
     // Orbit insertion live readout.
     if (this.cam.mode === 'insertion') this._updateInsertionInfo();
+
+    // Procedural detail indicator on the open info panel.
+    if (this.detailDot && !this.info.classList.contains('hidden')) {
+      this.detailDot.style.display =
+        this.r.getDetailBlend(this.infoBody) > 0.05 ? '' : 'none';
+    }
 
     // Eclipse notifications.
     for (const b of this.physics.bodies) {
