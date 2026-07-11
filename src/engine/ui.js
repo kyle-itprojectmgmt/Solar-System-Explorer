@@ -1122,6 +1122,83 @@ export class UI {
 
   _buildNotifications() {
     this.noteWrap = el('div', 'notifications', this.rootEl);
+    // Event toasts (G7) — bottom center, above the tray.
+    this.toastWrap = el('div', 'event-toasts', this.rootEl);
+    this._toastSeen = new Map();  // occurrence key -> expiry (sim s)
+    this._toastQueue = [];
+    this._toastTimer = 0;
+  }
+
+  // -- Upcoming-event toasts (V4c Group 7) ------------------------------------------------
+
+  /** Once a second: surface eclipse/transit events that are imminent in
+   *  WALL-clock terms at the current multiplier (timely, not spammy). */
+  _updateEventToasts(dt) {
+    this._toastTimer -= dt;
+    if (this._toastTimer > 0) return;
+    this._toastTimer = 1;
+    const mult = this.physics.timeMultiplier;
+    if (mult <= 0) return;
+    for (const evt of this.physics.predictEvents(5)) {
+      const wallLead = evt.inSeconds / mult;
+      if (wallLead > 30 || evt.inSeconds < 1) continue; // > ~30 wall-s away
+      const key = `${evt.body}:${evt.type}:${Math.round((this.physics.simSeconds + evt.inSeconds) / 120)}`;
+      if (this._toastSeen.has(key)) continue;
+      this._toastSeen.set(key, this.physics.simSeconds + evt.inSeconds + 600);
+      this._spawnToast(evt);
+    }
+    // Expire dedupe keys once their events have long passed.
+    for (const [k, exp] of this._toastSeen) {
+      if (this.physics.simSeconds > exp) this._toastSeen.delete(k);
+    }
+    // Promote queued toasts when a slot frees up (max 2 visible).
+    while (this._toastQueue.length && this.toastWrap.children.length < 2) {
+      this.toastWrap.appendChild(this._toastQueue.shift());
+    }
+  }
+
+  _spawnToast(evt) {
+    const t = el('div', 'event-toast', null);
+    const verb = evt.type === 'eclipse' ? 'eclipse begins' : 'transit begins';
+    el('span', 'toast-text', t).textContent = `🔔 ${evt.body} ${verb} in ${fmtDur(evt.inSeconds)}`;
+    const watch = el('button', 'btn btn-small btn-primary', t);
+    watch.textContent = 'Watch →';
+    watch.onclick = () => { this._watchEvent(evt); t.remove(); };
+    const x = el('button', 'toast-x', t);
+    x.textContent = '✕';
+    x.onclick = () => t.remove();
+    setTimeout(() => t.remove(), 30000); // auto-dismiss
+    if (this.toastWrap.children.length < 2) this.toastWrap.appendChild(t);
+    else this._toastQueue.push(t);
+  }
+
+  /** Fly to the optimal viewpoint for the event type. */
+  _watchEvent(evt) {
+    const primary = this.system.primary.name;
+    if (evt.type === 'eclipse') {
+      // Pull back past the moon, looking inward: moon in the foreground,
+      // Jupiter behind it — the shadow crossing reads clearly.
+      const moonPos = this.r.bodyWorldPos(evt.body);
+      const jupPos = this.r.bodyWorldPos(primary);
+      const dir = moonPos.clone().sub(jupPos).normalize();
+      this.cam.setMode('orbit', evt.body);
+      this.cam.orbSpeedMult = Math.min(this.cam.orbSpeedMult, 0.2);
+      this.cam.orbTheta = Math.atan2(dir.z, dir.x);
+      this.cam.orbPhi = Math.PI / 2 - 0.12;
+      this.cam.orbDist = this.r.bodyRadius(evt.body) * 14;
+      this.cam.distTween = null;
+      this.notify(`Watching ${evt.body} — eclipse ahead`);
+    } else {
+      // Transit: sun-side view of Jupiter's face for the shadow silhouette.
+      const d = this.r.sunDir;
+      this.cam.setMode('orbit', primary);
+      this.cam.orbSpeedMult = Math.min(this.cam.orbSpeedMult, 0.2);
+      this.cam.orbTheta = Math.atan2(d.z, d.x);
+      this.cam.orbPhi = Math.PI / 2 - 0.1;
+      this.cam.orbDist = this.r.bodyRadius(primary) * 3.5;
+      this.cam.distTween = null;
+      this.notify(`Watching ${primary} — ${evt.body} transit ahead`);
+    }
   }
 
   notify(text) {
@@ -1378,6 +1455,9 @@ export class UI {
       if (b.inTransit && !prev.tra) this.notify(`${b.name} transiting ${this.system.primary.name}`);
       this.eclipseStates.set(b.name, { ecl, tra: b.inTransit });
     }
+
+    // Upcoming-event toasts.
+    this._updateEventToasts(dt);
 
     // Time panel date button mirrors the HUD clock.
     if (this.openPanelId === 'time') {
