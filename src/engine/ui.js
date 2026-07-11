@@ -41,6 +41,7 @@ export class UI {
     this.rootEl.id = 'ui-root';
     document.body.appendChild(this.rootEl);
 
+    this._buildDismissOverlay();
     this._buildHUD();
     this._buildIconStack();
     this._buildInsertionPanel();
@@ -50,6 +51,7 @@ export class UI {
     this._buildViewButtons();
     this._buildNotifications();
     this._buildLabels();
+    this._registerPanels();
     this._bindKeys();
     this._attachTooltips();
 
@@ -229,7 +231,12 @@ export class UI {
     this.rootEl.querySelectorAll('[data-cam-mode]').forEach((b) => {
       b.classList.toggle('active', b.dataset.camMode === mode);
     });
-    if (this.insPanel) this.insPanel.style.display = mode === 'insertion' ? '' : 'none';
+    // The OI panel is owned by the panel manager (V5b): entering insertion
+    // opens it (closing whatever else was open); leaving insertion closes it.
+    if (this.insPanel && this._panels) {
+      if (mode === 'insertion') this.openPanel('orbital-insertion');
+      else if (this._activePanel === 'orbital-insertion') this.closeAllPanels();
+    }
     if (this.chaseSec) this.chaseSec.style.display = mode === 'chase' ? '' : 'none';
   }
 
@@ -302,16 +309,110 @@ export class UI {
     this._buildSpdPanel(this.stackContents.spd);
   }
 
-  /** One panel open at a time; the ghost clock dims while any is open. */
+  /** One panel open at a time — routes through the global manager (V5b). */
   togglePanel(id, force) {
     const open = force !== undefined ? force : this.openPanelId !== id;
+    if (open) this.openPanel(id);
+    else if (this._activePanel === id) this.closeAllPanels();
+  }
+
+  /** Raw stack-panel DOM state; id = null hides everything. Manager-internal. */
+  _setStackPanel(id) {
     for (const [pid, c] of Object.entries(this.stackContents)) {
-      c.style.display = open && pid === id ? '' : 'none';
-      this.stackButtons[pid].classList.toggle('active', open && pid === id);
+      c.style.display = id && pid === id ? '' : 'none';
+      this.stackButtons[pid].classList.toggle('active', !!id && pid === id);
     }
-    this.stackPanel.style.display = open ? '' : 'none';
-    this.openPanelId = open ? id : null;
-    this.hudGhost.classList.toggle('dimmed', open);
+    this.stackPanel.style.display = id ? '' : 'none';
+    this.openPanelId = id;
+    this.hudGhost.classList.toggle('dimmed', !!id);
+  }
+
+  // -- V5b: central panel manager — one panel open at a time, GLOBALLY -----------
+  // Covers the nine stack panels, the Orbital Insertion panel, the body info
+  // card, and the audio flyout. The bottom tray is a persistent control
+  // surface, not a panel. The date picker is an anchored popover with its own
+  // click-away dismiss and stays outside the registry.
+
+  _registerPanels() {
+    this._panels = new Map();
+    this._activePanel = null;
+
+    // Stack panels share one container; open/close via _setStackPanel.
+    for (const id of this._panelOrder) {
+      this._panels.set(id, {
+        open: () => this._setStackPanel(id),
+        close: () => this._setStackPanel(null),
+      });
+    }
+
+    this._panels.set('orbital-insertion', {
+      open: () => { this.insPanel.style.display = ''; },
+      close: () => {
+        this.insPanel.style.display = 'none';
+        // Dismissing the panel leaves the mode too (item 3b): back to the
+        // mode the camera was in before insertion. Guarded so mode changes
+        // that closed the panel themselves don't re-enter setMode.
+        if (this.cam.mode === 'insertion') {
+          const prev = (this.cam.preModeOI && this.cam.preModeOI !== 'insertion')
+            ? this.cam.preModeOI : 'free';
+          const needsTarget = ['orbit', 'chase', 'surface'].includes(prev);
+          this.cam.setMode(prev,
+            needsTarget ? (this.cam.lastTarget || this.system.primary.name) : null);
+        }
+      },
+    });
+
+    this._panels.set('body-info', {
+      open: () => this.info.classList.remove('hidden'),
+      close: () => this.info.classList.add('hidden'),
+    });
+
+    this._panels.set('audio', {
+      open: () => { this.audioFlyout.style.display = ''; },
+      close: () => { this.audioFlyout.style.display = 'none'; },
+    });
+  }
+
+  openPanel(id) {
+    if (this._activePanel && this._activePanel !== id) {
+      const prev = this._panels.get(this._activePanel);
+      this._activePanel = null; // clear first — close fns may cascade
+      prev?.close();
+    }
+    this._activePanel = id;
+    this._panels.get(id)?.open();
+    this.dismissOverlay.style.display = 'block';
+  }
+
+  closeAllPanels() {
+    const id = this._activePanel;
+    this._activePanel = null; // clear first — close fns may cascade
+    if (id) this._panels.get(id)?.close();
+    this.dismissOverlay.style.display = 'none';
+  }
+
+  /** Transparent full-screen catcher shown while a panel is open. Sits below
+   *  every UI element (first positioned child of #ui-root, DOM order) but
+   *  above the canvas, so clicks that miss all UI dismiss the active panel. */
+  _buildDismissOverlay() {
+    const d = el('div', '', this.rootEl);
+    d.id = 'dismiss-overlay';
+    d.style.cssText = 'position:fixed;inset:0;background:transparent;display:none;cursor:default;';
+    d.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.closeAllPanels();
+    });
+    // Mobile: a swipe that starts on the overlay also dismisses.
+    let tx = 0, ty = 0;
+    d.addEventListener('touchstart', (e) => {
+      tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+    }, { passive: true });
+    d.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - tx;
+      const dy = e.changedTouches[0].clientY - ty;
+      if (Math.abs(dx) > 20 || Math.abs(dy) > 20) this.closeAllPanels();
+    }, { passive: true });
+    this.dismissOverlay = d;
   }
 
   _cyclePanel() {
@@ -803,7 +904,12 @@ export class UI {
     const p = el('div', 'insertion-panel panel', this.rootEl);
     this.insPanel = p;
     p.style.display = 'none';
-    el('h2', 'side-title', p).textContent = 'ORBITAL INSERTION';
+    const head = el('div', 'oi-header', p);
+    el('h2', 'side-title', head).textContent = 'ORBITAL INSERTION';
+    const closeBtn = el('button', 'panel-close-btn', head);
+    closeBtn.id = 'oi-close';
+    closeBtn.textContent = '✕';
+    closeBtn.onclick = () => this.closeAllPanels();
 
     // Parent body selector: primary + major moons.
     const bodyRow = el('div', 'btn-grid', p);
@@ -886,6 +992,11 @@ export class UI {
     const m = Math.floor((ins.periodS % 3600) / 60);
     const s = Math.floor(ins.periodS % 60);
     const isPrimary = ins.body === this.system.primary.name;
+    // Radiation warning is config-driven per body (V5b): show the label of
+    // whichever zone the altitude falls in, nothing outside all zones.
+    // (Jupiter declares one blanket zone; Earth the Van Allen belts.)
+    const zones = this._bodyCfg(ins.body)?.radiationWarning?.zones || [];
+    const zone = zones.find((z) => ins.altitudeKm >= z.minKm && ins.altitudeKm <= z.maxKm);
     this.insInfo.innerHTML = `
       <div class="ins-row"><span>Altitude</span><span>${Math.round(ins.altitudeKm).toLocaleString()} km above ${isPrimary ? 'clouds' : 'surface'}</span></div>
       <div class="ins-row"><span>Velocity</span><span>${ins.velKmS.toFixed(1)} km/s</span></div>
@@ -894,18 +1005,14 @@ export class UI {
       <div class="ins-row"><span>Surface speed</span><span>${
         ins.locked ? '0.0 km/s (Geosynchronous)' : `${ins.surfaceKmS.toFixed(1)} km/s`
       }</span></div>
-      ${isPrimary ? '<div class="ins-warn">⚠️ Extreme radiation environment</div>' : ''}`;
+      ${zone ? `<div class="ins-warn">${zone.label}</div>` : ''}`;
   }
 
   // -- Info panel -----------------------------------------------------------------
 
   _buildInfoPanel() {
+    // Outside-click dismissal is handled by the panel manager's overlay (V5b).
     this.info = el('div', 'info-panel panel hidden', this.rootEl);
-    document.addEventListener('pointerdown', (e) => {
-      if (!this.info.classList.contains('hidden') && !this.info.contains(e.target)) {
-        this.hideInfo();
-      }
-    });
   }
 
   showInfo(name) {
@@ -982,10 +1089,13 @@ export class UI {
     const close = el('button', 'btn', row);
     close.textContent = 'Close';
     close.onclick = () => this.hideInfo();
-    this.info.classList.remove('hidden');
+    this.openPanel('body-info');
   }
 
-  hideInfo() { this.info.classList.add('hidden'); }
+  hideInfo() {
+    if (this._activePanel === 'body-info') this.closeAllPanels();
+    else this.info.classList.add('hidden');
+  }
 
   // -- Bottom center tray (V4c Group 3) ---------------------------------------------
   // The one persistent control surface: music, volume, screenshot,
@@ -1135,7 +1245,8 @@ export class UI {
 
   toggleAudioFlyout(force) {
     const show = force !== undefined ? force : this.audioFlyout.style.display === 'none';
-    this.audioFlyout.style.display = show ? '' : 'none';
+    if (show) this.openPanel('audio');
+    else if (this._activePanel === 'audio') this.closeAllPanels();
   }
 
   /** Keep tray glow, mute icon, dropdown and active-row highlights in sync. */
@@ -1306,9 +1417,8 @@ export class UI {
         case 'KeyP': this.setPresentation(!this.presentationMode); break;
         case 'F11': e.preventDefault(); this.toggleFullscreen(); break;
         case 'Escape':
-          this.hideInfo();
-          if (this.openPanelId) this.togglePanel(this.openPanelId, false);
-          this.toggleAudioFlyout(false); this.toggleDatePicker(false);
+          this.closeAllPanels();
+          this.toggleDatePicker(false);
           break;
         default: break;
       }

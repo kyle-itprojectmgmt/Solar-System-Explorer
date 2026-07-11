@@ -138,7 +138,7 @@ async function boot() {
   // Dev-only handle for automated smoke tests.
   if (import.meta.env.DEV) {
     const THREE = await import('three');
-    window.__sse = { physics, renderer, cameraCtl, THREE };
+    window.__sse = { physics, renderer, cameraCtl, ui, THREE };
   }
 
   // -- Render loop ----------------------------------------------------------------

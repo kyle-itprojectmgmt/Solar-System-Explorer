@@ -542,6 +542,21 @@ html, body {
   .insertion-panel { width: min(264px, calc(100vw - 32px)); top: 96px; }
 }
 
+/* -- Panel manager (V5b) ----------------------------------------------------------------- */
+
+.oi-header { display: flex; align-items: center; justify-content: space-between; }
+.oi-header .side-title { margin-bottom: 0; }
+.panel-close-btn {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--gray-light);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.panel-close-btn:hover { color: #ffffff; }
+
 /* -- Info panel ------------------------------------------------------------------------ */
 
 .info-panel {

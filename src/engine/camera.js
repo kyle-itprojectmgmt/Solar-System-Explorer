@@ -81,6 +81,9 @@ export class CameraController {
 
   setMode(mode, target = null) {
     if (mode === this.mode && target === this.target) return;
+    // Remember where insertion was entered from, so dismissing the OI
+    // panel can return there (V5b item 3b).
+    if (mode === 'insertion' && this.mode !== 'insertion') this.preModeOI = this.mode;
     this.setFreeLook(false);
     this.mode = mode;
     this.target = target;
