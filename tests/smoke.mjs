@@ -34,7 +34,7 @@ await page.waitForFunction(
 
 // -- Group 1: version display ------------------------------------------------
 const ver = await page.$eval('#loading-version', (e) => e.textContent);
-check('loading screen shows v4.1.0', ver.includes('v4.1.0'), ver);
+check('loading screen shows v4.2.0', ver.includes('v4.2.0'), ver);
 
 // -- Group 2a/2b: plume + label parenting -------------------------------------
 const parenting = await page.evaluate(() => {
@@ -139,15 +139,15 @@ check('slider drag flies camera to ~5,000 km', Math.abs(alt.altKm - 5000) < 100,
 // -- Group 3c: presentation mode -----------------------------------------------------
 const pres = await page.evaluate(() => {
   const fs = !!document.querySelector('.fs-btn');
-  const eye = document.querySelector('.presentation-btn');
+  const eye = document.querySelector('[data-tray="presentation"]');
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', bubbles: true }));
   const on = document.body.classList.contains('presentation-mode');
-  const hudHidden = !document.querySelector('.hud-topleft').checkVisibility();
-  const panelHidden = !document.querySelector('.side-panel').checkVisibility();
+  const hudHidden = !document.querySelector('.hud-ghost').checkVisibility();
+  const panelHidden = !document.querySelector('.icon-stack').checkVisibility();
   const eyeVisible = eye.checkVisibility();
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', bubbles: true }));
   const off = !document.body.classList.contains('presentation-mode');
-  const hudBack = document.querySelector('.hud-topleft').checkVisibility();
+  const hudBack = document.querySelector('.hud-ghost').checkVisibility();
   return { fs, on, hudHidden, panelHidden, eyeVisible, off, hudBack };
 });
 check('fullscreen button present', pres.fs);

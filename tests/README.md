@@ -48,3 +48,10 @@ script's own directory) — git-ignored.
   `npm run preview`.
 - Zoom-floor resistance is asymptotic: assert convergence into the band
   above `hardKm`, not exact arrival at it.
+
+# v4c additions:
+node tests/freelook.mjs   # Alt free-look + inclination auto-switch
+node tests/tray.mjs       # bottom tray + audio flyout (17 checks)
+node tests/datepicker.mjs # ghost clock, calendar jump, LIVE mode
+node tests/stack.mjs      # icon stack: 6 panels, presets, ?view= URL sharing (23 checks)
+node tests/toast.mjs      # event toasts + Watch navigation
