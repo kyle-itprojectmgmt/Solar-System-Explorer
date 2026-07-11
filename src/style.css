@@ -407,31 +407,103 @@ html, body {
 .info-fact { font-size: 0.8rem; color: var(--gray-light); margin: 5px 0; font-weight: 300; }
 .info-actions { display: flex; gap: 8px; margin-top: 12px; }
 
-/* -- Audio + corners ---------------------------------------------------------------------- */
+/* -- Bottom center tray (V4c) ---------------------------------------------------------------- */
 
-.audio-panel {
+.bottom-tray {
   position: fixed;
-  left: 16px;
   bottom: 16px;
-  padding: 10px 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(20, 20, 40, 0.85);
+  border: 1px solid rgba(0, 119, 204, 0.3);
+  border-radius: 32px;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+  z-index: 1000;
 }
-.audio-row { display: flex; gap: 5px; margin-bottom: 8px; }
-.vol-slider { width: 100%; }
+.bottom-tray:hover { opacity: 1; }
+.tray-btn {
+  background: none;
+  border: none;
+  color: var(--white);
+  font-size: 1.05rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  line-height: 1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+.tray-btn:hover { background: rgba(102, 178, 255, 0.2); }
+.tray-music.audio-active { text-shadow: 0 0 10px #0077cc; color: var(--blue-light); }
+.tray-vol { width: 120px; accent-color: var(--blue-light); }
 
-.corner-buttons {
+/* -- Audio flyout (V4c) ------------------------------------------------------------------------ */
+
+.audio-flyout {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  padding: 12px 14px;
+  background: rgba(20, 20, 40, 0.9);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
   gap: 8px;
+  z-index: 1000;
+  animation: afSlideUp 0.3s ease-out;
 }
-.kofi-btn {
-  background: var(--panel-bg);
-  border-color: rgba(102, 178, 255, 0.4);
-  font-size: 0.7rem;
+@keyframes afSlideUp {
+  from { transform: translate(-50%, 12px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
 }
+.af-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+}
+.af-row.af-active { border-left-color: var(--blue); background: rgba(0, 119, 204, 0.12); }
+.af-label {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+}
+.af-select {
+  flex: 1;
+  background: rgba(5, 5, 16, 0.6);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  padding: 5px 7px;
+}
+.af-stream { flex-direction: column; align-items: stretch; gap: 6px; }
+.af-stream-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.af-stream-head svg { width: 15px; height: 15px; }
+.af-stream-head .af-chev { margin-left: auto; color: var(--gray-light); }
+.af-stream-body { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.kofi-btn { font-size: 1rem; }
 
 /* -- Fullscreen + presentation mode ------------------------------------------------------------ */
 
@@ -444,24 +516,16 @@ html, body {
 /* Keep the fullscreen button reachable when Mission Control is open. */
 #ui-root:has(.side-panel.open) .fs-btn { right: 328px; }
 
-.presentation-btn {
-  position: fixed;
-  right: 16px;
-  bottom: 132px;
-  background: var(--panel-bg);
-  opacity: 0.55;
-}
-.presentation-btn:hover { opacity: 1; }
-
-/* Presentation mode: pure 3D scene — only the subtle exit eye survives. */
-body.presentation-mode #ui-root > *:not(.presentation-btn) { display: none !important; }
-body.presentation-mode .presentation-btn {
-  bottom: 16px;
-  opacity: 0.22;
+/* Presentation mode: pure 3D scene — only the tray's subtle exit eye
+   survives (everything else, including the rest of the tray, hides). */
+body.presentation-mode #ui-root > *:not(.bottom-tray) { display: none !important; }
+body.presentation-mode .bottom-tray {
   background: transparent;
   border-color: transparent;
+  opacity: 0.25;
 }
-body.presentation-mode .presentation-btn:hover { opacity: 0.9; }
+body.presentation-mode .bottom-tray:hover { opacity: 0.9; }
+body.presentation-mode .bottom-tray > *:not([data-tray="presentation"]) { display: none !important; }
 
 /* -- Notifications --------------------------------------------------------------------------- */
 
@@ -488,34 +552,7 @@ body.presentation-mode .presentation-btn:hover { opacity: 0.9; }
 }
 .notification.show { opacity: 1; transform: translateY(0); }
 
-/* -- Embed drawer ------------------------------------------------------------------------------- */
-
-.embed-drawer {
-  position: fixed;
-  left: 16px;
-  bottom: 96px;
-  width: 320px;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-  max-height: 320px;
-}
-.embed-drawer.collapsed { max-height: 38px; }
-.embed-head {
-  width: 100%;
-  background: none;
-  border: none;
-  color: var(--blue-light);
-  font-family: var(--font-head);
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 10px;
-  cursor: pointer;
-  text-align: left;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.embed-chevron { color: var(--gray-light); font-size: 0.9rem; }
+/* -- Embed inputs (shared by the audio flyout) ---------------------------------------------------- */
 
 /* Streaming-brand icons (3d) */
 .brand-spotify svg, .brand-youtube svg { width: 16px; height: 16px; display: block; }

@@ -44,11 +44,10 @@ export class UI {
     this._buildInsertionPanel();
     this._buildInfoPanel();
     this._buildHelpOverlay();
-    this._buildAudioControls();
-    this._buildCornerButtons();
+    this._buildBottomTray();
+    this._buildAudioFlyout();
     this._buildViewButtons();
     this._buildNotifications();
-    this._buildEmbedDrawer();
     this._buildLabels();
     this._bindKeys();
     this._attachTooltips();
@@ -528,59 +527,179 @@ export class UI {
     this.help.classList.toggle('hidden', !show);
   }
 
-  // -- Audio controls ----------------------------------------------------------------
+  // -- Bottom center tray (V4c Group 3) ---------------------------------------------
+  // The one persistent control surface: music, volume, screenshot,
+  // presentation mode, Ko-fi. Fixed bottom-center, never moves.
 
-  _buildAudioControls() {
-    const wrap = el('div', 'audio-panel panel', this.rootEl);
-    const row = el('div', 'audio-row', wrap);
-    for (const m of AUDIO_MODES) {
-      const b = el('button', 'btn btn-icon', row);
-      // Brand-accurate inline SVG for the streaming services (3d).
-      if (m.id === 'spotify') { b.classList.add('brand-spotify'); b.innerHTML = SPOTIFY_SVG; }
-      else if (m.id === 'youtube') { b.classList.add('brand-youtube'); b.innerHTML = YOUTUBE_SVG; }
-      else b.textContent = m.icon;
-      b.title = m.label;
-      b.dataset.audioMode = m.id;
-      b.onclick = () => {
-        this.audio.setMode(m.id);
-        row.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
-      };
-      if (m.id === this.audio.mode) b.classList.add('active');
-    }
-    const vol = el('input', 'slider vol-slider', wrap);
-    Object.assign(vol, { type: 'range', min: 0, max: 1, step: 0.01, value: this.audio.volume });
-    vol.oninput = () => this.audio.setVolume(+vol.value);
-  }
+  _buildBottomTray() {
+    const tray = el('div', 'bottom-tray', this.rootEl);
+    this.tray = tray;
 
-  // -- Corner buttons (Ko-fi + screenshot) -----------------------------------------------
+    this.musicBtn = el('button', 'tray-btn tray-music', tray);
+    this.musicBtn.textContent = '🎵';
+    this.musicBtn.onclick = () => this.toggleAudioFlyout();
 
-  _buildCornerButtons() {
-    const wrap = el('div', 'corner-buttons', this.rootEl);
-    const kofi = el('a', 'btn kofi-btn', wrap);
+    this.trayVol = el('input', 'slider tray-vol', tray);
+    Object.assign(this.trayVol, { type: 'range', min: 0, max: 1, step: 0.01, value: this.audio.volume });
+    this.trayVol.oninput = () => {
+      this.audio.setVolume(+this.trayVol.value);
+      if (+this.trayVol.value > 0) this._muted = false;
+      this._syncAudioUI();
+    };
+
+    const shot = el('button', 'tray-btn', tray);
+    shot.textContent = '📷';
+    shot.dataset.tray = 'screenshot';
+    shot.onclick = () => this.onScreenshot?.();
+
+    this.presBtn = el('button', 'tray-btn', tray);
+    this.presBtn.textContent = '👁';
+    this.presBtn.dataset.tray = 'presentation';
+    this.presBtn.onclick = () => this.setPresentation(!this.presentationMode);
+
+    const kofi = el('a', 'tray-btn kofi-btn', tray);
     kofi.href = KOFI_URL;
     kofi.target = '_blank';
     kofi.rel = 'noopener';
-    kofi.textContent = '☕ Support this project';
-    const shot = el('button', 'btn btn-icon', wrap);
-    shot.textContent = '📷';
-    shot.title = 'Screenshot';
-    shot.onclick = () => this.onScreenshot?.();
+    kofi.textContent = '☕';
+  }
+
+  // -- Audio flyout (V4c Group 4) -----------------------------------------------------
+  // Expands upward from the tray's music icon. Replaces the old Player
+  // panel and the 7-button audio mode row.
+
+  _buildAudioFlyout() {
+    const p = el('div', 'audio-flyout panel', this.rootEl);
+    this.audioFlyout = p;
+    p.style.display = 'none';
+
+    // Row 1 — mute toggle.
+    const muteRow = el('div', 'af-row', p);
+    this.muteBtn = el('button', 'tray-btn', muteRow);
+    this.muteBtn.onclick = () => {
+      this._muted = !this._muted;
+      if (this._muted) {
+        this._preMuteVol = this.audio.volume || 0.6;
+        this.audio.setVolume(0);
+      } else {
+        this.audio.setVolume(this._preMuteVol ?? 0.6);
+      }
+      this._syncAudioUI();
+    };
+    el('span', 'af-label', muteRow).textContent = 'Mute';
+
+    // Row 2 — generative sounds dropdown.
+    this.genRow = el('div', 'af-row', p);
+    el('span', 'af-label', this.genRow).textContent = 'Space Sounds';
+    this.genSelect = el('select', 'af-select', this.genRow);
+    const GEN = [
+      ['silent', '— None —'],
+      ['voyager', 'Voyager Radio'],
+      ['ambient', 'Deep Space Ambient'],
+      ['psychedelic', 'Psychedelic Journey'],
+      ['electronic', 'Cosmic Electronic'],
+    ];
+    for (const [id, label] of GEN) {
+      const o = el('option', '', this.genSelect);
+      o.value = id; o.textContent = label;
+    }
+    this.genSelect.onchange = () => {
+      this.audio.setMode(this.genSelect.value);
+      this._syncAudioUI();
+    };
+
+    // Rows 3/4 — streaming services with expandable URL inputs.
+    this.streamRows = {};
+    for (const [mode, svg, label] of [
+      ['spotify', SPOTIFY_SVG, 'Spotify Playlist'],
+      ['youtube', YOUTUBE_SVG, 'YouTube Playlist'],
+    ]) {
+      const row = el('div', 'af-row af-stream', p);
+      const head = el('button', `af-stream-head brand-${mode}`, row);
+      head.innerHTML = `${svg}<span class="af-label">${label}</span><span class="af-chev">▾</span>`;
+      const body = el('div', 'af-stream-body', row);
+      body.style.display = 'none';
+      const input = el('input', 'embed-input', body);
+      input.type = 'text';
+      input.placeholder = mode === 'spotify'
+        ? 'Paste a Spotify playlist URL…'
+        : 'Paste a YouTube playlist or video URL…';
+      input.value = localStorage.getItem(`sse-${mode}-url`) || '';
+      const load = el('button', 'btn btn-primary btn-small', body);
+      load.textContent = 'Load';
+      const frameWrap = el('div', 'embed-frame', body);
+      const render = (url) => {
+        frameWrap.innerHTML = '';
+        const src = mode === 'spotify' ? spotifyEmbedUrl(url) : youtubeEmbedUrl(url);
+        if (!src) return;
+        const f = document.createElement('iframe');
+        f.src = src;
+        f.allow = 'autoplay; encrypted-media';
+        f.width = '100%';
+        f.height = mode === 'spotify' ? '152' : '180';
+        f.style.border = '0';
+        f.style.borderRadius = '8px';
+        frameWrap.appendChild(f);
+      };
+      load.onclick = () => {
+        localStorage.setItem(`sse-${mode}-url`, input.value);
+        this.audio.setMode(mode);
+        render(input.value);
+        this._syncAudioUI();
+      };
+      head.onclick = () => {
+        const open = body.style.display === 'none';
+        body.style.display = open ? '' : 'none';
+        head.querySelector('.af-chev').textContent = open ? '▴' : '▾';
+        if (open && input.value && !frameWrap.firstChild) render(input.value);
+      };
+      this.streamRows[mode] = { row, head, body };
+    }
+
+    // Engine asks for the embed UI when a streaming mode is restored.
+    this.audio.onEmbedRequest = (mode) => {
+      this.toggleAudioFlyout(true);
+      const r = this.streamRows[mode];
+      if (r && r.body.style.display === 'none') r.head.click();
+    };
+
+    // Click-away / Escape close.
+    document.addEventListener('pointerdown', (e) => {
+      if (this.audioFlyout.style.display !== 'none'
+        && !this.audioFlyout.contains(e.target) && e.target !== this.musicBtn) {
+        this.toggleAudioFlyout(false);
+      }
+    });
+    this._syncAudioUI();
+  }
+
+  toggleAudioFlyout(force) {
+    const show = force !== undefined ? force : this.audioFlyout.style.display === 'none';
+    this.audioFlyout.style.display = show ? '' : 'none';
+  }
+
+  /** Keep tray glow, mute icon, dropdown and active-row highlights in sync. */
+  _syncAudioUI() {
+    const mode = this.audio.mode;
+    this.musicBtn.classList.toggle('audio-active', mode !== 'silent');
+    this.muteBtn.textContent = this._muted || this.audio.volume === 0 ? '🔇' : '🔊';
+    this.trayVol.value = this.audio.volume;
+    const generative = ['silent', 'voyager', 'ambient', 'psychedelic', 'electronic'];
+    if (generative.includes(mode)) this.genSelect.value = mode;
+    this.genRow.classList.toggle('af-active', generative.includes(mode) && mode !== 'silent');
+    for (const [m, r] of Object.entries(this.streamRows || {})) {
+      r.row.classList.toggle('af-active', mode === m);
+    }
   }
 
   // -- Fullscreen + presentation mode ---------------------------------------------------------
 
   _buildViewButtons() {
-    // Fullscreen — always visible in the top-right, outside Mission Control.
+    // Fullscreen — always visible in the top-right, outside the panels.
     this.fsBtn = el('button', 'btn btn-icon fs-btn', this.rootEl);
     this.fsBtn.textContent = '⛶';
     this.fsBtn.title = 'Fullscreen (F11)';
     this.fsBtn.onclick = () => this.toggleFullscreen();
-
-    // Presentation mode — hides every UI element except this eye icon.
-    this.presBtn = el('button', 'btn btn-icon presentation-btn', this.rootEl);
-    this.presBtn.textContent = '👁';
-    this.presBtn.title = 'Presentation mode (P)';
-    this.presBtn.onclick = () => this.setPresentation(!this.presentationMode);
   }
 
   toggleFullscreen() {
@@ -588,11 +707,11 @@ export class UI {
     else document.documentElement.requestFullscreen?.();
   }
 
-  /** Pure 3D scene: one class on <body> hides all UI except the exit eye. */
+  /** Pure 3D scene: one class on <body> hides all UI except the tray's eye. */
   setPresentation(v) {
     this.presentationMode = v;
     document.body.classList.toggle('presentation-mode', v);
-    this.presBtn.title = v ? 'Exit presentation mode (P)' : 'Presentation mode (P)';
+    this.presBtn.textContent = v ? '🚫' : '👁'; // eye-slash while active
   }
 
   // -- Notifications ------------------------------------------------------------------------
@@ -609,70 +728,6 @@ export class UI {
       n.classList.remove('show');
       setTimeout(() => n.remove(), 600);
     }, 5000);
-  }
-
-  // -- Spotify / YouTube drawer ---------------------------------------------------------------
-
-  _buildEmbedDrawer() {
-    this.drawer = el('div', 'embed-drawer panel', this.rootEl);
-    this.drawer.classList.add('collapsed');
-    const head = el('button', 'embed-head', this.drawer);
-    el('span', '', head).textContent = '🎵 Player';
-    this.embedChevron = el('span', 'embed-chevron', head);
-    this._syncChevron = () => {
-      this.embedChevron.textContent = this.drawer.classList.contains('collapsed') ? '▴' : '▾';
-    };
-    // Collapse state persists (independent of presentation mode, which
-    // hides the whole drawer along with everything else).
-    head.onclick = () => {
-      const collapsed = this.drawer.classList.toggle('collapsed');
-      localStorage.setItem('sse-music-collapsed', collapsed ? '1' : '0');
-      this._syncChevron();
-    };
-    this._syncChevron();
-    this.embedBody = el('div', 'embed-body', this.drawer);
-    this.drawer.style.display = 'none';
-
-    this.audio.onEmbedRequest = (mode) => this._showEmbed(mode);
-  }
-
-  _showEmbed(mode) {
-    this.drawer.style.display = '';
-    this.drawer.classList.toggle('collapsed',
-      localStorage.getItem('sse-music-collapsed') === '1');
-    this._syncChevron();
-    this.embedBody.innerHTML = '';
-    const storageKey = `sse-${mode}-url`;
-    const saved = localStorage.getItem(storageKey) || '';
-
-    const input = el('input', 'embed-input', this.embedBody);
-    input.type = 'text';
-    input.placeholder = mode === 'spotify'
-      ? 'Paste a Spotify playlist URL…'
-      : 'Paste a YouTube playlist or video URL…';
-    input.value = saved;
-    const load = el('button', 'btn btn-primary btn-small', this.embedBody);
-    load.textContent = 'Load';
-    const frameWrap = el('div', 'embed-frame', this.embedBody);
-
-    const render = (url) => {
-      frameWrap.innerHTML = '';
-      const src = mode === 'spotify' ? spotifyEmbedUrl(url) : youtubeEmbedUrl(url);
-      if (!src) return;
-      const f = document.createElement('iframe');
-      f.src = src;
-      f.allow = 'autoplay; encrypted-media';
-      f.width = '100%';
-      f.height = mode === 'spotify' ? '152' : '180';
-      f.style.border = '0';
-      f.style.borderRadius = '8px';
-      frameWrap.appendChild(f);
-    };
-    load.onclick = () => {
-      localStorage.setItem(storageKey, input.value);
-      render(input.value);
-    };
-    if (saved) render(saved);
   }
 
   // -- Labels ------------------------------------------------------------------------------------
@@ -713,7 +768,7 @@ export class UI {
         case 'Tab': e.preventDefault(); this.toggleSidePanel(); break;
         case 'KeyP': this.setPresentation(!this.presentationMode); break;
         case 'F11': e.preventDefault(); this.toggleFullscreen(); break;
-        case 'Escape': this.hideInfo(); this.toggleHelp(false); break;
+        case 'Escape': this.hideInfo(); this.toggleHelp(false); this.toggleAudioFlyout(false); break;
         case 'KeyS':
           // S is both surface-mode select and free-fly backward; only treat
           // as surface select when not flying.
@@ -734,16 +789,12 @@ export class UI {
       : null;
 
     // Sound modes
-    const audioTips = {
-      silent: 'No audio — complete silence',
-      voyager: 'Procedural plasma wave sounds inspired by NASA Voyager recordings',
-      ambient: 'Generative ambient drone — evolves continuously, never repeats',
-      psychedelic: 'Slow evolving micro-tonal pads — designed for long hypnotic sessions',
-      electronic: 'Slow-pulse generative electronic — rhythmic but cosmic',
-      spotify: 'Connect your Spotify playlist — paste URL and click Load',
-      youtube: 'Connect your YouTube playlist — paste URL and click Load',
-    };
-    this.rootEl.querySelectorAll('[data-audio-mode]').forEach((b) => t.attach(b, audioTips[b.dataset.audioMode]));
+    t.attach(this.musicBtn, 'Music and soundscapes — generative modes, Spotify, YouTube');
+    t.attach(this.trayVol, 'Volume');
+    t.attach(this.muteBtn, 'Mute / unmute all audio');
+    t.attach(this.genSelect, 'Generative space soundscapes — evolve continuously, never repeat');
+    t.attach(this.streamRows.spotify.head, 'Connect your Spotify playlist — paste URL and click Load');
+    t.attach(this.streamRows.youtube.head, 'Connect your YouTube playlist — paste URL and click Load');
 
     // Camera modes
     const camTips = {
@@ -791,11 +842,11 @@ export class UI {
     t.attach(find(this.insPanel, /GeoSync/), "Jump to geosynchronous orbit — 160,000 km above Jupiter's clouds");
     for (const b of this.insNavBtns) t.attach(b, "Navigate to the Great Red Spot — Jupiter's ancient storm");
 
-    // Corner / footer buttons
-    t.attach(q('[title="Screenshot"]'), 'Capture a clean screenshot — hides UI, saves image, restores UI');
-    t.attach(this.presBtn, 'Hide all UI for TV or big-screen display — press P again to restore');
+    // Bottom tray buttons
+    t.attach(q('[data-tray="screenshot"]'), 'Capture screenshot — hides UI for clean image');
+    t.attach(this.presBtn, 'Presentation mode — hides all UI. Press P or click again to restore.');
     t.attach(this.fsBtn, 'Enter fullscreen — press F11 or Escape to exit');
-    t.attach(q('.kofi-btn'), 'Enjoyed exploring the cosmos? Support this project');
+    t.attach(q('.kofi-btn'), 'Enjoyed exploring? Support this project');
     t.attach(q('.help-btn'), 'Show keyboard shortcuts and control reference');
 
     // Presets
