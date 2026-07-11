@@ -201,10 +201,12 @@ Always use loader callbacks / promises, never synchronous load.
 Cap renderer.setPixelRatio at 2.0 maximum on all devices.
 Uncapped pixel ratio on high-DPI mobile destroys performance.
 
-**GeoSync drift:**
-If texture rotation and camera orbit angle use separate deltaTime
-accumulators they will drift apart over long sessions. Both must
-reference the same master elapsed time variable.
+**Headless Chrome smoke test fps:**
+Headless Chrome renders the Three.js scene at ~4 FPS, not 60.
+Wall-clock rate assertions will produce false failures (~32 of them).
+Correct pattern: measure everything against sim-time, settle camera
+transitions by calling cameraCtl.update() directly rather than waiting
+on wall-clock time. Never use wall-clock assertions in smoke tests.
 
 ---
 
