@@ -159,7 +159,13 @@ export default {
         { name: 'Valhalla Impact Basin', latDeg: 14.7, lonDeg: 55.4 },
         { name: 'Asgard Basin',          latDeg: 30,   lonDeg: 140 },
         { name: 'Heimdall Crater',       latDeg: -62,  lonDeg: 356 },
+        { name: 'Lofn Crater',           latDeg: -56,  lonDeg: 23 },
+        { name: 'Burr Crater',           latDeg: 43,   lonDeg: 135 },
       ],
+      detail: {
+        style: 'cratered', activationKm: 10000, fullKm: 500,
+        params: { basinUV: [0.833, 0.6] }, // Valhalla, scanned from the map
+      },
       facts: [
         'Callisto has the most heavily cratered surface in the solar system',
         'Its Valhalla impact basin is nearly 4,000 km across',

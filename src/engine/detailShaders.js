@@ -260,6 +260,71 @@ DETAIL_STYLES.grooved = {
   `,
 };
 
+// -- Cratered (Callisto): 4 octaves of impact history + Valhalla rings -----------
+
+DETAIL_STYLES.cratered = {
+  uniforms: (p) => {
+    // Basin anchor given as texture UV; convert via the SphereGeometry
+    // mapping so the rings land on the map's actual basin.
+    const [u, v] = p.basinUV || [0.5, 0.5];
+    const phi = u * Math.PI * 2;
+    const theta = (1 - v) * Math.PI;
+    return {
+      uBasinDir: { value: new THREE.Vector3(
+        -Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta)) },
+    };
+  },
+  decls: /* glsl */ `uniform vec3 uBasinDir;`,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    float t1 = uTime * 0.00001; // geologically dead — near-zero motion
+
+    // LAYER 2 — dark carbonaceous regolith base with warm dust patches.
+    float dustN = fbm3(vObjPos * 24.0 + vec3(t1));
+    detail = mix(detail,
+      mix(vec3(0.102, 0.082, 0.063), vec3(0.239, 0.169, 0.122),        // #1A1510 -> #3D2B1F
+          smoothstep(-0.3, 0.5, dustN)), 0.35);
+
+    // LAYER 1 — craters on craters on craters, four scales. The crater
+    // micro-detail ramps in as the camera descends.
+    float crAct = 1.0 - smoothstep(500.0, 3500.0, uAltitude);
+    float id1; float c1 = craterProfile(dUv * 18.0, id1);
+    float id2; float c2 = craterProfile(dUv * 55.0 + 7.3, id2);
+    float id3; float c3 = craterProfile(dUv * 170.0 + 19.1, id3);
+    float id4; float c4 = craterProfile(dUv * 520.0 + 3.7, id4);
+    // Large craters: deep shadowed floors, raised rims, faint ejecta.
+    detail = mix(detail, vec3(0.051), clamp(-c1, 0.0, 1.0) * 0.55);                    // #0D0D0D
+    detail = mix(detail, vec3(0.239, 0.188, 0.125), clamp(c1, 0.0, 1.0) * 0.4);        // #3D3020
+    detail = mix(detail, vec3(0.165, 0.125, 0.094), smoothstep(0.4, 0.0, abs(c1)) * 0.10); // ejecta
+    // Medium: brighter floors (less shadow), overlapping everywhere.
+    detail = mix(detail, vec3(0.09), clamp(-c2, 0.0, 1.0) * 0.4 * (0.4 + 0.6 * crAct));
+    detail = mix(detail, vec3(0.220, 0.176, 0.125), clamp(c2, 0.0, 1.0) * 0.3 * (0.4 + 0.6 * crAct));
+    // Small: covering floors and rims alike.
+    detail = mix(detail, vec3(0.10), clamp(-c3, 0.0, 1.0) * 0.5 * crAct);
+    detail = mix(detail, vec3(0.27, 0.23, 0.17), clamp(c3, 0.0, 1.0) * 0.32 * crAct);
+    // Micro-cratering / powdery regolith.
+    detail *= 1.0 + (clamp(c4, -1.0, 1.0) * 0.18 + snoise(vObjPos * 1100.0) * 0.05) * crAct;
+
+    // LAYER 3 — bright ice floors in the freshest craters.
+    float fresh = step(0.82, id2) * clamp(-c2, 0.0, 1.0);
+    detail = mix(detail, mix(vec3(1.0), vec3(0.910, 0.941, 1.0), id2), fresh * 0.7);   // #FFFFFF/#E8F0FF
+
+    // LAYER 4 — Valhalla multi-ring basin: concentric, ancient, worn flat.
+    float basinAngle = acos(clamp(dot(vObjPos, normalize(uBasinDir)), -1.0, 1.0));
+    if (basinAngle < 0.45) {
+      float rings = sin(basinAngle * 55.0);
+      float ringFade = 1.0 - smoothstep(0.30, 0.42, basinAngle);
+      detail = mix(detail,
+        mix(vec3(0.078, 0.063, 0.031), vec3(0.165, 0.125, 0.094),      // #141008 -> #2A2018
+            0.5 + 0.5 * rings), ringFade * 0.25);
+      // Central plain: refrozen impact melt, pale and flat.
+      float core = 1.0 - smoothstep(0.05, 0.12, basinAngle);
+      detail = mix(detail, vec3(0.784, 0.753, 0.690), core * 0.45);    // #C8C0B0
+    }
+    ${DETAIL_FINAL}
+  `,
+};
+
 // -- Gas giant: banded cloud turbulence + vortex + limb haze ---------------------
 
 DETAIL_STYLES.gasGiant = {
