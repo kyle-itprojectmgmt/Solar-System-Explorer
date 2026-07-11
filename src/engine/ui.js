@@ -7,7 +7,7 @@
 
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
-import { KOFI_URL, KM_PER_UNIT } from '../config.js';
+import { KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM } from '../config.js';
 
 const CAMERA_MODES = [
   { id: 'cinematic', label: 'Cinematic', key: 'C', targeted: false },
@@ -40,10 +40,9 @@ export class UI {
     document.body.appendChild(this.rootEl);
 
     this._buildHUD();
-    this._buildSidePanel();
+    this._buildIconStack();
     this._buildInsertionPanel();
     this._buildInfoPanel();
-    this._buildHelpOverlay();
     this._buildBottomTray();
     this._buildAudioFlyout();
     this._buildViewButtons();
@@ -58,6 +57,7 @@ export class UI {
     };
     this.cam.onBodyPicked = (name) => this.showInfo(name);
     this._updateModeHUD(this.cam.mode, this.cam.target);
+    this._checkSharedView();
   }
 
   // -- HUD ------------------------------------------------------------------
@@ -244,61 +244,87 @@ export class UI {
     }
   }
 
-  // -- Side panel --------------------------------------------------------------
+  // -- Right-edge icon stack (V4c Group 6) — replaces Mission Control ---------------
 
-  _buildSidePanel() {
-    this.side = el('div', 'side-panel panel', this.rootEl);
-    this.sideTab = el('button', 'side-tab', this.rootEl);
-    this.sideTab.innerHTML = '◂';
-    this.sideTab.title = 'Toggle panel (Tab)';
-    this.sideTab.onclick = () => this.toggleSidePanel();
+  _buildIconStack() {
+    this.stack = el('div', 'icon-stack', this.rootEl);
+    this.stackPanel = el('div', 'stack-panel panel', this.rootEl);
+    this.stackPanel.style.display = 'none';
+    this.stackContents = {};
+    this.stackButtons = {};
+    this.openPanelId = null;
+    this._panelOrder = ['camera', 'time', 'bodies', 'presets', 'display', 'help'];
 
-    const head = el('div', 'side-head', this.side);
-    el('h2', 'side-title', head).textContent = 'MISSION CONTROL';
-    const helpBtn = el('button', 'btn btn-icon help-btn', head);
-    helpBtn.textContent = '?';
-    helpBtn.title = 'Controls (?)';
-    helpBtn.onclick = () => this.toggleHelp();
+    const defs = [
+      ['camera', '🎥', 'Camera'], ['time', '⏱', 'Time'], ['bodies', '🪐', 'Bodies'],
+      ['presets', '⭐', 'Presets'], ['display', '👁', 'Display'], ['help', '❓', 'Help'],
+    ];
+    for (const [id, icon, label] of defs) {
+      const b = el('button', 'stack-btn', this.stack);
+      b.textContent = icon;
+      b.dataset.panel = id;
+      b.onclick = () => this.togglePanel(id);
+      this.stackButtons[id] = b;
+      const c = el('div', 'stack-content', this.stackPanel);
+      c.style.display = 'none';
+      el('h2', 'side-title', c).textContent = label.toUpperCase();
+      this.stackContents[id] = c;
+    }
 
-    // Camera modes
-    const camSec = section(this.side, 'Camera');
-    const camGrid = el('div', 'btn-grid', camSec);
+    this._buildCameraPanel(this.stackContents.camera);
+    this._buildTimePanel(this.stackContents.time);
+    this._buildBodiesPanel(this.stackContents.bodies);
+    this._buildPresetsPanel(this.stackContents.presets);
+    this._buildDisplayPanel(this.stackContents.display);
+    this._buildHelpPanel(this.stackContents.help);
+  }
+
+  /** One panel open at a time; the ghost clock dims while any is open. */
+  togglePanel(id, force) {
+    const open = force !== undefined ? force : this.openPanelId !== id;
+    for (const [pid, c] of Object.entries(this.stackContents)) {
+      c.style.display = open && pid === id ? '' : 'none';
+      this.stackButtons[pid].classList.toggle('active', open && pid === id);
+    }
+    this.stackPanel.style.display = open ? '' : 'none';
+    this.openPanelId = open ? id : null;
+    this.hudGhost.classList.toggle('dimmed', open);
+  }
+
+  _cyclePanel() {
+    const i = this.openPanelId ? this._panelOrder.indexOf(this.openPanelId) : -1;
+    if (i === this._panelOrder.length - 1) this.togglePanel(this.openPanelId, false);
+    else this.togglePanel(this._panelOrder[i + 1], true);
+  }
+
+  // -- 6a Camera panel ---------------------------------------------------------------
+
+  _buildCameraPanel(c) {
+    const icons = {
+      cinematic: '🎬', free: '✈️', orbit: '🔄', surface: '🌍',
+      chase: '🏃', system: '🌌', insertion: '🛸',
+    };
+    const list = el('div', 'mode-list', c);
     for (const m of CAMERA_MODES) {
-      const b = el('button', 'btn', camGrid);
-      b.dataset.camMode = m.id;
-      b.innerHTML = `${m.label}<span class="key">${m.key}</span>`;
-      b.onclick = () => this._activateMode(m);
+      const row = el('button', 'mode-row', list);
+      row.dataset.camMode = m.id;
+      row.innerHTML = `<span class="mode-ico">${icons[m.id]}</span>`
+        + `<span class="mode-label">${m.label}</span><span class="key">${m.key}</span>`;
+      row.onclick = () => this._activateMode(m);
     }
+    this._buildCameraSliders(c);
+  }
 
-    // Time controls
-    const timeSec = section(this.side, 'Time');
-    const timeRow = el('div', 'time-row', timeSec);
-    for (let i = 0; i < TIME_STEPS.length; i++) {
-      const b = el('button', 'btn btn-small', timeRow);
-      b.textContent = TIME_STEPS[i] === 0 ? '⏸' : `${TIME_STEPS[i].toLocaleString()}x`;
-      b.dataset.timeIndex = i;
-      b.onclick = () => this.physics.setTimeIndex(i);
-    }
-    this.timeSlider = el('input', 'slider', timeSec);
-    Object.assign(this.timeSlider, { type: 'range', min: 0, max: TIME_STEPS.length - 1, step: 1, value: this.physics.timeIndex });
-    this.timeSlider.oninput = () => this.physics.setTimeIndex(+this.timeSlider.value);
-
-    // Body selector
-    const bodySec = section(this.side, 'Bodies');
-    const bodyGrid = el('div', 'btn-grid', bodySec);
-    const names = [this.system.primary.name, ...this.system.bodies.map((b) => b.name)];
-    for (const n of names) {
-      const b = el('button', 'btn btn-small', bodyGrid);
-      b.textContent = n;
-      b.onclick = () => { this.cam.focusBody(n); this.showInfo(n); };
-    }
+  // Altitude / inclination / camera speed / chase height — preserved from
+  // the old Mission Control, now contextual sections of the Camera panel.
+  _buildCameraSliders(parent) {
 
     // Altitude — continuous logarithmic slider (replaces the old presets).
     // Equal slider travel = equal zoom factor; readout tracks the camera live.
     const ALT_MIN = 50, ALT_MAX = 500000;
     this._altT = (km) => Math.log10(km / ALT_MIN) / Math.log10(ALT_MAX / ALT_MIN);
     this._altKm = (t) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, t);
-    this.altSec = section(this.side, 'Altitude');
+    this.altSec = section(parent, 'Altitude');
     this.mcAltReadout = el('div', 'alt-readout', this.altSec);
     this.mcAltSlider = el('input', 'slider', this.altSec);
     Object.assign(this.mcAltSlider, { type: 'range', min: 0, max: 1, step: 0.001, value: 0.5 });
@@ -319,7 +345,7 @@ export class UI {
     this.altSec.style.display = 'none';
 
     // Quick-access inclination — mirrors the Orbit Insertion panel control.
-    this.incSecMC = section(this.side, 'Inclination');
+    this.incSecMC = section(parent, 'Inclination');
     this.mcIncLabel = el('div', 'ins-label', this.incSecMC);
     this.mcIncSlider = el('input', 'slider', this.incSecMC);
     Object.assign(this.mcIncSlider, { type: 'range', min: -90, max: 90, step: 1, value: this.cam.ins.incDeg });
@@ -343,7 +369,7 @@ export class UI {
 
     // Orbit mode tuning — how fast the camera sweeps along its orbital path,
     // independent of the time multiplier.
-    this.orbSec = section(this.side, 'Orbit Camera');
+    this.orbSec = section(parent, 'Camera Speed');
     const orbLabel = el('div', 'ins-label', this.orbSec);
     const orbSlider = el('input', 'slider', this.orbSec);
     Object.assign(orbSlider, { type: 'range', min: 0, max: 4, step: 0.05, value: this.cam.orbSpeedMult });
@@ -353,7 +379,7 @@ export class UI {
     this.orbSec.style.display = 'none';
 
     // Chase mode tuning — camera height above the chased moon.
-    this.chaseSec = section(this.side, 'Chase Camera');
+    this.chaseSec = section(parent, 'Chase Camera');
     const chaseLabel = el('div', 'ins-label', this.chaseSec);
     const chaseSlider = el('input', 'slider', this.chaseSec);
     Object.assign(chaseSlider, { type: 'range', min: 0.2, max: 4, step: 0.05, value: this.cam.chaseHeightMult });
@@ -365,22 +391,348 @@ export class UI {
     syncChase();
     this.chaseSec.style.display = 'none';
 
-    // Toggles
-    const togSec = section(this.side, 'Display');
-    this.orbitToggle = toggle(togSec, 'Orbital paths', false, (v) => this.r.setOrbitLinesVisible(v));
-    this.labelToggle = toggle(togSec, 'Body labels', false, (v) => this.setLabelsVisible(v));
-    this.ringToggle = toggle(togSec, 'Rings', true, (v) => this.r.setRingsVisible(v));
-    this.resonanceToggle = toggle(togSec, 'Resonance lines', false, (v) => this.r.setResonanceVisible(v && this.cam.mode === 'system'));
+  }
 
-    // Voyager preset
-    const presetSec = section(this.side, 'Presets');
-    const voyBtn = el('button', 'btn btn-primary', presetSec);
-    voyBtn.textContent = '🛰 Voyager 1 Flyby — Mar 5, 1979';
-    voyBtn.onclick = () => this.onVoyagerPreset?.();
+  // -- 6b Time panel ------------------------------------------------------------------
 
-    // Event ticker
-    const tickSec = section(this.side, 'Upcoming Events');
-    this.tickerEl = el('div', 'ticker', tickSec);
+  _buildTimePanel(c) {
+    const timeRow = el('div', 'time-row', c);
+    for (let i = 0; i < TIME_STEPS.length; i++) {
+      const b = el('button', 'btn btn-small', timeRow);
+      b.textContent = TIME_STEPS[i] === 0 ? '⏸' : `${TIME_STEPS[i].toLocaleString()}×`;
+      b.dataset.timeIndex = i;
+      b.onclick = () => this.physics.setTimeIndex(i);
+    }
+    this.timeSlider = el('input', 'slider', c);
+    Object.assign(this.timeSlider, { type: 'range', min: 0, max: TIME_STEPS.length - 1, step: 1, value: this.physics.timeIndex });
+    this.timeSlider.oninput = () => this.physics.setTimeIndex(+this.timeSlider.value);
+
+    // Date row — same picker and LIVE toggle as the HUD (synchronized:
+    // both routes read/write the one physics clock through the utility).
+    const dateRow = el('div', 'tp-daterow', c);
+    this.tpDate = el('button', 'btn btn-small', dateRow);
+    this.tpDate.onclick = () => this.toggleDatePicker();
+    const live = el('button', 'btn btn-small tp-live', dateRow);
+    live.textContent = '🔴';
+    live.onclick = () => this.setLive(!this.liveMode);
+  }
+
+  // -- 6c Bodies panel — solar system hierarchy ----------------------------------------
+
+  _buildBodiesPanel(c) {
+    const list = el('div', 'bodies-list', c);
+    for (const p of SOLAR_SYSTEM) {
+      const isCurrent = p.name === this.system.primary.name;
+      const row = el('button', 'body-row', list);
+      if (p.star) {
+        row.innerHTML = '<span>☀️ Sun</span>';
+        row.onclick = () => this.notify('Solar Observatory — coming in a future update');
+        this._sunRow = row;
+      } else if (isCurrent) {
+        row.classList.add('current');
+        row.innerHTML = `<span>★ ${p.name}</span><span class="here-badge">HERE</span>`;
+        row.onclick = () => { this.cam.focusBody(p.name); this.showInfo(p.name); };
+        // The active system's real moons — clickable navigation.
+        for (const b of this.system.bodies) {
+          const m = el('button', 'moon-row', list);
+          m.textContent = `↳ ${b.name}`;
+          m.onclick = () => this.cam.focusBody(b.name);
+        }
+      } else {
+        row.innerHTML = `<span>● ${p.name}</span>${p.moons?.length ? '<span class="body-chev">›</span>' : ''}`;
+        row.onclick = () => this.notify(`Coming Soon — ${p.name} system launching soon`);
+        if (p.moons?.length) {
+          const sub = el('div', 'moon-sub', list);
+          sub.style.display = 'none';
+          for (const mn of p.moons) el('div', 'moon-row ghost-moon', sub).textContent = `↳ ${mn} — Coming Soon`;
+          row.addEventListener('mouseenter', () => { sub.style.display = ''; });
+          row.addEventListener('mouseleave', (e) => {
+            if (!sub.contains(e.relatedTarget)) sub.style.display = 'none';
+          });
+          sub.addEventListener('mouseleave', () => { sub.style.display = 'none'; });
+        }
+      }
+    }
+  }
+
+  // -- 6d Presets panel — curated + saved views ------------------------------------------
+
+  _buildPresetsPanel(c) {
+    el('h3', 'side-heading', c).textContent = 'CURATED';
+    const curated = [
+      ['🌋 Io Volcano Flyby', () => {
+        this.cam.playSequence([
+          { target: 'Io', dist: 4, height: 1.0, orbitRate: 0.07, duration: 10, startTheta: 1.0 },
+          { target: 'Io', dist: 1.6, height: 0.35, orbitRate: 0.1, duration: 12, startTheta: 2.6 },
+          { target: 'Io', dist: 6, height: 1.4, orbitRate: 0.05, duration: 10, startTheta: 4.2, lookAt: this.system.primary.name },
+        ]);
+        this.notify('Io volcano flyby — watch for plumes on the limb');
+      }],
+      ['🌑 Triple Moon Shadow', () => {
+        this.cam.setMode('orbit', this.system.primary.name);
+        this.cam.setAltitudeDirect(80000);
+        this.physics.setTimeIndex(4);
+        this.notify('1,000× — watch for moon shadows crossing Jupiter');
+      }],
+      ['🔴 GRS Close Pass', () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Navigating to the Great Red Spot…');
+        }
+      }],
+      ['🛸 Voyager 1979', () => this.onVoyagerPreset?.()],
+      ['💫 Moon Alignment', () => {
+        this.cam.setMode('system');
+        if (!this.resonanceToggle.checked) {
+          this.resonanceToggle.checked = true;
+          this.resonanceToggle.onchange();
+        }
+        this.physics.setTimeIndex(5);
+        this.notify('10,000× — resonance lines pulse when moons align');
+      }],
+    ];
+    this.voyagerBtn = null;
+    for (const [label, fn] of curated) {
+      const b = el('button', 'preset-row', c);
+      b.textContent = label;
+      b.onclick = fn;
+      if (label.includes('Voyager')) this.voyagerBtn = b;
+    }
+
+    el('h3', 'side-heading', c).textContent = 'MY PRESETS';
+    const saveBtn = el('button', 'btn btn-primary preset-save', c);
+    saveBtn.textContent = '+ Save Current View';
+    const nameRow = el('div', 'preset-namerow', c);
+    nameRow.style.display = 'none';
+    const nameInput = el('input', 'embed-input', nameRow);
+    nameInput.placeholder = 'Preset name…';
+    const okBtn = el('button', 'btn btn-small btn-primary', nameRow);
+    okBtn.textContent = '✓';
+    this.presetList = el('div', 'preset-list', c);
+
+    const MAX_PRESETS = 20;
+    saveBtn.onclick = () => {
+      if (this._loadPresets().length >= MAX_PRESETS) {
+        this.notify('Delete a preset to save more.');
+        return;
+      }
+      nameRow.style.display = '';
+      nameInput.value = '';
+      nameInput.focus();
+    };
+    const commit = () => {
+      const name = nameInput.value.trim();
+      if (!name) return;
+      const arr = this._loadPresets();
+      arr.push(this.capturePreset(name));
+      this._savePresets(arr);
+      nameRow.style.display = 'none';
+      this._renderPresetList();
+      this.notify(`Saved "${name}"`);
+    };
+    okBtn.onclick = commit;
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commit();
+      if (e.key === 'Escape') nameRow.style.display = 'none';
+      e.stopPropagation();
+    });
+    this._renderPresetList();
+  }
+
+  _loadPresets() {
+    try { return JSON.parse(localStorage.getItem('sse-presets') || '[]'); }
+    catch { return []; }
+  }
+
+  _savePresets(arr) { localStorage.setItem('sse-presets', JSON.stringify(arr)); }
+
+  _renderPresetList() {
+    this.presetList.innerHTML = '';
+    this._loadPresets().forEach((p, i) => {
+      const row = el('div', 'preset-item', this.presetList);
+      const go = el('button', 'preset-row', row);
+      go.textContent = `📍 ${p.name}`;
+      go.onclick = () => { this.applyPreset(p); this.notify(`Restored "${p.name}"`); };
+      const share = el('button', 'btn btn-small', row);
+      share.textContent = '🔗';
+      share.onclick = () => this._sharePreset(p);
+      const del = el('button', 'btn btn-small', row);
+      del.textContent = '🗑';
+      del.onclick = () => {
+        const arr = this._loadPresets();
+        arr.splice(i, 1);
+        this._savePresets(arr);
+        this._renderPresetList();
+      };
+    });
+  }
+
+  /** Full state snapshot. sim.date is an ISO 8601 UTC string (never raw
+   *  simSeconds) via the physics date utility — the long-term contract. */
+  capturePreset(name) {
+    return {
+      name,
+      sim: {
+        date: simSecondsToDate(this.physics.simSeconds, this.physics.epochMs),
+        timeMultiplier: this.physics.timeMultiplier,
+      },
+      camera: this._captureCamera(),
+      display: {
+        rings: this.ringToggle.checked,
+        orbitalPaths: this.orbitToggle.checked,
+        localLabels: this.labelToggle.checked,
+        systemLabels: this.sysLabelToggle?.checked ?? false,
+        resonance: this.resonanceToggle.checked,
+      },
+    };
+  }
+
+  _captureCamera() {
+    const cam = this.cam;
+    const base = { mode: cam.mode, target: cam.target || cam.lastTarget };
+    if (cam.mode === 'insertion') {
+      Object.assign(base, {
+        altitudeKm: cam.ins.altitudeKm, incDeg: cam.ins.incDeg,
+        phase: cam.ins.phase, yaw: cam.ins.yaw, pitch: cam.ins.pitch,
+        locked: cam.ins.locked,
+      });
+    } else if (cam.mode === 'free') {
+      Object.assign(base, { pos: cam.camera.position.toArray(), yaw: cam.yaw, pitch: cam.pitch });
+    } else {
+      Object.assign(base, { orbTheta: cam.orbTheta, orbPhi: cam.orbPhi, orbDist: cam.orbDist });
+    }
+    return base;
+  }
+
+  applyPreset(p) {
+    if (p.sim?.date) {
+      this.setLive(false);
+      this.physics.jumpToSimSeconds(dateToSimSeconds(p.sim.date, this.physics.epochMs));
+    }
+    const ti = TIME_STEPS.indexOf(p.sim?.timeMultiplier);
+    if (ti >= 0) this.physics.setTimeIndex(ti);
+    const cam = p.camera || {};
+    if (cam.mode === 'insertion') {
+      this.cam.setMode('insertion', cam.target);
+      this.cam.setInsertion({
+        body: cam.target, altitudeKm: cam.altitudeKm ?? 10000,
+        incDeg: cam.incDeg ?? 0, locked: !!cam.locked,
+      });
+      if (cam.phase != null) this.cam.ins.phase = cam.phase;
+      if (cam.yaw != null) this.cam.ins.yaw = cam.yaw;
+      if (cam.pitch != null) this.cam.ins.pitch = cam.pitch;
+    } else if (cam.mode === 'free') {
+      this.cam.setMode('free');
+      if (cam.pos) this.cam.camera.position.fromArray(cam.pos);
+      if (cam.yaw != null) this.cam.yaw = cam.yaw;
+      if (cam.pitch != null) this.cam.pitch = cam.pitch;
+    } else if (cam.mode) {
+      this.cam.setMode(cam.mode, cam.target || null);
+      if (cam.orbTheta != null) {
+        this.cam.orbTheta = cam.orbTheta;
+        this.cam.orbPhi = cam.orbPhi;
+        this.cam.orbDist = cam.orbDist;
+        this.cam.distTween = null;
+      }
+    }
+    const d = p.display || {};
+    const set = (t, v) => { if (t && v != null && t.checked !== v) { t.checked = v; t.onchange(); } };
+    set(this.ringToggle, d.rings);
+    set(this.orbitToggle, d.orbitalPaths);
+    set(this.labelToggle, d.localLabels);
+    set(this.sysLabelToggle, d.systemLabels);
+    set(this.resonanceToggle, d.resonance);
+  }
+
+  _sharePreset(p) {
+    const encoded = btoa(encodeURIComponent(JSON.stringify(p)));
+    const url = `${location.origin}${location.pathname}?view=${encoded}`;
+    navigator.clipboard?.writeText(url).then(
+      () => this.notify('Link copied! Share this view with anyone.'),
+      () => this.notify('Could not copy — check clipboard permissions'),
+    );
+  }
+
+  /** ?view= in the URL restores a shared preset on load. */
+  _checkSharedView() {
+    const v = new URLSearchParams(location.search).get('view');
+    if (!v) return;
+    try {
+      const p = JSON.parse(decodeURIComponent(atob(v)));
+      this.applyPreset(p);
+      this.notify(p.name ? `Shared view: "${p.name}"` : 'Shared view restored');
+    } catch {
+      this.notify('Could not read the shared view link');
+    }
+  }
+
+  // -- 6e Display panel -----------------------------------------------------------------
+
+  _buildDisplayPanel(c) {
+    const labels = section(c, 'Labels');
+    this.labelToggle = toggle(labels, 'Local labels (current system)', false, (v) => this.setLabelsVisible(v));
+    this.sysLabelToggle = toggle(labels, 'System-wide labels (all planets)', false, () => {
+      if (!this._sysLabelNoted) {
+        this._sysLabelNoted = true;
+        this.notify('System-wide labels arrive with the Solar System view');
+      }
+    });
+
+    const vis = section(c, 'Visual');
+    this.ringToggle = toggle(vis, 'Rings', true, (v) => this.r.setRingsVisible(v));
+    this.orbitToggle = toggle(vis, 'Orbital paths', false, (v) => this.r.setOrbitLinesVisible(v));
+    this.resonanceToggle = toggle(vis, 'Resonance lines', false, (v) => this.r.setResonanceVisible(v && this.cam.mode === 'system'));
+    this.velToggle = toggle(vis, 'Velocity vectors', false, () => {
+      if (!this._velNoted) {
+        this._velNoted = true;
+        this.notify('Velocity vectors — coming soon');
+      }
+    });
+
+    // Quick-jump altitude presets (restored from the pre-v4 Mission Control,
+    // now compact buttons alongside the continuous slider).
+    const alt = section(c, 'Altitude Presets');
+    const grid = el('div', 'btn-grid', alt);
+    for (const [label, km] of [['Distant', 100000], ['Near', 10000], ['Low Orbit', 500], ['Skim', 50]]) {
+      const b = el('button', 'btn btn-small', grid);
+      b.textContent = `${label} · ${km.toLocaleString()} km`;
+      b.onclick = () => this.cam.flyToAltitude(km);
+    }
+  }
+
+  // -- 6f Help panel ----------------------------------------------------------------------
+
+  _buildHelpPanel(c) {
+    const sec = (title, rows) => {
+      el('h3', 'side-heading', c).textContent = title;
+      const list = el('div', 'help-list', c);
+      for (const [key, desc] of rows) {
+        const row = el('div', 'help-row', list);
+        el('span', 'help-key', row).textContent = key;
+        el('span', 'help-desc', row).textContent = desc;
+      }
+    };
+    sec('KEYBOARD SHORTCUTS', [
+      ['C', 'Cinematic (auto)'], ['F', 'Free Fly'], ['O', 'Orbit'],
+      ['S', 'Surface'], ['H', 'Chase'], ['G', 'System View'], ['I', 'Orbit Insertion'],
+      ['W A S D', 'Move (Free Fly)'], ['Shift', 'Speed boost 5×'],
+      ['Alt (hold)', 'Free look while orbiting'],
+      [',  .', 'Time slower / faster'], ['Space', 'Pause / Resume'],
+      ['Tab', 'Cycle panels'], ['?', 'This help panel'],
+      ['P', 'Presentation mode'], ['F11', 'Fullscreen'], ['Escape', 'Close panels'],
+    ]);
+    sec('MOUSE + TOUCH', [
+      ['Drag', 'Look / rotate'], ['Scroll wheel', 'Zoom / altitude'],
+      ['Click body', 'Focus / info card'], ['Double tap', 'Focus body'],
+      ['1 finger drag', 'Look / rotate'], ['2 finger pinch', 'Zoom'],
+      ['2 finger drag', 'Free look (orbit modes)'],
+    ]);
+    sec('TIPS', [
+      ['🔓', 'Hold Alt to free-look while orbiting'],
+      ['📅', 'Click the date to pick any year 1950–2050'],
+      ['🔗', 'Share any saved view with a link'],
+    ]);
   }
 
   _activateMode(m) {
@@ -393,11 +745,6 @@ export class UI {
     } else {
       this.cam.setMode(m.id);
     }
-  }
-
-  toggleSidePanel() {
-    const open = this.side.classList.toggle('open');
-    this.sideTab.innerHTML = open ? '▸' : '◂';
   }
 
   // -- Orbit insertion panel --------------------------------------------------------
@@ -583,69 +930,6 @@ export class UI {
   }
 
   hideInfo() { this.info.classList.add('hidden'); }
-
-  // -- Help overlay -------------------------------------------------------------------
-
-  _buildHelpOverlay() {
-    this.help = el('div', 'help-overlay hidden', this.rootEl);
-    const card = el('div', 'help-card panel', this.help);
-    el('h2', 'help-title', card).textContent = 'CONTROLS';
-
-    const cols = el('div', 'help-cols', card);
-    const left = el('div', 'help-col', cols);
-    const right = el('div', 'help-col', cols);
-
-    const sec = (parent, title, rows) => {
-      el('h3', 'help-heading', parent).textContent = title;
-      const list = el('div', 'help-list', parent);
-      for (const [key, desc] of rows) {
-        const row = el('div', 'help-row', list);
-        el('span', 'help-key', row).textContent = key;
-        el('span', 'help-desc', row).textContent = desc;
-      }
-    };
-
-    sec(left, 'CAMERA MODES', [
-      ['C', 'Cinematic (auto)'], ['F', 'Free Fly'], ['O', 'Orbit (click body)'],
-      ['S', 'Surface (click body)'], ['H', 'Chase (click body)'],
-      ['G', 'System View'], ['I', 'Orbit Insertion'],
-    ]);
-    sec(left, 'NAVIGATION', [
-      ['W A S D', 'Move (Free Fly)'], ['Shift', 'Speed boost 5×'],
-      [',  .', 'Time slower / faster'], ['Space', 'Pause / Resume'],
-    ]);
-    sec(left, 'INTERFACE', [
-      ['Tab', 'Mission Control panel'], ['?', 'This help screen'], ['Escape', 'Close panels'],
-      ['F11', 'Fullscreen'], ['P', 'Presentation mode (hide UI)'],
-    ]);
-
-    sec(right, 'MOUSE', [
-      ['Drag', 'Look / rotate'], ['Scroll wheel', 'Zoom / altitude'],
-      ['Click body', 'Focus / info panel'],
-    ]);
-    sec(right, 'TOUCH', [
-      ['1 finger drag', 'Look / rotate'], ['2 finger pinch', 'Zoom'],
-      ['2 finger drag', 'Pan'], ['Double tap', 'Focus body'],
-      ['Long press', 'Body info panel'], ['Swipe up', 'Mission Control'],
-    ]);
-    sec(right, 'ALTITUDE', [
-      ['Slider', 'Mission Control — log scale'],
-      ['Range', '50 km – 500,000 km'],
-    ]);
-
-    el('p', 'help-tip', card).textContent =
-      'Pro tip: Press Space to pause, then drag to explore any moment in time.';
-
-    // Click outside the card closes.
-    this.help.addEventListener('pointerdown', (e) => {
-      if (e.target === this.help) this.toggleHelp(false);
-    });
-  }
-
-  toggleHelp(force) {
-    const show = force !== undefined ? force : this.help.classList.contains('hidden');
-    this.help.classList.toggle('hidden', !show);
-  }
 
   // -- Bottom center tray (V4c Group 3) ---------------------------------------------
   // The one persistent control surface: music, volume, screenshot,
@@ -874,7 +1158,7 @@ export class UI {
   _bindKeys() {
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.key === '?') { this.toggleHelp(); return; }
+      if (e.key === '?') { this.togglePanel('help'); return; }
       switch (e.code) {
         case 'KeyC': this.cam.setMode('cinematic'); break;
         case 'KeyF': this.cam.setMode('free'); break;
@@ -885,11 +1169,12 @@ export class UI {
         case 'Space': e.preventDefault(); this.physics.togglePause(); break;
         case 'Comma': this.physics.slower(); break;
         case 'Period': this.physics.faster(); break;
-        case 'Tab': e.preventDefault(); this.toggleSidePanel(); break;
+        case 'Tab': e.preventDefault(); this._cyclePanel(); break;
         case 'KeyP': this.setPresentation(!this.presentationMode); break;
         case 'F11': e.preventDefault(); this.toggleFullscreen(); break;
         case 'Escape':
-          this.hideInfo(); this.toggleHelp(false);
+          this.hideInfo();
+          if (this.openPanelId) this.togglePanel(this.openPanelId, false);
           this.toggleAudioFlyout(false); this.toggleDatePicker(false);
           break;
         case 'KeyS':
@@ -972,8 +1257,14 @@ export class UI {
     t.attach(q('.kofi-btn'), 'Enjoyed exploring? Support this project');
     t.attach(q('.help-btn'), 'Show keyboard shortcuts and control reference');
 
-    // Presets
-    t.attach(find(this.side, /Voyager/), 'Recreate the Voyager 1 flyby of Jupiter — March 5, 1979');
+    // Presets + icon stack
+    t.attach(this.voyagerBtn, 'Recreate the Voyager 1 flyby of Jupiter — March 5, 1979');
+    const stackTips = {
+      camera: 'Camera modes', time: 'Time controls', bodies: 'Bodies — navigate the system',
+      presets: 'Presets — curated and saved views', display: 'Display options', help: 'Help (?)',
+    };
+    for (const [id, b] of Object.entries(this.stackButtons)) t.attach(b, stackTips[id]);
+    t.attach(this._sunRow, 'Solar Observatory — coming in a future update');
 
     // Mode indicator: free look hint (2b).
     t.attach(this.modeEl, 'Hold Alt to look around freely while maintaining orbital position');
@@ -1088,14 +1379,9 @@ export class UI {
       this.eclipseStates.set(b.name, { ecl, tra: b.inTransit });
     }
 
-    // Event ticker (refresh once a second).
-    this._eventTickTimer -= dt;
-    if (this._eventTickTimer <= 0) {
-      this._eventTickTimer = 1;
-      const evts = this.physics.predictEvents(5);
-      this.tickerEl.innerHTML = evts
-        .map((e) => `<div class="tick-row"><span>${e.body} ${e.type}</span><span class="tick-time">${fmtDur(e.inSeconds)}</span></div>`)
-        .join('');
+    // Time panel date button mirrors the HUD clock.
+    if (this.openPanelId === 'time') {
+      this.tpDate.textContent = `📅 ${simSecondsToDate(this.physics.simSeconds, this.physics.epochMs).slice(0, 10)}`;
     }
 
     // Labels.

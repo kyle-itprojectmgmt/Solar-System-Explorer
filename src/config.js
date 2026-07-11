@@ -20,6 +20,22 @@ export const G = 6.674e-20; // km^3 / (kg * s^2)
 export const C_KM_S = 299792.458; // speed of light, km/s
 export const AU_KM = 149597870.7;
 
+// Solar system roadmap for the Bodies panel. The active system's moons come
+// from its own config at runtime; entries here are the future-build listing
+// ("Coming Soon") shown in the UI.
+export const SOLAR_SYSTEM = [
+  { name: 'Sun', star: true },
+  { name: 'Mercury' },
+  { name: 'Venus' },
+  { name: 'Earth', moons: ['Moon'] },
+  { name: 'Mars', moons: ['Phobos', 'Deimos'] },
+  { name: 'Jupiter', moons: [] }, // active system — moons injected from config
+  { name: 'Saturn', moons: ['Titan', 'Enceladus', 'Rhea', 'Iapetus'] },
+  { name: 'Uranus', moons: ['Titania', 'Miranda'] },
+  { name: 'Neptune', moons: ['Triton'] },
+  { name: 'Pluto', moons: ['Charon'] },
+];
+
 // Ko-fi handle for the donate button.
 export const KOFI_URL = 'https://ko-fi.com/YOUR_HANDLE';
 if (import.meta.env.DEV && KOFI_URL.includes('YOUR_HANDLE')) {
