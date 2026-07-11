@@ -8,8 +8,8 @@
 ## Repository
 
 Root: C:\dev\Solar-System-Explorer
-Live: solar-system-explorer.kyle-d06.workers.dev
-Host: Cloudflare Pages ($5/mo plan, unlimited bandwidth)
+Live: https://solar-system-explorer.kyle-d06.workers.dev
+Host: Cloudflare Worker (workers.dev URL — NOT Cloudflare Pages)
 Textures: Cloudflare R2 (zero egress fees)
 
 ---
@@ -20,8 +20,179 @@ src/engine/        Core renderer, physics, camera, audio, UI, shaders
 src/data/systems/  Planetary system configs (jupiter.js, saturn.js stub)
 src/engine/glsl/   Shared GLSL libraries (simplex noise, etc.)
 public/textures/   Local dev textures (production serves from R2)
-.claude/           This file and any session prompt .md files
+.claude/           This file and session prompt .md files
+Docs/              Versioned prompt files (MASTER_PROMPT.md, V2, V3, etc.)
 PROJECT_LOG.md     Living document — single source of truth
+
+---
+
+## CRITICAL — Git Discipline (Source Code Has Been Lost Before)
+
+Source code was lost across v1–v3b because Claude Code committed only
+documentation files. ALL work must be committed properly every session.
+
+### Session Start — Pull Latest
+ALWAYS begin every session with:
+  git pull origin main
+  git status  ← must show clean working tree before starting work
+
+If working tree is not clean at session start — STOP and report.
+Never start work on top of uncommitted changes from a prior session.
+
+### After Every Feature or Bug Fix — Commit Immediately
+Do NOT wait until end of session. After every completed task:
+
+  git add -A
+  git status   ← review what is staged BEFORE committing
+
+VERIFY the staged files include actual source code (.js, .glsl, .css):
+  git diff --cached --name-only
+
+If only .md files appear — source code was NOT staged. Fix it:
+  git add src/ public/ index.html vite.config.js
+  git diff --cached --name-only  ← verify source files now appear
+
+Then commit:
+  git commit -m "[area]: [description]"
+
+VERIFY source files appear in the commit:
+  git show HEAD --name-only
+
+If only .md files appear in the commit — the commit is wrong.
+Amend it immediately:
+  git add src/ public/ index.html
+  git commit --amend --no-edit
+
+### After Every Commit — Push Immediately
+  git push origin main
+
+Never accumulate local commits without pushing. If the session ends
+without pushing, the work is at risk. Push after every commit.
+
+### End of Session — Final Verification
+  git status          ← must show clean working tree
+  git log --oneline -5  ← verify recent commits have source files
+  git show HEAD --name-only  ← verify .js files in latest commit
+
+---
+
+## Deploy Commands
+
+CRITICAL: This project is a Cloudflare WORKER, NOT Cloudflare Pages.
+
+Local dev:      npm run dev      → http://localhost:5173 (hot reload)
+Test build:     npm run build    → builds to /dist
+Preview build:  npm run preview  → http://localhost:4173
+Production:     npx wrangler deploy  ← THE ONLY CORRECT DEPLOY COMMAND
+
+NEVER use:
+  wrangler pages publish   ← prompts to create new project (WRONG)
+  wrangler pages deploy    ← wrong deployment type (WRONG)
+  npm run deploy           ← check package.json first, may be wrong
+
+Deploy sequence (always in this order):
+  1. npm run build
+  2. Verify dist/assets has multiple chunked files:
+       three-[hash].js        ← ~533KB Three.js chunk
+       postprocessing-[hash].js  ← ~76KB
+       main-[hash].js         ← your source code ~89KB+
+     If only 4 files with index-DCcom_7B.js — build is wrong, stop.
+  3. npm run preview → verify at localhost:4173
+  4. npx wrangler deploy
+  5. Open live URL in incognito window to bypass browser cache
+  6. Verify specific v3b+ features work (not just loading screen)
+
+### Verifying Production Has Latest Code
+Do NOT trust the loading screen version number alone.
+In browser DevTools → Sources → find main-[hash].js → Ctrl+F
+Search for 'geosync' — if found, v3b+ is confirmed deployed.
+Search for 'detailShaders' — if found, v3 is confirmed deployed.
+
+---
+
+## Vite Build Configuration
+
+vite.config.js MUST include manualChunks or the build produces only
+21 modules (missing all source code) with identical hash every time.
+The correct vite.config.js:
+
+  import { defineConfig } from 'vite'
+  import { readFileSync } from 'fs'
+  const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
+
+  export default defineConfig({
+    root: '.',
+    base: '/',
+    define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      target: 'esnext',
+      rollupOptions: {
+        input: { main: './index.html' },
+        output: {
+          manualChunks: {
+            three: ['three'],
+            postprocessing: ['postprocessing']
+          }
+        }
+      }
+    },
+    server: { port: 5173 }
+  })
+
+If build produces only 4 files or same hash every time:
+  1. Verify vite.config.js has manualChunks as above
+  2. rd /s /q dist  (Windows) or rm -rf dist  (Mac/Linux)
+  3. npm run build
+  4. Verify dist/assets now has 5-6 files with different hashes
+
+Do NOT include @cloudflare/vite-plugin — it hijacks the build and
+causes the 21-module problem. It must not appear in package.json
+devDependencies or vite.config.js imports.
+
+---
+
+## Multi-Worker Conflict Prevention
+
+When multiple workers are spawned in parallel, file conflicts cause
+merge issues and lost work. Follow these rules strictly:
+
+### Before Spawning Workers
+1. Orchestrator commits and pushes all shared infrastructure first:
+     git add -A && git commit -m "infra: shared dependencies"
+     git push origin main
+2. Each worker gets an exclusive file list — no overlaps
+3. Workers must NOT touch: PROJECT_LOG.md, vite.config.js,
+   package.json, index.html, src/config.js, src/main.js,
+   src/engine/glsl/simplex.glsl — orchestrator owns these
+
+### Worker Branch Strategy
+Each worker operates on a named branch:
+  git checkout -b worker/[feature-name]
+  # ... do work, commit ...
+  git push origin worker/[feature-name]
+
+Orchestrator merges worker branches sequentially:
+  git checkout main
+  git merge worker/io-shader --no-ff
+  git merge worker/europa-shader --no-ff
+  # resolve any conflicts before merging next branch
+  git push origin main
+
+### Worker File Ownership (Shader Sessions)
+  Orchestrator: src/engine/glsl/simplex.glsl (build first, push before workers start)
+  Worker 1:     src/engine/shaders/io-detail.glsl + io entries in jupiter.js
+  Worker 2:     src/engine/shaders/europa-detail.glsl + europa entries
+  Worker 3:     src/engine/shaders/ganymede-detail.glsl + ganymede entries
+  Worker 4:     src/engine/shaders/callisto-detail.glsl + callisto entries
+
+### After Merging All Workers
+  git log --oneline -10  ← verify all worker commits present
+  npm run build          ← must succeed with no errors
+  npm run preview        ← visual verify all features work together
+  npx wrangler deploy    ← deploy integrated result
+  git show HEAD --name-only  ← verify source files in final commit
 
 ---
 
@@ -34,7 +205,7 @@ PROJECT_LOG.md     Living document — single source of truth
   - Move resolved bugs from Known Bugs to Version History
   - Add any new bugs discovered to Known Bugs
   - Add any new backlog items discussed
-- Commit living doc update WITH every code commit — never separate
+- Commit living doc WITH source code — never as a separate commit
 - PROJECT_LOG.md is the single source of truth for project state
 
 ---
@@ -44,28 +215,14 @@ PROJECT_LOG.md     Living document — single source of truth
 [area]: [what changed] ([feature/bug ref if applicable])
 
 Areas: engine, physics, camera, audio, ui, shaders, config,
-       textures, deploy, docs
+       textures, deploy, docs, infra
 
 Examples:
   shaders: add Io procedural volcanic surface detail
   camera: fix chase mode spring follow + orbital direction offset
-  physics: fix geosync texture-camera time accumulator sync
-  engine: upgrade Jupiter texture to 16K Solar System Scope
-  docs: update PROJECT_LOG.md
-  deploy: push v3 procedural shaders to Cloudflare Pages
-
----
-
-## Deploy Commands
-
-Local dev:    npm run dev          → http://localhost:5173
-Test build:   npm run preview      → http://localhost:4173
-Production:   npm run deploy       → Cloudflare Pages via Wrangler
-Staging:      npm run deploy:preview → preview URL for review
-
-ALWAYS run npm run build before npm run deploy.
-ALWAYS verify npm run preview locally before deploying to production.
-NEVER deploy with TypeScript errors or console errors in preview.
+  ui: replace altitude presets with continuous logarithmic slider
+  deploy: fix vite manualChunks — production now bundles source code
+  docs: update PROJECT_LOG.md — v4 complete
 
 ---
 
@@ -75,6 +232,7 @@ Shaders / visuals:
   Open http://localhost:5173, navigate to the affected body,
   verify the feature visually at the altitudes specified in the task.
   Do not mark complete based on code alone — visual confirmation required.
+  Run npm run build and verify in npm run preview before marking done.
 
 Camera modes:
   Test the specific mode on at least two bodies (one inner, one outer).
@@ -88,28 +246,35 @@ Audio:
   Cycle through all 7 sound modes. Confirm crossfade works.
   Check localStorage persistence by reloading the page.
 
-Deploy:
-  After npm run deploy, open the live Cloudflare Pages URL and
-  confirm the feature works in production, not just localhost.
-  Check browser console for errors in production build.
+UI changes:
+  Test on both desktop (wide) and mobile (narrow) viewport.
+  Verify no elements overlap or get cut off.
+  Verify brand colors and fonts match style guide.
+
+Deploy verification:
+  After npx wrangler deploy, open live URL in INCOGNITO window.
+  Search for feature-specific string in DevTools Sources to confirm
+  latest code is deployed, not browser-cached v1.
+  Check browser console — zero errors required before marking done.
 
 ---
 
 ## Stopping Rules — Stop and Report to User Immediately
 
-1. Any item that requires an architectural decision not covered
-   by PROJECT_LOG.md or the session prompt
-2. Any conflict with a prior decision documented in PROJECT_LOG.md
+1. Any item requiring architectural decision not in PROJECT_LOG.md
+2. Any conflict with a prior decision in PROJECT_LOG.md
 3. Any unexpected finding during implementation — do not improvise
-4. Any shader compilation error that requires structural changes
-   to the shared GLSL library (other shaders depend on it)
+4. Any shader compilation error requiring structural changes to
+   the shared GLSL library (other shaders depend on it)
 5. npm run build fails with errors
-6. wrangler deploy fails
-7. A physics change causes orbital instability or moon escape
-8. Any change that would break the data-driven engine architecture
-   (Jupiter-specific logic appearing outside jupiter.js)
-9. Performance drops below 30 FPS on desktop tier after a change
-10. Any change to audio system that breaks localStorage persistence
+6. npx wrangler deploy fails
+7. Physics change causes orbital instability or moon escape
+8. Any change that puts Jupiter-specific logic outside jupiter.js
+9. Performance drops below 30 FPS on desktop tier
+10. Any audio change that breaks localStorage persistence
+11. git push fails or conflicts with remote — stop and report
+12. dist/assets shows only 4 files after build (manualChunks broken)
+13. Worker branch merge produces conflicts — stop, do not force merge
 
 ---
 
@@ -117,21 +282,21 @@ Deploy:
 
 - Improvise on unexpected findings — stop and report
 - Hard-code Jupiter-specific logic outside src/data/systems/jupiter.js
-- Commit without updating PROJECT_LOG.md
-- Deploy without running npm run build and npm run preview first
-- Re-read the same file multiple times in a session — read once,
-  reference in memory
-- Modify the shared GLSL noise library without checking all shaders
-  that depend on it
-- Change camera.updateProjectionMatrix() call placement — it must
-  fire on every resize event or Jupiter goes oval
-- Alter the texture TEXTURE_BASE_URL logic — dev vs production
-  path switching is intentional, do not simplify it away
-- Remove the uDetailBlend = 0 fast-path in shaders — it is a
-  deliberate performance optimization for far-away views
-- Change the geosync time accumulator without verifying surface
-  lock still works (texture rotation and camera orbit must stay
-  in sync)
+- Commit without staging source files (verify with git diff --cached)
+- Commit without pushing immediately after
+- Deploy without verifying dist has multiple chunked files
+- Use wrangler pages publish or wrangler pages deploy (wrong type)
+- Include @cloudflare/vite-plugin in package.json or vite.config.js
+- Re-read the same file multiple times in a session
+- Modify shared GLSL noise library without checking all dependents
+- Change camera.updateProjectionMatrix() call placement
+- Alter TEXTURE_BASE_URL logic
+- Remove uDetailBlend = 0 fast-path in shaders
+- Change geosync time accumulator without verifying surface lock
+- Let workers touch shared files (vite.config.js, package.json,
+  index.html, src/config.js, src/main.js, simplex.glsl)
+- Merge worker branches without resolving conflicts first
+- Deploy worker branch output — always merge to main first
 
 ---
 
@@ -154,126 +319,110 @@ above their activation altitude. No GPU cost when camera is far away.
 
 **Renderer:**
 Currently WebGL (not WebGPU) for postprocessing compatibility.
-Do not attempt WebGPU migration — it is in the backlog pending
-postprocessing library support. Document as Future Enhancement only.
+Do not attempt WebGPU migration — backlog item, pending library support.
 
 **Orbit camera:**
 Camera orbital angle and body texture rotation must reference the
-same time accumulator for GeoSync to work correctly.
-Never separate these update paths.
+same time accumulator for GeoSync. Never separate these update paths.
+
+**Vite build:**
+vite.config.js must always include manualChunks splitting three and
+postprocessing. Without this, build produces 21 modules and source
+code is not bundled. Never remove manualChunks.
 
 ---
 
 ## Known Gotchas
 
+**Source code not committed (has caused full session loss):**
+git show HEAD --name-only must show .js files, not just .md files.
+If only docs appear in commits, source was never staged. See git
+discipline section above for recovery steps.
+
+**Production serving wrong version:**
+Browser cache can serve stale JS even after deploy. Always verify
+in incognito window. Search DevTools Sources for feature-specific
+strings to confirm correct version is live.
+
+**Build produces 21 modules / identical hash:**
+Caused by missing manualChunks in vite.config.js OR by
+@cloudflare/vite-plugin being present. Remove the plugin,
+add manualChunks, delete dist, rebuild.
+
+**Deploy prompts for new project name:**
+Using wrong deploy command. ONLY use: npx wrangler deploy
+Never use: wrangler pages publish / wrangler pages deploy
+
 **Jupiter goes oval:**
-If camera aspect ratio is not updated on resize AND
-camera.updateProjectionMatrix() is not called, Jupiter renders oval.
-Both must fire in the window resize handler.
+camera.updateProjectionMatrix() must fire on every resize event.
+Also verify Jupiter oblate scale is exactly 0.9353 on Y axis.
 
 **Click events swallowed:**
-If a full-screen label layer has pointer-events enabled, it blocks
-all clicks to the 3D scene. Always set pointer-events: none on
-overlay layers unless they contain interactive elements.
+Full-screen overlay layers must have pointer-events: none unless
+they contain interactive elements.
 
 **Halo ring shader crash:**
-The halo ring uses a torus geometry with a custom shader.
-Shader uniforms must be declared before the material is added
-to the scene or it crashes on init. Declare all uniforms upfront.
+Shader uniforms must be declared before material is added to scene.
 
 **HUD date malformed:**
-The simulated date formatter must handle month rollover from the
-Voyager start date (March 5, 1979). Off-by-one in month index
-causes NaN display. Use UTC date methods only, never local.
+Use UTC date methods only, never local. Handle month rollover from
+March 5, 1979 Voyager start date.
 
-**Postprocessing + WebGL:**
-The postprocessing library requires WebGL renderer.
-Do not switch to WebGPU renderer without verifying every
-post-processing effect still works. This is a known blocker
-for the WebGPU migration in the backlog.
+**GeoSync drift:**
+Camera phase must be pinned to body's actual rotation angle each
+frame — not a separate accumulator. See camera.js _bodyRotationAngle().
+
+**Headless Chrome smoke tests:**
+Headless Chrome renders at ~4 FPS. Measure against sim-time, not
+wall-clock. Call cameraCtl.update() directly to settle transitions.
 
 **Texture loading order:**
-Textures must be fully loaded before the body mesh is added
-to the scene or the body flashes black on first render.
-Always use loader callbacks / promises, never synchronous load.
+Textures must be fully loaded before body mesh added to scene.
+Use loader callbacks/promises, never synchronous load.
 
 **Mobile pixel ratio:**
 Cap renderer.setPixelRatio at 2.0 maximum on all devices.
-Uncapped pixel ratio on high-DPI mobile destroys performance.
-
-**Headless Chrome smoke test fps:**
-Headless Chrome renders the Three.js scene at ~4 FPS, not 60.
-Wall-clock rate assertions will produce false failures (~32 of them).
-Correct pattern: measure everything against sim-time, settle camera
-transitions by calling cameraCtl.update() directly rather than waiting
-on wall-clock time. Never use wall-clock assertions in smoke tests.
 
 ---
 
 ## Token Efficiency
 
 - Read PROJECT_LOG.md once at session start — do not re-read
-  unless a specific lookup is needed later in the session
 - Read prompt .md files once — reference in memory
-- When spawning sub-agents, pass only the relevant section
-  of PROJECT_LOG.md and the specific task spec, not full files
-- Prefer targeted file reads (specific functions or sections)
-  over whole-file reads when change scope is narrow
-- Do not re-read unchanged files between tasks in a session
+- When spawning sub-agents, pass only relevant PROJECT_LOG.md
+  section + specific task spec — never the full document
+- Prefer targeted file reads over whole-file reads
+- Do not re-read unchanged files between tasks
 
 ---
 
 ## Cost Efficiency (Fable Budget Aware)
 
 - Run /compact after each major completed feature
-- For isolated implementational tasks (single shader, single
-  config entry, documentation) prefer sequential execution
-  over parallel sub-agents unless session prompt explicitly
-  requests parallelization
-- Sub-agent context: task spec + relevant PROJECT_LOG.md
-  section only — never pass the full living document to workers
-- Haiku-tier workers appropriate for: shader implementation
-  from complete spec, config data entry, documentation updates,
-  surface feature label content, UI copy
-- Orchestrator (Sonnet/Opus) required for: architecture decisions,
-  shared infrastructure, integration, debugging, code review
-
----
-
-## Multi-Agent Delegation (When Requested)
-
-When the session prompt includes AGENT DELEGATION INSTRUCTIONS:
-
-1. Complete all shared infrastructure first and commit before
-   spawning any workers (workers depend on shared files)
-2. Assign each worker only files it owns exclusively —
-   no two workers touch the same file
-3. Review all worker output before integrating
-4. Orchestrator handles: shared libs, integration, review,
-   PROJECT_LOG.md update, final commit
-5. Workers handle: isolated shader files, individual config
-   entries, documentation sections
-
-Worker file ownership for shader sessions:
-  Orchestrator: src/engine/glsl/simplex.glsl (shared dependency)
-  Worker 1: src/engine/shaders/io-detail.glsl + io body config
-  Worker 2: src/engine/shaders/europa-detail.glsl + europa body config
-  Worker 3: src/engine/shaders/ganymede-detail.glsl + ganymede body config
-  Worker 4: src/engine/shaders/callisto-detail.glsl + callisto body config
+- Sequential execution preferred unless prompt requests parallel
+- Sub-agent context: task spec + relevant log section only
+- Haiku-tier workers: shader impl from spec, config data, docs, UI copy
+- Orchestrator (Sonnet/Opus): architecture, integration, debugging
 
 ---
 
 ## Session Prompt Files
 
-Prompt files live in the repo root and are named by version:
-  MASTER_PROMPT.md    Original full build spec
-  V2_PROMPT.md        Bug fixes + orbit insertion
-  V3_DETAIL_SHADERS.md  Procedural detail shaders
-  V3b_ORBIT_FIX.md    Orbit surface movement fixes
-  FUTURE_ENHANCEMENTS.md  Documented future work (do not build)
+Prompt files live in Docs/ folder:
+  Docs/MASTER_PROMPT.md       Original full build spec
+  Docs/V2_PROMPT.md           Bug fixes + orbit insertion
+  Docs/V3_DETAIL_SHADERS.md   Procedural detail shaders
+  Docs/V3b_ORBIT_FIX.md       Orbit surface movement fixes
+  Docs/V4_PROMPT.md           Backlog features batch (next session)
+  FUTURE_ENHANCEMENTS.md      Documented future work (do not build)
 
-At session start: read instructions.md → read PROJECT_LOG.md →
-read the session prompt file → begin work.
+Session start sequence:
+  1. git pull origin main
+  2. git status  ← verify clean
+  3. Read .claude/instructions.md (this file)
+  4. Read PROJECT_LOG.md
+  5. Read session prompt file
+  6. Begin work
 
 ---
 
@@ -296,11 +445,11 @@ Apply to ALL UI elements without exception.
 
 ## End of Session Checklist
 
-Before ending any session:
-  [ ] All committed code verified working in browser
-  [ ] npm run build succeeds with no errors
-  [ ] PROJECT_LOG.md updated with session changes
-  [ ] Known Bugs updated (new bugs added, fixed bugs moved)
-  [ ] Backlog updated if new items were discussed
-  [ ] Living doc committed with same commit as final code change
-  [ ] If deployed: live URL verified in production browser
+  [ ] git status shows clean working tree
+  [ ] git log --oneline -5 shows recent commits
+  [ ] git show HEAD --name-only shows .js source files in latest commit
+  [ ] All commits pushed to origin main
+  [ ] npm run build succeeds with 5-6 chunked files in dist/assets
+  [ ] Live URL verified in incognito window
+  [ ] PROJECT_LOG.md updated (version history, bugs, backlog)
+  [ ] No items left uncommitted or unpushed

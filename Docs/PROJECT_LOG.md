@@ -15,7 +15,9 @@ to scale to Saturn, the full solar system, and beyond.
 **Hosting:** Cloudflare Pages (unlimited bandwidth, $5/mo plan)
 **Texture Storage:** Cloudflare R2 (zero egress fees)
 **Build:** Vite + Vanilla JavaScript + Three.js
-**Deploy:** `npm run deploy` → Cloudflare Pages via Wrangler
+**Deploy:** `npm run deploy` → `npx wrangler deploy` (Workers deployment, not Pages)
+**Note:** Site is deployed as a Cloudflare Worker (workers.dev URL), not Cloudflare Pages.
+Use `npx wrangler deploy` — NOT `wrangler pages publish` or `wrangler pages deploy`.
 
 ---
 
@@ -55,7 +57,16 @@ All planetary system data lives in config files, never in engine code.
 - A future developer can drop in `saturn.js` and it renders with no
   engine changes
 
-### Domain
+### Git Commit Discipline — CRITICAL
+Source code was lost across multiple sessions (v1 through v3b) because
+Claude Code committed only documentation files, not source code.
+ALL sessions lost — v1, v2, v3, v3b source never committed to git.
+Recovery required full rebuild from prompt files.
+
+Rule: after every feature, run git add -A, verify source files are
+staged with git status, commit, then git push origin main immediately.
+Verify with git show HEAD --name-only that .js/.glsl files appear.
+If only .md files appear in the commit, source was not staged — fix it.
 Registered via Cloudflare Registrar (at-cost, zero markup, native DNS
 integration with Pages). Target domain: a *.co extension — final name
 TBD. DNS connection to Cloudflare Pages is two clicks once registered.
@@ -295,40 +306,30 @@ Commit: b1fcdf2 (26 files)
 - All bodies screenshot-tested at spec altitudes, 50-61 FPS confirmed
 - Zero console errors in production
 
-### v3b — Orbit Surface Movement Fix (Complete — 2026-07-10)
-Commits: 7e69fa4 (orbit), ffc3fe8 (insertion + geosync), 9e09060 (chase),
-abbd3a9 (UI controls). Per V3b_ORBIT_FIX.md.
-- Fixed: Orbit mode — camera advances along its orbital path, surface
-  sweeps beneath. Visual period 60 s of sim time per revolution (scales
-  with time multiplier, freezes on pause), × Orbital Speed slider,
-  capped at one rev per 5 wall-seconds so high multipliers sweep
-  dramatically instead of strobing. Low-altitude 15° tilt now leans
-  toward the direction of travel (was camera-right axis).
-- Fixed: Orbit Insertion non-geosync — phase advances from the shared
-  sim-time accumulator (physics.simSeconds delta), camera moves at the
-  true orbital rate; surface sweeps at |orbital − rotation| rate.
-- Fixed: GeoSync — camera phase pinned directly to the rotation angle
-  the renderer applied this frame (primaryRotation for Jupiter,
-  mesh.rotation.y for tidally locked moons) plus a lock offset captured
-  when the lock engages: drift is exactly zero by construction.
-  Verified zero drift over 2,000 sim-seconds at 10,000x (Jupiter + Io).
-- Fixed: Chase mode — camera 3R behind / 1.5R above (both × scroll
-  zoom), height along the orbital plane's north (root Y, carries axial
-  tilt), looking 2R ahead of the moon along travel: surface below,
-  horizon and Jupiter ahead.
-- Added: Surface speed readout in Orbit Insertion HUD — ground-track
-  rate; reads "0.0 km/s (Geosynchronous)" when locked
-- Added: Orbital Speed slider (Orbit mode, 0–4×, Mission Control)
-- Added: Chase Height slider (Chase mode, 0.2–4× radius, Mission Control)
-- Changed: default insertion view is nadir + 15° forward tilt
-  (pitch −1.31 rad; GeoSync preset keeps its wider −0.8 view)
-- Verified: 51-check headless smoke test, all passing — orbit sweep
-  rate/cap/pause, insertion rate, geosync zero-drift, chase geometry,
-  sliders, HUD, across Jupiter + all four Galilean moons. Testing note:
-  headless Chrome renders this scene at ~4 fps (0.6 fps under
-  SwiftShader), so smoke tests must measure rates against
-  physics.simSeconds — never wall clock — and settle transitions by
-  calling cameraCtl.update(dt) in a loop.
+### v3b — Orbit Surface Movement Fix (Complete — commits → 07793f3)
+- Bug 1 (Orbit mode): Camera advances along orbital path, one revolution
+  per 60 sim-seconds scaling with time multiplier. Capped at 1 rev per
+  5 wall-seconds to prevent strobing at high time multipliers. 15° nadir
+  tilt now correctly aligned with direction of travel.
+- Bug 2 (Orbit Insertion): Phase driven by shared physics.simSeconds
+  accumulator — was advancing at real orbital periods (imperceptible at
+  1x). Surface speed ground-track readout added to HUD (e.g. 29.1 km/s
+  over Jupiter at 500 km). Default view: nadir + 15° forward tilt.
+- Bug 3 (GeoSync): Camera phase pinned directly to rotation angle
+  applied that frame (primaryRotation for Jupiter, moon mesh rotation
+  for tidally locked moons) + offset captured at lock engage. Zero drift
+  by construction — verified 0.0 km/s over 2,000 sim-seconds at 10,000x
+  on both Jupiter and Io. HUD reads "0.0 km/s (Geosynchronous)."
+- Bug 4 (Chase): Camera 3R behind + 1.5R above, looking 2R ahead of
+  moon. Surface below, horizon and Jupiter ahead. Chase Height slider
+  (0.2–4× radius) and Orbital Speed slider in Mission Control, appear
+  only in their respective modes.
+- Smoke test: 51-check headless test suite, all passing. Test pattern:
+  measure against sim-time, settle transitions via cameraCtl.update()
+  directly (headless Chrome renders at ~4fps so wall-clock assertions
+  give false failures).
+- Note: not yet deployed — live site still v3. Deploy when ready:
+  update Ko-fi handle in config.js first, then npm run deploy.
 
 ---
 
@@ -342,6 +343,7 @@ abbd3a9 (UI controls). Per V3b_ORBIT_FIX.md.
 | 4 | Io volcanic plumes not parented to moon — float over surface during rotation | Backlog | — |
 | 5 | GRS vortex detail not discoverable — no way to navigate directly to GRS longitude | Backlog | — |
 | 6 | instructions.md in Docs/ not .claude/ — move to .claude/instructions.md for auto-read | Fix needed | — |
+| 7 | Some moons appear egg-shaped / oval — aspect ratio bug not fully fixed for moon meshes, and/or Amalthea irregular shape scale over-exaggerated | Backlog | — |
 
 ---
 
@@ -357,6 +359,9 @@ abbd3a9 (UI controls). Per V3b_ORBIT_FIX.md.
 | 6 | Orbit Insertion inclination range fix | Extend inclination slider from 0–90° to -90°–90°. Slider center = 0° (equatorial). Negative = retrograde orbit. Label: "-90° (retrograde)" left, "0° (equatorial)" center, "90° (polar)" right. Physics: negative inclination reverses orbital direction. |
 | 7 | GRS navigation preset | Add "Jump to Great Red Spot" button in Jupiter body info panel and/or Orbit Insertion panel. Rotates camera longitude to align with GRS position (23°S, current simulated longitude). Solves discoverability — GRS vortex detail exists but user has no way to find it without knowing Jupiter's rotation state. |
 | 8 | Detail-aware zoom floor | Minimum zoom altitude adapts to where procedural detail + texture resolution runs out. Resistance zoom: quadratic taper below soft floor, hard stop at floor. Per-body floors stored in body config (not engine). Floors: Jupiter 1,500 km, Io 150 km, Europa 150 km, Ganymede 200 km, Callisto 300 km, inner moons 50 km. HUD feedback: "Maximum surface detail reached" fades in at soft floor, ALT readout pulses once at hard floor. |
+| 9 | Dynamic version display on loading screen | Pull version from package.json via Vite define plugin. Loading screen subtitle reads "Jupiter System — v{version}" dynamically. Bump package.json version each session so loading screen always reflects current build. Add __APP_VERSION__ constant to vite.config.js. |
+| 10 | Replace altitude presets with altitude slider in Mission Control | Remove Distant/Near/Low Orbit/Skim preset buttons from Mission Control panel. Replace with a continuous logarithmic altitude slider (10 km to 500,000 km). Slider in Mission Control right panel, always visible when a body is targeted. Current ALT value shown as readout next to slider. Logarithmic scale: fine-grained control at low altitude, fast movement at high altitude. |
+| 11 | Add inclination slider to Mission Control right panel | Move inclination control out of Orbit Insertion panel into Mission Control right panel so it's always accessible. Range: -90° to +90°. Slider center = 0° (equatorial). Labels: "-90° retrograde" left, "0° equatorial" center, "90° polar" right. Negative = retrograde orbit (reverses orbital direction). Works in both Orbit mode and Orbit Insertion mode. |
 
 ---
 
@@ -365,14 +370,153 @@ abbd3a9 (UI controls). Per V3b_ORBIT_FIX.md.
 | # | Feature | Notes |
 |---|---------|-------|
 | 1 | Saturn System | saturn.js config, particle ring system, Titan atmosphere shader, Enceladus geysers |
-| 2 | Full Solar System view | Zoom out to all planets, click any to enter |
-| 3 | Historic mission trajectories | Voyager 1&2, Cassini, Juno, Galileo animated paths |
-| 4 | Polar orbit presets | One-click polar orbit over any body |
-| 5 | Time of day selector | Jump to specific simulated date/time |
-| 6 | Multiplayer shared view | URL encodes camera position + time |
-| 7 | VR support | WebXR for headset exploration |
-| 8 | Resonance visualizer | 1:2:4 Io/Europa/Ganymede animation in System View |
-| 9 | Io volcanic event notifications | Random eruption alerts when near Io |
+| 2 | Earth + Moon System | See full spec below. Binary system — Earth and Moon together. ISS altitude experience, procedural clouds, city lights, auroras, Earthrise, Apollo landing sites. |
+| 3 | Full Solar System Orrery | Camera Mode 8 (V key). All planets in correct orbital positions. Click any to travel. Scale-adjusted so all visible. Gateway to inter-system navigation. |
+| 4 | Inter-System Navigation | System selector UI in Mission Control. Cinematic hyperjump sequence (8-12s, skippable). Runtime system switching with GPU memory management. Floating origin / scale switching between AU and km coordinate systems. |
+| 5 | Historic mission trajectories | Voyager 1&2, Cassini, Juno, Galileo animated paths |
+| 6 | Time of day selector | Jump to specific simulated date/time |
+| 7 | Multiplayer shared view | URL encodes camera position + time |
+| 8 | VR support | WebXR for headset exploration |
+| 9 | Resonance visualizer | 1:2:4 Io/Europa/Ganymede animation in System View |
+| 10 | Io volcanic event notifications | Random eruption alerts when near Io |
+
+---
+
+## Earth + Moon System Spec (Future Build)
+
+### Overview
+Earth and Moon treated as a binary system in earth.js config.
+Seamless navigation between them. Moon orbits Earth accurately.
+Target experience: ISS quality — NASA 4K video from orbit.
+
+### Earth Texture Stack (all NASA public domain)
+- Day: Blue Marble Next Generation 8K (12 monthly variants for seasonal change)
+- Night: Black Marble city lights 8K (NASA)
+- Specular map: ocean vs land reflectivity
+- Normal/elevation map: terrain height data
+- Cloud layer: separate texture rotating independently of surface
+
+### Earth Procedural Layers
+
+**Atmosphere (all altitudes):**
+- Rayleigh scattering limb glow — vivid blue-white, exponentially
+  brighter at the very edge. Most recognizable Earth feature from space.
+- Terminator atmospheric glow — lit side bleeds past geometric
+  terminator. Soft orange-red at terminator line itself.
+
+**Day side (activate below 50,000 km):**
+- Animated cloud system: Simplex noise cloud layer rotating ~30%
+  faster than surface (jet stream simulation)
+- Hurricane vortex shader: same technique as GRS — spiral noise
+  vortex features that slowly drift westward at tropical latitudes
+- Ocean specular glint: blinding white sun reflection on ocean
+  surface, moves correctly with camera angle (BRDF specular)
+- Mountain shadow detail: normal map intensity increases at low alt
+- Weather front streaks: elongated cloud noise at mid-latitudes
+
+**Night side:**
+- City lights texture (Black Marble) fades in past terminator
+- Auroral oval: animated green/purple curtains at 65-70° latitude,
+  visible from above as glowing rings around poles
+- Lightning: occasional blue-white flashes in storm cloud regions
+  (particle system, random, weighted toward tropics)
+
+**ISS altitude — below 1,000 km:**
+- Ocean wave normal perturbation + whitecap noise in wind regions
+- Coastline atmospheric haze
+- Storm system vortex detail visible in cloud layer
+- Zoom floor: 200 km (ISS is at 408 km — natural reference point)
+
+**Unique Earth features:**
+- Earthshine: from Moon's night side, Earth's reflected light
+  illuminates dark lunar surface in blue-grey glow
+- Earthrise: Earth rises above lunar horizon as camera orbits Moon —
+  dynamically rendered using Earth's full procedural texture
+- ISS Mode: NASA open API gives real-time ISS position (updates
+  every 5 seconds). "ISS Mode" button places camera at actual
+  current ISS altitude and position — showing what an astronaut
+  sees right now. Unique feature, no other web app has this.
+
+### Moon Procedural Layers
+
+**Source material:**
+- NASA CGI Moon Kit: 8K color, displacement, normal maps
+- LRO (Lunar Reconnaissance Orbiter): 100m/pixel global, 0.5m
+  selected regions, complete LOLA elevation data
+
+**High altitude (10,000 km to 1,000 km):**
+- Multi-scale cratering (same technique as Callisto, more variety)
+- Mare vs highland detection from base texture luminance:
+  Mare (dark): smooth, subtle ripple texture, dark basalt
+  Highland (bright): dense small craters, ancient rough terrain
+- Crater ray system: Tycho rays (1,500 km), Copernicus rays —
+  bright white streaks fading with distance from impact point
+
+**Mid altitude (1,000 km to 100 km):**
+- Terminator enhancement: craters near day/night boundary show
+  extreme long shadow fingers — changes in real time with sun angle
+- Regolith sparkle: opposition surge effect — glowing halo around
+  camera shadow when sun is directly behind viewer
+- Crater chain detail: secondary craters form visible strings
+- Rilles: sinuous channels from ancient lava flows
+
+**Low altitude (100 km to 10 km):**
+- Boulder fields around crater rims
+- Lava tube skylights in mare regions: dark pit features
+- Colour variation: olivine (green), pyroclastic glass (dark orange),
+  fresh highland material (bright white)
+- Permanently shadowed regions near poles: absolute black with
+  subtle blue ice sheen (confirmed water ice — Chandrayaan data)
+
+**Very low altitude (10 km to 1 km):**
+- Individual boulder shadows
+- Crater interior detail: central peaks, terraced walls, floor fractures
+- Zoom floor: 1 km (best zoom floor of any body — LRO data supports it)
+
+**Apollo Landing Sites (all 6):**
+- Precise coordinates known and marked
+- Below 50 km: subtle equipment markers (descent stages still there,
+  LRO photographed them)
+- Info panel: mission name, crew, date, key achievement
+- "Apollo Tour" preset: visits all 6 sites in chronological order
+  with cinematic transitions and mission facts
+  Apollo 11: Mare Tranquillitatis (0.67°N, 23.47°E) — Jul 20 1969
+  Apollo 12: Oceanus Procellarum (3.01°S, 23.42°W) — Nov 19 1969
+  Apollo 14: Fra Mauro (3.65°S, 17.47°W) — Feb 5 1971
+  Apollo 15: Hadley-Apennine (26.13°N, 3.63°E) — Jul 30 1971
+  Apollo 16: Descartes (8.97°S, 15.50°E) — Apr 21 1972
+  Apollo 17: Taurus-Littrow (20.19°N, 30.77°E) — Dec 11 1972
+
+### Inter-System Navigation Spec
+
+**System Selector UI:**
+Navigation bar in Mission Control panel showing all available systems.
+Current system: Primary Blue #0077CC highlight.
+Built systems: fully clickable.
+Unbuilt systems: Light Gray #D9D9D9 with lock icon — shows roadmap.
+
+**Cinematic Hyperjump Sequence (8-12 seconds, skippable):**
+1. Camera pulls back from current system dramatically (2s)
+2. Current planet shrinks to a dot against starfield (1s)
+3. Solar system orrery briefly visible — glowing line traces
+   path to destination planet (2s)
+4. Camera accelerates toward destination — subtle star motion,
+   not Star Wars warp (2s)
+5. Destination grows from dot to fill screen (2s)
+6. Cinematic arrival pan reveals new system (2s)
+
+**Runtime System Switching:**
+- Dispose all current system geometries and textures before loading new
+- GPU memory must not grow unbounded across system switches
+- Loading screen with destination planet facts during asset load
+- Three.js scene graph fully cleared between systems
+
+**Floating Origin / Scale System:**
+Solar system scale: AU coordinate units
+Planetary system scale: km coordinate units, centered on planet
+Transition: seamless unit switch as camera crosses system boundary
+Camera near/far planes adjusted per scale context
+Prevents floating point precision artifacts at large distances
 
 ---
 
@@ -386,7 +530,8 @@ Before each deploy:
 - [ ] README live URL updated
 - [ ] PROJECT_LOG.md updated with session changes
 
-Deploy command: `npm run deploy`
+Deploy command: `npm run deploy` (runs `npx wrangler deploy` — Workers, not Pages)
+Do NOT use: `wrangler pages publish` or `wrangler pages deploy` — wrong deployment type.
 
 ---
 

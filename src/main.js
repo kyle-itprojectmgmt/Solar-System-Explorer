@@ -4,6 +4,8 @@
 // quality tier, and wires renderer + physics + camera + audio + UI together.
 // ---------------------------------------------------------------------------
 
+/* global __APP_VERSION__ */
+
 import { SYSTEM_CONFIG } from './config.js';
 import { PhysicsEngine } from './engine/physics.js';
 import { SceneRenderer } from './engine/renderer.js';
@@ -60,6 +62,9 @@ function loadingScreen(facts) {
 // -- Boot ---------------------------------------------------------------------------
 
 async function boot() {
+  const verEl = document.getElementById('loading-version');
+  if (verEl) verEl.textContent = `Jupiter System — v${__APP_VERSION__}`;
+
   const { default: system } = await import(`./data/systems/${SYSTEM_CONFIG}.js`);
   const quality = detectQuality();
   const loader = loadingScreen(system.loadingFacts || []);
