@@ -27,10 +27,14 @@ export default {
   primary: {
     name: 'Jupiter',
     slug: 'jupiter',
+    type: 'Gas Giant',
     radiusKm: 71492,          // equatorial
     polarRadiusKm: 66854,     // oblate — rendered as ellipsoid
     massKg: 1.898e27,
     rotationPeriodHours: 9.925,
+    orbitalPeriodDays: 4332.59, // around the Sun
+    surfaceGravity: 24.79,      // m/s² at cloud tops
+    surfaceTempRange: [-108, -108], // °C, cloud tops
     axialTiltDeg: 3.13,
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
     normalScale: 2.0,   // cloud band depth (drives procedural relief lighting)
@@ -58,17 +62,23 @@ export default {
       uniformUV: 'uGrsUV',
       message: 'Navigating to Great Red Spot…',
     }],
+    notableFeatures: [
+      'Great Red Spot — storm raging 350+ years',
+      'Strongest magnetic field of any planet',
+      'More than twice the mass of all other planets combined',
+      '4 large Galilean moons + 91 smaller moons',
+    ],
+    moreInfo: {
+      grsSize: '16,000 km wide — larger than Earth',
+      magneticField: "20,000x stronger than Earth's",
+      rings: '4-component faint ring system discovered 1979',
+      radiation: 'Radiation belts lethal to unshielded spacecraft',
+    },
     facts: [
       'Jupiter is so large that 1,300 Earths could fit inside it',
       "Jupiter's Great Red Spot is a storm that has raged for over 350 years",
       'Jupiter completes a full rotation in under 10 hours — the fastest in the solar system',
     ],
-    stats: {
-      'Radius': '71,492 km',
-      'Mass': '1.898 × 10²⁷ kg',
-      'Rotation period': '9.925 hours',
-      'Axial tilt': '3.13°',
-    },
   },
 
   // Jupiter's four ring components. Nearly invisible face-on, dramatically
@@ -111,12 +121,26 @@ export default {
         { name: 'Prometheus Volcano', latDeg: -1.5, lonDeg: 153.0 },
       ],
       detail: { style: 'volcanic', activationKm: 10000, fullKm: 500 },
+      type: 'Volcanic Moon',
+      surfaceGravity: 1.796,
+      surfaceTempRange: [-143, 1600], // °C — surface vs volcanic vents
+      orbitalDistanceKm: { min: 420000, max: 423000 },
+      notableFeatures: [
+        'Most volcanically active body in the solar system',
+        "Tidal heating from Jupiter's gravity drives volcanism",
+        'Surface resurfaced by lava every few thousand years',
+        'Over 400 active volcanoes',
+      ],
+      moreInfo: {
+        tidalHeating: "Jupiter's tidal forces generate ~100TW of heat",
+        atmosphere: 'Thin SO₂ atmosphere from volcanic outgassing',
+        plumes: 'Volcanic plumes reach 500km into space',
+      },
       facts: [
         'Io is the most volcanically active body in the solar system',
         'Its volcanoes are driven by tidal heating from Jupiter\'s immense gravity',
         'Io\'s plumes reach 300 km above the surface',
       ],
-      stats: { 'Radius': '1,821 km', 'Orbital period': '1.77 days', 'Distance': '421,700 km' },
     },
     {
       name: 'Europa', slug: 'europa',
@@ -136,12 +160,26 @@ export default {
         { name: 'Pwyll Crater',   latDeg: -25.2, lonDeg: 271.4 },
       ],
       detail: { style: 'ice', activationKm: 10000, fullKm: 500 },
+      type: 'Ice Moon',
+      surfaceGravity: 1.315,
+      surfaceTempRange: [-220, -160],
+      orbitalDistanceKm: { min: 664000, max: 678000 },
+      notableFeatures: [
+        'Subsurface ocean 100km deep beneath ice shell',
+        'Best candidate for extraterrestrial life in solar system',
+        'Surface ice cracks reveal tidal flexing activity',
+        'Europa Clipper mission currently en route (arrives 2030)',
+      ],
+      moreInfo: {
+        ocean: "More liquid water than all of Earth's oceans combined",
+        iceShell: 'Ice shell 10-30km thick over liquid ocean',
+        habitability: 'Hydrothermal vents likely on ocean floor',
+      },
       facts: [
         'Europa may harbor a liquid water ocean beneath its icy surface',
         'Its ice shell is criss-crossed by reddish fractures called lineae',
         'Europa\'s ocean may contain twice the water of all Earth\'s oceans',
       ],
-      stats: { 'Radius': '1,560 km', 'Orbital period': '3.55 days', 'Distance': '671,100 km' },
     },
     {
       name: 'Ganymede', slug: 'ganymede',
@@ -164,12 +202,26 @@ export default {
         { name: 'Gilgamesh Basin', latDeg: -62,  lonDeg: 125 },
       ],
       detail: { style: 'grooved', activationKm: 10000, fullKm: 500 },
+      type: 'Giant Moon',
+      surfaceGravity: 1.428,
+      surfaceTempRange: [-203, -121],
+      orbitalDistanceKm: { min: 1069000, max: 1071000 },
+      notableFeatures: [
+        'Largest moon in the solar system — bigger than Mercury',
+        'Only moon with its own magnetic field and auroras',
+        'Ancient dark terrain and younger grooved terrain',
+        'JUICE mission en route, arrives 2034',
+      ],
+      moreInfo: {
+        magnetosphere: 'Aurora ovals visible from orbit at poles',
+        terrain: 'Two terrain types separated by sharp geological boundary',
+        size: "Diameter 5,268km — exceeds Mercury's 4,879km",
+      },
       facts: [
         'Ganymede is larger than the planet Mercury',
         'It is the only moon in the solar system with its own magnetic field',
         'Its surface mixes ancient dark terrain with younger grooved ice',
       ],
-      stats: { 'Radius': '2,634 km', 'Orbital period': '7.15 days', 'Distance': '1,070,400 km' },
     },
     {
       name: 'Callisto', slug: 'callisto',
@@ -192,24 +244,46 @@ export default {
         style: 'cratered', activationKm: 10000, fullKm: 500,
         params: { basinUV: [0.833, 0.6] }, // Valhalla, scanned from the map
       },
+      type: 'Ancient Moon',
+      surfaceGravity: 1.235,
+      surfaceTempRange: [-193, -108],
+      orbitalDistanceKm: { min: 1869000, max: 1897000 },
+      notableFeatures: [
+        'Most heavily cratered object in the solar system',
+        'Surface unchanged for ~4 billion years',
+        'Valhalla impact basin — rings spread 1,900km from center',
+        'Lowest radiation of any Galilean moon — best for crewed base',
+      ],
+      moreInfo: {
+        age: 'Surface is a record of 4 billion years of impacts',
+        valhalla: 'Largest multi-ring impact structure in solar system',
+        future: 'Proposed site for human outpost due to low radiation',
+      },
       facts: [
         'Callisto has the most heavily cratered surface in the solar system',
         'Its Valhalla impact basin is nearly 4,000 km across',
         'Callisto\'s ancient surface is about 4 billion years old',
       ],
-      stats: { 'Radius': '2,410 km', 'Orbital period': '16.69 days', 'Distance': '1,882,700 km' },
     },
 
     // Inner moons — ring sources, simplified Keplerian orbits.
     { name: 'Metis',    slug: 'metis',    radiusKm: 22,  massKg: 3.6e16, semiMajorAxisKm: 127969, periodDays: 0.295, phaseDeg: 40,  physics: 'kepler', color: 0x8a8078, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 }, geometrySegments: 64,
-      facts: ['Metis orbits inside Jupiter\'s main ring and supplies it with dust'], stats: { 'Radius': '~22 km', 'Orbital period': '7.1 hours' } },
+      type: 'Ring Moon', discoveredYear: 1979, discoveredBy: 'Voyager 1',
+      notableFeatures: ['Orbits inside Jupiter\'s main ring', 'Supplies the main ring with dust', 'Orbits faster than Jupiter rotates'],
+      facts: ['Metis orbits inside Jupiter\'s main ring and supplies it with dust'] },
     { name: 'Adrastea', slug: 'adrastea', radiusKm: 8,   massKg: 2.0e15, semiMajorAxisKm: 128980, periodDays: 0.298, phaseDeg: 160, physics: 'kepler', color: 0x87837c, normalScale: 1.5, detailFloor: { softKm: 50, hardKm: 20 }, geometrySegments: 64,
-      facts: ['Adrastea is one of the smallest known moons, discovered by Voyager 2'], stats: { 'Radius': '~8 km', 'Orbital period': '7.2 hours' } },
+      type: 'Ring Moon', discoveredYear: 1979, discoveredBy: 'Voyager 2',
+      notableFeatures: ['One of the smallest known moons', 'Shepherds the outer edge of the main ring'],
+      facts: ['Adrastea is one of the smallest known moons, discovered by Voyager 2'] },
     { name: 'Amalthea', slug: 'amalthea', radiusKm: 84,  massKg: 2.1e18, semiMajorAxisKm: 181366, periodDays: 0.498, phaseDeg: 250, physics: 'kepler', color: 0xa05540, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 }, geometrySegments: 64,
       radii: { x: 125, y: 73, z: 64 }, // real irregular body: 250 x 146 x 128 km
-      facts: ['Amalthea is the reddest object in the solar system', 'It sheds the dust that forms the Amalthea gossamer ring'], stats: { 'Dimensions': '250 × 146 × 128 km', 'Orbital period': '12 hours' } },
+      type: 'Irregular Moon', discoveredYear: 1892, discoveredBy: 'E. E. Barnard',
+      notableFeatures: ['Reddest object in the solar system', 'Irregular 250 × 146 × 128 km ellipsoid', 'Sheds the dust of the Amalthea gossamer ring'],
+      facts: ['Amalthea is the reddest object in the solar system', 'It sheds the dust that forms the Amalthea gossamer ring'] },
     { name: 'Thebe',    slug: 'thebe',    radiusKm: 49,  massKg: 4.3e17, semiMajorAxisKm: 221900, periodDays: 0.675, phaseDeg: 15,  physics: 'kepler', color: 0x8f7a6a, normalScale: 1.5, detailFloor: { softKm: 100, hardKm: 50 }, geometrySegments: 64,
-      facts: ['Thebe feeds the outermost, faintest gossamer ring'], stats: { 'Radius': '~49 km', 'Orbital period': '16.2 hours' } },
+      type: 'Ring Moon', discoveredYear: 1979, discoveredBy: 'Voyager 1',
+      notableFeatures: ['Feeds the outermost, faintest gossamer ring', 'Heavily cratered despite its small size'],
+      facts: ['Thebe feeds the outermost, faintest gossamer ring'] },
   ],
 
   loadingFacts: [

@@ -306,11 +306,58 @@ html, body {
   left: 50%;
   bottom: 88px;
   transform: translateX(-50%);
-  width: min(400px, calc(100vw - 32px));
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 180px));
+  overflow-y: auto;
   padding: 18px 20px;
   transition: opacity 0.25s;
+  scrollbar-width: thin;
+  scrollbar-color: var(--blue) transparent;
 }
 .info-panel.hidden { opacity: 0; pointer-events: none; }
+.info-head { display: flex; align-items: baseline; gap: 10px; }
+.info-badge {
+  font-family: var(--font-head);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--space);
+  background: var(--blue-light);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.info-subhead {
+  font-family: var(--font-head);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--gray-light);
+  margin: 10px 0 4px;
+}
+.info-features {
+  list-style: none;
+  font-size: 0.78rem;
+  color: var(--gray-light);
+  font-weight: 300;
+}
+.info-features li { padding: 2px 0 2px 14px; position: relative; }
+.info-features li::before { content: '•'; position: absolute; left: 2px; color: var(--blue-light); }
+.info-more-btn {
+  background: none;
+  border: none;
+  color: var(--blue-light);
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  padding: 8px 0 2px;
+  text-align: left;
+}
+.info-more-btn:hover { color: var(--white); }
+.info-more { border-top: 1px solid rgba(217, 217, 217, 0.12); padding-top: 6px; margin-top: 4px; }
 .info-title {
   font-family: var(--font-head);
   color: var(--blue-light);

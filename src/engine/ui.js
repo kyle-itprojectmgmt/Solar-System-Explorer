@@ -371,28 +371,67 @@ export class UI {
     if (!cfg) return;
     this.info.innerHTML = '';
     this.infoBody = name;
-    el('h2', 'info-title', this.info).textContent = cfg.name;
+
+    // Header: name + type badge. All card data comes from the system
+    // config — nothing body-specific lives here.
+    const head = el('div', 'info-head', this.info);
+    el('h2', 'info-title', head).textContent = cfg.name;
+    if (cfg.type) el('span', 'info-badge', head).textContent = cfg.type;
     this.detailDot = el('div', 'detail-indicator', this.info);
     this.detailDot.textContent = '● Surface Detail Active';
     this.detailDot.style.display = 'none';
+
+    // Key stats grid. Diameter/periods derive from the same fields that
+    // drive the simulation (radiusKm, periodDays) — single source of truth.
     const stats = el('dl', 'info-stats', this.info);
-    for (const [k, v] of Object.entries(cfg.stats || {})) {
+    const add = (k, v, html = false) => {
+      if (v == null) return;
       el('dt', '', stats).textContent = k;
-      el('dd', '', stats).textContent = v;
+      const dd = el('dd', '', stats);
+      if (html) dd.innerHTML = v; else dd.textContent = v;
+    };
+    if (cfg.radii) add('Dimensions', `${cfg.radii.x * 2} × ${cfg.radii.y * 2} × ${cfg.radii.z * 2} km`);
+    else add('Diameter', `${(cfg.radiusKm * 2).toLocaleString()} km`);
+    if (cfg.massKg) add('Mass', fmtMass(cfg.massKg), true);
+    if (cfg.surfaceGravity) add('Gravity', `${cfg.surfaceGravity} m/s²`);
+    if (cfg.surfaceTempRange) add('Temp', fmtTempRange(cfg.surfaceTempRange));
+    if (cfg.orbitalDistanceKm) {
+      add('Orbit distance', `${cfg.orbitalDistanceKm.min.toLocaleString()} – ${cfg.orbitalDistanceKm.max.toLocaleString()} km`);
+    } else if (cfg.semiMajorAxisKm) {
+      add('Orbit distance', `${cfg.semiMajorAxisKm.toLocaleString()} km`);
     }
-    for (const f of cfg.facts || []) {
-      el('p', 'info-fact', this.info).textContent = f;
+    const period = cfg.periodDays ?? cfg.orbitalPeriodDays;
+    if (period) add('Orbital period', period < 1 ? `${(period * 24).toFixed(1)} hours` : `${period.toLocaleString()} days`);
+    if (cfg.tidallyLocked) add('Rotation', `${(cfg.periodDays * 24).toFixed(1)} hours (tidally locked)`);
+    else if (cfg.rotationPeriodHours) add('Rotation', `${cfg.rotationPeriodHours} hours`);
+    if (cfg.discoveredYear) add('Discovered', `${cfg.discoveredYear} — ${cfg.discoveredBy || ''}`);
+
+    // Notable features (fall back to legacy facts for bodies without them).
+    const feats = cfg.notableFeatures || cfg.facts || [];
+    if (feats.length) {
+      el('h3', 'info-subhead', this.info).textContent = 'NOTABLE FEATURES';
+      const ul = el('ul', 'info-features', this.info);
+      for (const f of feats) el('li', '', ul).textContent = f;
     }
-    const row = el('div', 'info-actions', this.info);
-    for (const preset of cfg.navPresets || []) {
-      const nb = el('button', 'btn btn-primary', row);
-      nb.textContent = preset.label;
-      nb.onclick = () => {
-        this.cam.flyToFeature(name, preset);
-        if (preset.message) this.notify(preset.message);
-        this.hideInfo();
+
+    // Expandable "More Info" section.
+    if (cfg.moreInfo) {
+      const more = el('button', 'info-more-btn', this.info);
+      more.textContent = 'More Info ▾';
+      const box = el('dl', 'info-stats info-more', this.info);
+      box.style.display = 'none';
+      for (const [k, v] of Object.entries(cfg.moreInfo)) {
+        el('dt', '', box).textContent = humanizeKey(k);
+        el('dd', '', box).textContent = v;
+      }
+      more.onclick = () => {
+        const open = box.style.display === 'none';
+        box.style.display = open ? '' : 'none';
+        more.textContent = open ? 'More Info ▴' : 'More Info ▾';
       };
     }
+
+    const row = el('div', 'info-actions', this.info);
     const btn = el('button', 'btn btn-primary', row);
     btn.textContent = 'Set as target';
     btn.onclick = () => { this.cam.focusBody(name); this.hideInfo(); };
@@ -780,6 +819,20 @@ function toggle(parent, label, initial, onChange) {
   input.onchange = () => onChange(input.checked);
   el('span', '', row).textContent = label;
   return input;
+}
+
+function fmtMass(kg) {
+  const [mant, exp] = kg.toExponential(3).split('e+');
+  return `${mant} × 10<sup>${exp}</sup> kg`;
+}
+
+function fmtTempRange([a, b]) {
+  const f = (t) => `${t.toLocaleString()} °C`;
+  return a === b ? f(a) : `${f(Math.min(a, b))} to ${f(Math.max(a, b))}`;
+}
+
+function humanizeKey(k) {
+  return k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 
 function incText(v) {
