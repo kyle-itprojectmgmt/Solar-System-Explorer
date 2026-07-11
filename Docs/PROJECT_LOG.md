@@ -207,8 +207,14 @@ Distance: 5.2 AU from Jupiter. Rendered as distant point light
 **Mission Control Panel (Tab key):**
 Camera mode switcher, time controls, body selector, orbital paths
 toggle, body labels toggle, ring visibility toggle, eclipse event
-ticker with countdown, altitude presets (Distant/Near/Low Orbit/Skim),
-orbital speed slider (Orbit mode), chase height slider (Chase mode)
+ticker with countdown, continuous log altitude slider (50 km–500,000 km,
+live ALT readout), inclination slider (-90°..90°, synced with insertion
+panel), orbital speed slider (Orbit mode), chase height slider (Chase mode)
+
+**View controls (v4):**
+Fullscreen — F11 or top-right button. Presentation mode — P or the
+subtle bottom-right eye icon: hides all UI except the exit eye
+(TV / big screen / screenshots; the screenshot button uses it).
 
 **Body Info Panel (click any body):**
 Name, radius, mass, orbital period, distance from Jupiter, 2-3 facts,
@@ -227,8 +233,9 @@ Blurred Jupiter background, progress bar, rotating Jupiter facts.
 
 Appear below activation altitude as 3D billboard sprites.
 Fade in below threshold, fade out above.
-**Note: labels must be parented to moon mesh (not scene) so they
-rotate with the surface. Same fix required as volcanic plumes (Bug #4).**
+Labels and volcanic plumes are parented to the moon MESH (not the group
+or scene) so they ride the tidally-locked rotation — fixed in v3b/v4
+(Bug #4), verified by the tests/ smoke suite.
 
 | Moon | Altitude | Features |
 |------|----------|---------|
@@ -331,19 +338,80 @@ Commit: b1fcdf2 (26 files)
 - Note: not yet deployed — live site still v3. Deploy when ready:
   update Ko-fi handle in config.js first, then npm run deploy.
 
+### v4 — Backlog Batch + Sharpness Pass (Complete — 2026-07-11, commits ba275a3 → e5672ea)
+Per Docs/V4_PROMPT.md + Docs/V4_SHARPNESS_PASS.md (mid-session addition).
+Deployed twice (after Group 3 and at session end). Live URL serves v4.
+
+- Group 1 (ba275a3): version 4.0.0; loading screen reads version from
+  package.json via __APP_VERSION__; instructions.md moved to .claude/
+  (Bug #6); vite.config.js verified to spec; @cloudflare/vite-plugin
+  purged from lockfile.
+- Group 2 (67d9b1d, a77180b): Io plumes + night-side hotspots re-parented
+  from the moon group to the mesh — tidal-lock rotation applies to the
+  mesh, so they now stay pinned to the surface (Bug #4; verified at
+  10,000x by hotspot bearing tracking mesh rotation). Surface feature
+  labels were already mesh-parented since v3b (Bug #4 note) — verified,
+  no change needed. Egg-shaped moons (Bug #7): render loop self-heals a
+  stale camera aspect every frame; Amalthea now uses real half-dimensions
+  radii {125, 73, 64} km from config instead of an arbitrary stretch;
+  Galilean moons verified perfect spheres, Jupiter oblate Y 0.9351.
+- Group 3 (504069a, 50ad071, e81b568, 13dcc1a): inclination slider
+  -90°..+90° — negative = retrograde. Implementation note: a negative
+  axis-angle tilt alone does NOT reverse travel direction, so the engine
+  tilts by |inc| and reverses the phase advance + travel tangent;
+  ground-track speed uses the signed rate. Altitude presets replaced by
+  a continuous log slider (50 km–500,000 km) in Mission Control with a
+  live ALT readout (camera drives slider; dragging drives camera);
+  Mission Control also gained a quick-access inclination slider synced
+  with the insertion panel. Fullscreen (F11 / top-right button) +
+  Presentation Mode (P / eye icon; single body class hides all UI except
+  the exit eye; screenshot uses it). GRS navigation preset: data-driven
+  navPresets in jupiter.js anchored to the live uGrsUV shader uniform
+  (survives hi-res texture swap); generic camera.flyToFeature; buttons in
+  the Jupiter info panel + insertion panel (Bug #5).
+- Group 0 sharpness pass (038f8f2, mid-session prompt): max anisotropy +
+  trilinear filtering on every surface texture; per-body normalScale in
+  config; Jupiter warm specular (shininess 8, #332211); bloom tightened
+  (threshold 0.85 / smoothing 0.1 / intensity 0.8); altitude-staged
+  dynamic fBm octaves (3→9 descending, mobile −2) with 1.5x/2x base
+  frequencies; procedural relief now perturbs the shading normal via
+  screen-space height gradients (dtlPerturbNormal in simplex.glsl) —
+  derivative clamping prevents sub-pixel octaves shading as gravel.
+  Jupiter 16K not publicly available (SSS caps at 8K, already shipped);
+  moon 8K upgrade sources noted in renderer.js.
+- Group 4 (d002009, e5672ea): detail-aware zoom floor — per-body
+  detailFloor { softKm, hardKm } in config, quadratic resistance below
+  soft, hard stop at floor (asymptotic convergence), HUD "Maximum
+  surface detail reached" + ALT pulse. Jupiter limb glow (Bug #1):
+  solid halo sphere replaced by an atmospheric scattering shader —
+  fresnel³ rim, lit-side only, terminator-boosted, #C8824A → #E8D4A0 →
+  transparent, colors data-driven from config. Verified from day side,
+  terminator, night side (absent) and 20,000 km insertion.
+- Testing: 22-check headless smoke suite (Puppeteer + system Chrome)
+  committed under tests/ — covers parenting, shapes, aspect guard,
+  retrograde inclination, altitude slider, presentation mode, GRS
+  preset, zoom floors, console errors. Screenshot verification at spec
+  altitudes for all five detail shaders.
+- Known cosmetic items noted for future: Io plume particles render as
+  squares up close (PointsMaterial has no sprite texture); sharpness
+  calibration (crater darkness, Io frost speckle density) deserves an
+  eyeball pass on real hardware — headless screenshots reviewed but
+  desktop GPU + 60 fps motion may read differently.
+
 ---
 
 ## Known Bugs / In Progress
 
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
-| 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Backlog | — |
+| 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | V4_PROMPT.md |
 | 2 | Surface stationary during orbit (camera doesn't advance along path) | Resolved v3b | V3b_ORBIT_FIX.md |
 | 3 | Texture resolution exhaustion on zoom | Resolved v3 | V3_DETAIL_SHADERS.md |
-| 4 | Io volcanic plumes not parented to moon — float over surface during rotation | Backlog | — |
-| 5 | GRS vortex detail not discoverable — no way to navigate directly to GRS longitude | Backlog | — |
-| 6 | instructions.md in Docs/ not .claude/ — move to .claude/instructions.md for auto-read | Fix needed | — |
-| 7 | Some moons appear egg-shaped / oval — aspect ratio bug not fully fixed for moon meshes, and/or Amalthea irregular shape scale over-exaggerated | Backlog | — |
+| 4 | Io volcanic plumes not parented to moon — float over surface during rotation | Resolved v4 | V4_PROMPT.md |
+| 5 | GRS vortex detail not discoverable — no way to navigate directly to GRS longitude | Resolved v4 | V4_PROMPT.md |
+| 6 | instructions.md in Docs/ not .claude/ — move to .claude/instructions.md for auto-read | Resolved v4 | V4_PROMPT.md |
+| 7 | Some moons appear egg-shaped / oval — aspect ratio bug not fully fixed for moon meshes, and/or Amalthea irregular shape scale over-exaggerated | Resolved v4 | V4_PROMPT.md |
+| 8 | Io plume particles render as squares at close range (PointsMaterial has no sprite texture) | Backlog | — |
 
 ---
 
@@ -351,17 +419,17 @@ Commit: b1fcdf2 (26 files)
 
 | # | Feature | Notes |
 |---|---------|-------|
-| 1 | Full screen mode | TV/presentation mode, hide all UI |
-| 2 | Hide all text / clean display mode | Big screen / screenshot mode, combine with fullscreen |
-| 3 | Jupiter limb glow fix | Replace solid halo with proper atmospheric scattering shader — feathered, lit-side only, color transitions warm orange to transparent |
-| 4 | KTX2 compressed textures | Add Basis encoder to build pipeline for faster mobile loading |
-| 5 | WebGPU renderer upgrade | When postprocessing library adds WebGPU support |
-| 6 | Orbit Insertion inclination range fix | Extend inclination slider from 0–90° to -90°–90°. Slider center = 0° (equatorial). Negative = retrograde orbit. Label: "-90° (retrograde)" left, "0° (equatorial)" center, "90° (polar)" right. Physics: negative inclination reverses orbital direction. |
-| 7 | GRS navigation preset | Add "Jump to Great Red Spot" button in Jupiter body info panel and/or Orbit Insertion panel. Rotates camera longitude to align with GRS position (23°S, current simulated longitude). Solves discoverability — GRS vortex detail exists but user has no way to find it without knowing Jupiter's rotation state. |
-| 8 | Detail-aware zoom floor | Minimum zoom altitude adapts to where procedural detail + texture resolution runs out. Resistance zoom: quadratic taper below soft floor, hard stop at floor. Per-body floors stored in body config (not engine). Floors: Jupiter 1,500 km, Io 150 km, Europa 150 km, Ganymede 200 km, Callisto 300 km, inner moons 50 km. HUD feedback: "Maximum surface detail reached" fades in at soft floor, ALT readout pulses once at hard floor. |
-| 9 | Dynamic version display on loading screen | Pull version from package.json via Vite define plugin. Loading screen subtitle reads "Jupiter System — v{version}" dynamically. Bump package.json version each session so loading screen always reflects current build. Add __APP_VERSION__ constant to vite.config.js. |
-| 10 | Replace altitude presets with altitude slider in Mission Control | Remove Distant/Near/Low Orbit/Skim preset buttons from Mission Control panel. Replace with a continuous logarithmic altitude slider (10 km to 500,000 km). Slider in Mission Control right panel, always visible when a body is targeted. Current ALT value shown as readout next to slider. Logarithmic scale: fine-grained control at low altitude, fast movement at high altitude. |
-| 11 | Add inclination slider to Mission Control right panel | Move inclination control out of Orbit Insertion panel into Mission Control right panel so it's always accessible. Range: -90° to +90°. Slider center = 0° (equatorial). Labels: "-90° retrograde" left, "0° equatorial" center, "90° polar" right. Negative = retrograde orbit (reverses orbital direction). Works in both Orbit mode and Orbit Insertion mode. |
+| 1 | KTX2 compressed textures | Add Basis encoder to build pipeline for faster mobile loading |
+| 2 | WebGPU renderer upgrade | When postprocessing library adds WebGPU support |
+| 3 | Moon 8K texture upgrades | Jupiter already at SSS's max (8K). Galilean moon candidates need GeoTIFF conversion: Björn Jónsson (bjj.is/3d/planetary-maps), USGS Astrogeology. Priority: Europa, Io, Ganymede, Callisto. URLs noted in renderer.js. |
+| 4 | Io plume particle sprites | Replace square PointsMaterial particles with a soft round sprite texture (Bug #8) |
+| 5 | Sharpness calibration eyeball pass | v4 sharpness pass verified via headless screenshots — review crater darkness (Callisto/Ganymede), Io frost speckle density, and relief strength on real hardware at 60 fps; per-body tuning knobs: normalScale in jupiter.js, height weights in detailShaders.js |
+| 6 | Ko-fi handle | src/config.js KOFI_URL still 'YOUR_HANDLE' placeholder — update before promoting the site |
+
+Completed in v4 (removed from backlog): fullscreen mode, presentation/clean
+display mode, Jupiter limb glow fix, inclination -90°..90° + retrograde,
+GRS navigation preset, detail-aware zoom floor, dynamic version display,
+continuous altitude slider, Mission Control inclination slider.
 
 ---
 
