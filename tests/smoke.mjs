@@ -34,7 +34,7 @@ await page.waitForFunction(
 
 // -- Group 1: version display ------------------------------------------------
 const ver = await page.$eval('#loading-version', (e) => e.textContent);
-check('loading screen shows v4.2.1', ver.includes('v4.2.1'), ver);
+check('loading screen shows v5.0.0', ver.includes('v5.0.0'), ver);
 
 // -- Group 2a/2b: plume + label parenting -------------------------------------
 const parenting = await page.evaluate(() => {

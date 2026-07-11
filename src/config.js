@@ -10,7 +10,7 @@ export const TEXTURE_BASE_URL = import.meta.env.DEV
 
 // Systems with a complete config in /src/data/systems/<name>.js.
 // Append new systems here as their configs land.
-export const AVAILABLE_SYSTEMS = ['jupiter'];
+export const AVAILABLE_SYSTEMS = ['jupiter', 'earth'];
 
 // Active system: ?system= URL parameter, validated against the list.
 const requested = new URLSearchParams(window.location.search).get('system');

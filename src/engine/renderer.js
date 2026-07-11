@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { TEXTURE_BASE_URL, KM_PER_UNIT, AU_KM } from '../config.js';
 import { applyDetailShader, detailBlend } from './detailShaders.js';
+import EARTH_ATMOSPHERE_GLSL from './shaders/earth-atmosphere.glsl?raw';
 
 const K = 1 / KM_PER_UNIT; // km -> scene units
 
@@ -338,7 +339,7 @@ export class SceneRenderer {
       const atm = p.atmosphere;
       const glow = new THREE.Mesh(
         new THREE.SphereGeometry(1, 96, 64),
-        makeLimbScatterMaterial(atm)
+        atm.style === 'rayleigh' ? makeRayleighMaterial(atm) : makeLimbScatterMaterial(atm)
       );
       const s = 1 + (atm.thickness || 0.025);
       glow.scale.set(rEq * s, rPol * s, rEq * s);
@@ -478,6 +479,35 @@ export class SceneRenderer {
         }
       }
 
+      // Apollo landing sites (V5 3c): bright markers + labels parented to
+      // the MESH so they ride the tidal-lock rotation; labels below 50 km.
+      if (cfg.apolloSites?.length) {
+        entry.apolloSprites = [];
+        for (const site of cfg.apolloSites) {
+          const lat = THREE.MathUtils.degToRad(site.latDeg);
+          const lon = THREE.MathUtils.degToRad(site.lonDeg);
+          const dir = new THREE.Vector3(
+            Math.cos(lat) * Math.cos(lon),
+            Math.sin(lat),
+            -Math.cos(lat) * Math.sin(lon)
+          );
+          const dot = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: makeFlareTexture(32, 'rgba(255,255,255,1)'),
+            color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false,
+          }));
+          dot.position.copy(dir).multiplyScalar(r * 1.002);
+          dot.scale.setScalar(r * 0.01);
+          const label = makeTextSprite(`${site.name} ↓`);
+          label.position.copy(dir).multiplyScalar(r * 1.03);
+          label.scale.set(r * 0.18, r * 0.045, 1);
+          label.material.opacity = 0;
+          label.visible = false;
+          mesh.add(dot);
+          mesh.add(label);
+          entry.apolloSprites.push(label);
+        }
+      }
+
       if (cfg.detail) this._registerDetail(cfg.name, group, mat, cfg.detail, r, cfg.normalScale);
 
       this.root.add(group);
@@ -501,12 +531,25 @@ export class SceneRenderer {
   _updateDetailShaders(physics) {
     const t = physics.simSeconds % 1e6; // keep float32-precision-friendly
     const v = this._tmpV ??= new THREE.Vector3();
+    const q = this._tmpQ ??= new THREE.Quaternion();
+    const sunWorld = (this._tmpSun ??= new THREE.Vector3())
+      .copy(this.sunDir).applyQuaternion(this.root.quaternion);
     for (const e of this.detailEntries) {
       const altKm = (e.anchor.getWorldPosition(v).distanceTo(this.camera.position) - e.radiusUnits) * KM_PER_UNIT;
       e.blend = detailBlend(altKm, e.detail.activationKm, e.detail.fullKm);
       e.uniforms.uTime.value = t;
       e.uniforms.uAltitude.value = altKm;
       e.uniforms.uDetailBlend.value = e.blend;
+      // Object-space sun + camera (V5): terminator-relative effects rotate
+      // with the mesh exactly like vObjPos does.
+      if (e.blend > 0 && e.uniforms.uSunObj) {
+        const mesh = this.bodyMeshes.get(e.name)?.mesh;
+        if (mesh) {
+          mesh.getWorldQuaternion(q).invert();
+          e.uniforms.uSunObj.value.copy(sunWorld).applyQuaternion(q).normalize();
+          e.uniforms.uCamObj.value.copy(mesh.worldToLocal(this.camera.position.clone()));
+        }
+      }
     }
   }
 
@@ -632,14 +675,24 @@ export class SceneRenderer {
 
       for (const plume of entry.plumes) plume.update(dt, elapsed);
 
-      // Altitude-driven detail: surface feature labels (<~500 km).
-      if (entry.featureSprites) {
+      // Altitude-driven detail: surface feature labels (<~500 km) and
+      // Apollo site labels (<~50 km).
+      if (entry.featureSprites || entry.apolloSprites) {
         const altKm = (entry.group.getWorldPosition(this._tmpV ??= new THREE.Vector3())
           .distanceTo(this.camera.position) - entry.radiusUnits) * KM_PER_UNIT;
-        const op = THREE.MathUtils.clamp((800 - altKm) / 300, 0, 1);
-        for (const s of entry.featureSprites) {
-          s.material.opacity = op;
-          s.visible = op > 0.02;
+        if (entry.featureSprites) {
+          const op = THREE.MathUtils.clamp((800 - altKm) / 300, 0, 1);
+          for (const s of entry.featureSprites) {
+            s.material.opacity = op;
+            s.visible = op > 0.02;
+          }
+        }
+        if (entry.apolloSprites) {
+          const op = THREE.MathUtils.clamp((70 - altKm) / 20, 0, 1);
+          for (const s of entry.apolloSprites) {
+            s.material.opacity = op;
+            s.visible = op > 0.02;
+          }
         }
       }
     }
@@ -654,11 +707,17 @@ export class SceneRenderer {
       }
     }
     if (this.atmosphereMesh) {
-      // Limb scatter shader works in world space (its varyings come from
-      // modelMatrix, which carries the root tilt).
+      // Limb/Rayleigh shaders work in world space (varyings from modelMatrix).
       const u = this.atmosphereMesh.material.uniforms;
       u.uCamPos.value.copy(this.camera.position);
-      u.uSunDir.value.copy(this.sunDir).applyQuaternion(this.root.quaternion);
+      const sw = this.sunDir.clone().applyQuaternion(this.root.quaternion);
+      if (u.uSunDir) u.uSunDir.value.copy(sw);
+      if (u.uSunW) u.uSunW.value.copy(sw);
+      if (u.uAltitude) {
+        u.uAltitude.value = (this.camera.position
+          .distanceTo(this.primaryMesh.getWorldPosition(this._tmpV ??= new THREE.Vector3()))
+          - this.bodyRadius(this.system.primary.name)) * KM_PER_UNIT;
+      }
     }
     for (const [, entry] of this.bodyMeshes) {
       for (const child of entry.group?.children || []) {
@@ -758,6 +817,30 @@ export class SceneRenderer {
 // ---------------------------------------------------------------------------
 // Materials & helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Rayleigh scattering atmosphere (V5, Worker 2's earth-atmosphere.glsl):
+ * Earth's vivid blue limb with terminator sunset band and ISS-altitude
+ * horizon line. Same shell geometry/blending as the limb scatter material.
+ */
+function makeRayleighMaterial(atm) {
+  const [, rest] = EARTH_ATMOSPHERE_GLSL.split('// === VERTEX ===');
+  const [vertexShader, fragmentShader] = rest.split('// === FRAGMENT ===');
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uSunW: { value: new THREE.Vector3(1, 0, 0) },
+      uCamPos: { value: new THREE.Vector3() },
+      uAltitude: { value: 1e9 },
+      uIntensity: { value: atm.intensity ?? 1.0 },
+    },
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+}
 
 /**
  * Atmospheric limb scattering (4b): a thin, feathered haze at the very edge

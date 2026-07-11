@@ -18,6 +18,11 @@
 
 import * as THREE from 'three';
 import SIMPLEX_GLSL from './glsl/simplex.glsl?raw';
+import TERRA_CLOUDS from './shaders/earth-clouds.glsl?raw';
+import TERRA_LIGHTS from './shaders/earth-lights.glsl?raw';
+import TERRA_AURORA from './shaders/earth-aurora.glsl?raw';
+import TERRA_OCEAN from './shaders/earth-ocean.glsl?raw';
+import LUNA_DETAIL from './shaders/moon-detail.glsl?raw';
 
 /** Registry of detail styles. Populated per body type below. */
 export const DETAIL_STYLES = {};
@@ -42,6 +47,11 @@ export function applyDetailShader(material, style, params = {}, quality = {}) {
     uAltitude: { value: 1e9 },
     uDetailBlend: { value: 0 },
     uNormalScale: { value: 1.5 }, // per-body relief strength (cfg.normalScale)
+    // Object-space sun direction and camera position (V5): sun-relative
+    // effects (terminator, city lights, glint, earthshine) rotate with the
+    // body because vObjPos does. The renderer updates these per frame.
+    uSunObj: { value: new THREE.Vector3(1, 0, 0) },
+    uCamObj: { value: new THREE.Vector3(0, 0, 1) },
     ...(def.uniforms ? def.uniforms(params) : {}),
   };
 
@@ -61,6 +71,8 @@ export function applyDetailShader(material, style, params = {}, quality = {}) {
         uniform float uAltitude;
         uniform float uDetailBlend;
         uniform float uNormalScale;
+        uniform vec3 uSunObj;
+        uniform vec3 uCamObj;
         ${def.decls || ''}
         ${quality.tier === 'mobile' ? '#define DETAIL_QUALITY_LOW' : ''}
         ${SIMPLEX_GLSL}
@@ -370,6 +382,38 @@ DETAIL_STYLES.cratered = {
     }
     ${DETAIL_FINAL}
   `,
+};
+
+// -- Terra (Earth) + Luna (Moon) — V5 worker shader chunks -------------------------
+// Worker files are fragment chunks; clouds carries helper functions above an
+// `// === APPLY ===` marker. Each chunk is brace-isolated so their local
+// variables can't collide; they share detail / gDetailEmissive / gDetailHeight.
+
+function splitChunk(src) {
+  const i = src.indexOf('// === APPLY ===');
+  return i === -1
+    ? { fns: '', apply: src }
+    : { fns: src.slice(0, i), apply: src.slice(i) };
+}
+
+const terraClouds = splitChunk(TERRA_CLOUDS);
+
+DETAIL_STYLES.terra = {
+  fns: terraClouds.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${terraClouds.apply} }
+    { ${TERRA_OCEAN} }
+    { ${TERRA_LIGHTS} }
+    { ${TERRA_AURORA} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+// The moon chunk includes its own preamble and final mix (matches the
+// framework's exactly), so it injects bare.
+DETAIL_STYLES.luna = {
+  apply: LUNA_DETAIL,
 };
 
 // -- Gas giant: banded cloud turbulence + vortex + limb haze ---------------------
