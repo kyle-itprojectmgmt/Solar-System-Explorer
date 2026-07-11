@@ -329,16 +329,20 @@ html, body {
 }
 .stack-btn {
   width: 44px;
-  height: 44px;
+  height: 38px;
   background: rgba(5, 5, 16, 0.4);
   border: 1px solid transparent;
-  border-radius: 12px;
-  font-size: 1.15rem;
+  border-radius: 10px;
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--gray-light);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.stack-btn:hover { border-color: var(--blue-light); }
-.stack-btn.active { background: var(--blue); }
+.stack-btn:hover { color: var(--blue-light); }
+.stack-btn.active { background: var(--blue); color: var(--white); }
 .stack-panel {
   position: fixed;
   right: 76px;

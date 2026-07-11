@@ -255,19 +255,20 @@ export class UI {
     this.openPanelId = null;
     this._panelOrder = ['camera', 'time', 'bodies', 'presets', 'display', 'help'];
 
+    // Text labels, not emoji (V4d item 2) — mission-control style.
     const defs = [
-      ['camera', '🎥', 'Camera'], ['time', '⏱', 'Time'], ['bodies', '🪐', 'Bodies'],
-      ['presets', '⭐', 'Presets'], ['display', '👁', 'Display'], ['help', '❓', 'Help'],
+      ['camera', 'CAM', 'Camera'], ['time', 'TIME', 'Time'], ['bodies', 'NAV', 'Bodies'],
+      ['presets', 'SAVE', 'Presets'], ['display', 'VIEW', 'Display'], ['help', 'HELP', 'Help'],
     ];
-    for (const [id, icon, label] of defs) {
+    for (const [id, label, title] of defs) {
       const b = el('button', 'stack-btn', this.stack);
-      b.textContent = icon;
+      b.textContent = label;
       b.dataset.panel = id;
       b.onclick = () => this.togglePanel(id);
       this.stackButtons[id] = b;
       const c = el('div', 'stack-content', this.stackPanel);
       c.style.display = 'none';
-      el('h2', 'side-title', c).textContent = label.toUpperCase();
+      el('h2', 'side-title', c).textContent = title.toUpperCase();
       this.stackContents[id] = c;
     }
 
@@ -1337,8 +1338,15 @@ export class UI {
     // Presets + icon stack
     t.attach(this.voyagerBtn, 'Recreate the Voyager 1 flyby of Jupiter — March 5, 1979');
     const stackTips = {
-      camera: 'Camera modes', time: 'Time controls', bodies: 'Bodies — navigate the system',
-      presets: 'Presets — curated and saved views', display: 'Display options', help: 'Help (?)',
+      camera: 'CAM — Camera modes and controls',
+      time: 'TIME — Simulation speed and date',
+      bodies: 'NAV — Navigate to any body',
+      presets: 'SAVE — Curated and saved views',
+      display: 'VIEW — Display options',
+      help: 'HELP — Shortcuts and controls (?)',
+      alt: 'ALT — Camera altitude',
+      inc: 'INC — Orbital inclination',
+      spd: 'SPD — Orbit speed',
     };
     for (const [id, b] of Object.entries(this.stackButtons)) t.attach(b, stackTips[id]);
     t.attach(this._sunRow, 'Solar Observatory — coming in a future update');
