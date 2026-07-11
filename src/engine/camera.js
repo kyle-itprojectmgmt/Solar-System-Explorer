@@ -484,31 +484,41 @@ export class CameraController {
     const entry = this.r.bodyMeshes.get(this.target);
     if (!entry) return this._poseFree(0);
     const center = entry.group.getWorldPosition(new THREE.Vector3());
-    const dist = entry.radiusUnits * 7 * this.chaseDistMult;
+    const R = entry.radiusUnits;
+    // Fighter-jet chase cam: 3R behind and (Chase Height slider) above the
+    // moon, both scaled by scroll zoom so the framing holds while zooming.
+    const behind = R * 3 * this.chaseDistMult;
+    const above = R * this.chaseHeightMult * this.chaseDistMult;
 
     // Trail BEHIND the direction of travel (velocity-derived, so the offset
-    // is correct at every point of the orbit).
+    // is correct at every point of the orbit). "Above" is the orbital plane's
+    // north — the root frame's Y axis, which carries the axial tilt.
     const vel = this._bodyVelocityWorld(this.target);
-    let desired;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.r.root.quaternion);
+    let desired, lookTarget;
     if (vel.lengthSq() > 1e-12) {
       vel.normalize();
       desired = center.clone()
-        .addScaledVector(vel, -dist)
-        .add(new THREE.Vector3(0, entry.radiusUnits * 2.2, 0));
+        .addScaledVector(vel, -behind)
+        .addScaledVector(up, above);
+      // Aim ahead of the moon along its travel: its surface fills the lower
+      // half of the view and the sky ahead (Jupiter, for inner moons) the rest.
+      lookTarget = center.clone().addScaledVector(vel, R * 2);
     } else {
       // Static target (the primary): hold the current bearing, station-keeping.
       const dir = this.chasePos.clone().sub(center);
       if (dir.lengthSq() < 1e-9) dir.set(0.3, 0.25, 1);
-      desired = center.clone().addScaledVector(dir.normalize(), dist);
+      desired = center.clone().addScaledVector(dir.normalize(), R * 3.5 * this.chaseDistMult);
+      lookTarget = center;
     }
 
     if (this.blend >= 1) {
       // Frame-rate-independent exponential spring on both position and look.
       this.chasePos.lerp(desired, 1 - Math.exp(-dt * 3.0));
-      this.chaseLook.lerp(center, 1 - Math.exp(-dt * 5.0));
+      this.chaseLook.lerp(lookTarget, 1 - Math.exp(-dt * 5.0));
     } else {
       this.chasePos.copy(desired);
-      this.chaseLook.copy(center);
+      this.chaseLook.copy(lookTarget);
     }
     return { pos: this.chasePos.clone(), quat: lookQuat(this.chasePos, this.chaseLook) };
   }
