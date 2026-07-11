@@ -242,12 +242,14 @@ export class SceneRenderer {
     }
 
     if (p.features?.atmosphericGlow) {
+      // Atmospheric limb scattering (4b) — replaces the old solid halo
+      // sphere. Thin feathered haze, lit-side only, terminator-boosted.
       const atm = p.atmosphere;
       const glow = new THREE.Mesh(
         new THREE.SphereGeometry(1, 96, 64),
-        makeAtmosphereMaterial(new THREE.Color(atm.glowColor), atm.intensity)
+        makeLimbScatterMaterial(atm)
       );
-      const s = 1 + (atm.thickness || 0.04);
+      const s = 1 + (atm.thickness || 0.025);
       glow.scale.set(rEq * s, rPol * s, rEq * s);
       this.root.add(glow);
       this.atmosphereMesh = glow;
@@ -557,9 +559,11 @@ export class SceneRenderer {
       }
     }
     if (this.atmosphereMesh) {
+      // Limb scatter shader works in world space (its varyings come from
+      // modelMatrix, which carries the root tilt).
       const u = this.atmosphereMesh.material.uniforms;
-      u.uCamPos.value.copy(camLocal);
-      u.uSunDir.value.copy(this.sunDir);
+      u.uCamPos.value.copy(this.camera.position);
+      u.uSunDir.value.copy(this.sunDir).applyQuaternion(this.root.quaternion);
     }
     for (const [, entry] of this.bodyMeshes) {
       // moon atmosphere-style shells need camera in their local frame
@@ -648,6 +652,62 @@ function makeAtmosphereMaterial(color, intensity) {
         float rim = 1.0 - abs(dot(viewDir, normalize(vNormal)));
         float glow = pow(rim, 4.5) * uIntensity * 0.8;
         gl_FragColor = vec4(uColor, glow);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+}
+
+/**
+ * Atmospheric limb scattering (4b): a thin, feathered haze at the very edge
+ * of the disk — grazing-angle fresnel, lit-side only, brightest where the
+ * atmosphere catches sunlight edge-on at the terminator. Rendered on a
+ * slightly larger BackSide sphere behind the body.
+ */
+function makeLimbScatterMaterial(atm) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uEdgeColor: { value: new THREE.Color(atm.limbEdge ?? 0xc8824a) },
+      uMidColor: { value: new THREE.Color(atm.limbMid ?? 0xe8d4a0) },
+      uIntensity: { value: atm.intensity ?? 1.0 },
+      uCamPos: { value: new THREE.Vector3() },      // world space
+      uSunDir: { value: new THREE.Vector3(1, 0, 0) }, // world space
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vWPos;
+      varying vec3 vWNormal;
+      void main() {
+        vWPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        vWNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uEdgeColor;
+      uniform vec3 uMidColor;
+      uniform float uIntensity;
+      uniform vec3 uCamPos;
+      uniform vec3 uSunDir;
+      varying vec3 vWPos;
+      varying vec3 vWNormal;
+      void main() {
+        vec3 n = normalize(vWNormal);
+        vec3 viewDir = normalize(uCamPos - vWPos);
+        // Grazing-angle fresnel, pow 3 for a sharp thin atmospheric edge.
+        float f = pow(1.0 - abs(dot(viewDir, n)), 3.0);
+        // Lit side only, with slight refraction bleed past the terminator.
+        float sunDot = dot(n, normalize(uSunDir));
+        float lit = smoothstep(-0.12, 0.25, sunDot);
+        // Brightest where the atmosphere catches sunlight at the terminator.
+        float term = 1.0 + 0.5 * pow(1.0 - abs(sunDot), 4.0);
+        // Warm orange-tan at the limb edge -> pale yellow-white -> nothing.
+        float edge = smoothstep(0.35, 0.9, f);
+        vec3 col = mix(uMidColor, uEdgeColor, edge);
+        float alpha = f * lit * term * mix(0.3, 0.6, edge) * uIntensity;
+        gl_FragColor = vec4(col, alpha);
       }
     `,
     transparent: true,

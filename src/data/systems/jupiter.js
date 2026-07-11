@@ -36,9 +36,10 @@ export default {
     normalScale: 2.0,   // cloud band depth (drives procedural relief lighting)
     detailFloor: { softKm: 3000, hardKm: 1500 }, // zoom resistance / hard stop
     atmosphere: {
-      glowColor: 0xffb877,    // warm orange-tan limb scattering
-      thickness: 0.045,       // fraction of radius
-      intensity: 1.25,
+      limbEdge: 0xc8824a,     // warm orange-tan at the very limb
+      limbMid: 0xe8d4a0,      // pale yellow-white mid falloff
+      thickness: 0.025,       // fraction of radius — thin feathered edge
+      intensity: 1.0,
     },
     features: { greatRedSpot: true, atmosphericGlow: true, equatorialBulge: true },
     detail: {
