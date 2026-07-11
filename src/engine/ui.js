@@ -76,6 +76,11 @@ export class UI {
     this.targetEl = el('div', 'hud-target', tr);
     this.hintEl = el('div', 'hud-hint', tr);
 
+    // Free look indicator (2b) — visible while Alt / two-finger look is held.
+    this.freeLookEl = el('div', 'freelook-indicator', this.hud);
+    this.freeLookEl.textContent = '🔓 Free Look';
+    this.cam.onFreeLookChange = (on) => this.freeLookEl.classList.toggle('show', on);
+
     // Altitude readout — top center, shown within 50,000 km of any body.
     this.altEl = el('div', 'hud-altitude', this.hud);
     this.altEl.style.display = 'none';
@@ -199,7 +204,19 @@ export class UI {
     this.mcIncLabel = el('div', 'ins-label', this.incSecMC);
     this.mcIncSlider = el('input', 'slider', this.incSecMC);
     Object.assign(this.mcIncSlider, { type: 'range', min: -90, max: 90, step: 1, value: this.cam.ins.incDeg });
-    this.mcIncSlider.oninput = () => this.cam.setInsertion({ incDeg: +this.mcIncSlider.value });
+    this.mcIncSlider.oninput = () => {
+      // Read first: entering insertion mode syncs this slider from the old
+      // ins state, which would clobber the value being dragged.
+      const incDeg = +this.mcIncSlider.value;
+      // Dragging inclination outside Orbit Insertion used to silently do
+      // nothing (bug #23) — the intent is clearly "orbit at this angle".
+      if (this.cam.mode !== 'insertion') {
+        const target = this.cam.target || this.cam.lastTarget || this.system.primary.name;
+        this.cam.setMode('insertion', target);
+        this.notify('Switched to Orbit Insertion for inclination');
+      }
+      this.cam.setInsertion({ incDeg });
+    };
     const mcIncScale = el('div', 'ins-scale', this.incSecMC);
     mcIncScale.innerHTML = '<span>-90° retro</span><span>0° equatorial</span><span>90° polar</span>';
     this.mcIncLabel.textContent = incText(this.cam.ins.incDeg);
@@ -783,6 +800,9 @@ export class UI {
 
     // Presets
     t.attach(find(this.side, /Voyager/), 'Recreate the Voyager 1 flyby of Jupiter — March 5, 1979');
+
+    // Mode indicator: free look hint (2b).
+    t.attach(this.modeEl, 'Hold Alt to look around freely while maintaining orbital position');
   }
 
   // -- Per-frame update ------------------------------------------------------------------------------

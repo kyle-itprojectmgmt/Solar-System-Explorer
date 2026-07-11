@@ -49,6 +49,11 @@ export class CameraController {
     this.chasePos = new THREE.Vector3();
     this.chaseLook = new THREE.Vector3();
 
+    // Free look (2b): orientation offset on top of the orbital pose.
+    // Position never changes — only where the camera is pointing.
+    this.freeLook = { active: false, yaw: 0, pitch: 0 };
+    this.onFreeLookChange = null; // (active) => void — UI indicator
+
     // Orbit insertion state (mode 7)
     this.ins = {
       body: null, altitudeKm: 10000, incDeg: 0, locked: false,
@@ -75,6 +80,7 @@ export class CameraController {
 
   setMode(mode, target = null) {
     if (mode === this.mode && target === this.target) return;
+    this.setFreeLook(false);
     this.mode = mode;
     this.target = target;
     if (target) this.lastTarget = target;
@@ -132,6 +138,15 @@ export class CameraController {
     this.onModeChange?.(mode, target);
   }
 
+  /** Hold-to-look: only meaningful in the nadir-locked orbital modes. */
+  setFreeLook(on) {
+    const usable = ['orbit', 'chase', 'insertion'].includes(this.mode);
+    const next = !!(on && usable);
+    if (next === this.freeLook.active) return;
+    this.freeLook.active = next;
+    this.onFreeLookChange?.(next);
+  }
+
   requestTargetedMode(mode) {
     this.pendingMode = mode;
     this.onModeChange?.(this.mode, this.target, `Click a body for ${mode} mode…`);
@@ -179,6 +194,18 @@ export class CameraController {
         const d = Math.hypot(a.x - b.x, a.y - b.y);
         if (this.pinchDist > 0) this._pinch(d - this.pinchDist);
         this.pinchDist = d;
+        // Two-finger drag = free look in orbital modes (2b); pinch still zooms.
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        if (this._twoMid) {
+          this.setFreeLook(true);
+          if (this.freeLook.active) {
+            const s = 0.0032;
+            this.freeLook.yaw -= (mx - this._twoMid.x) * s;
+            this.freeLook.pitch = THREE.MathUtils.clamp(
+              this.freeLook.pitch - (my - this._twoMid.y) * s, -1.5, 1.5);
+          }
+        }
+        this._twoMid = { x: mx, y: my };
         return;
       }
       const dx = e.clientX - this.pointer.x;
@@ -190,6 +217,10 @@ export class CameraController {
     const up = (e) => {
       this.touches.delete(e.pointerId);
       this.pinchDist = 0;
+      if (this.touches.size < 2) {
+        this._twoMid = null;
+        if (!this._altHeld) this.setFreeLook(false);
+      }
       if (this.touches.size === 0) this.pointer.down = false;
       if (this.pointer.moved < 6) this._click(e);
     };
@@ -209,12 +240,30 @@ export class CameraController {
 
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'Alt') {
+        e.preventDefault(); // keep the browser from focusing its menu bar
+        this._altHeld = true;
+        this.setFreeLook(true);
+        return;
+      }
       this.keys.add(e.code);
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(e.code)) {
         if (this.mode === 'cinematic') this.setMode('free');
       }
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'Alt') {
+        this._altHeld = false;
+        if (!this._twoMid) this.setFreeLook(false);
+      }
+      this.keys.delete(e.code);
+    });
+    // Alt+Tab away must not leave free look stuck on.
+    window.addEventListener('blur', () => {
+      this._altHeld = false;
+      this._twoMid = null;
+      this.setFreeLook(false);
+    });
   }
 
   _interruptCinematic() {
@@ -238,6 +287,12 @@ export class CameraController {
 
   _drag(dx, dy) {
     const s = 0.0032;
+    // Free look consumes the drag: orientation only, position untouched.
+    if (this.freeLook.active) {
+      this.freeLook.yaw -= dx * s;
+      this.freeLook.pitch = THREE.MathUtils.clamp(this.freeLook.pitch - dy * s, -1.5, 1.5);
+      return;
+    }
     switch (this.mode) {
       case 'free':
         this.yaw -= dx * s; this.pitch -= dy * s;
@@ -430,6 +485,21 @@ export class CameraController {
       this.camera.position.copy(pose.pos);
       this.camera.quaternion.copy(pose.quat);
     }
+
+    // Free look (2b): yaw/pitch offset on top of the mode pose. On release
+    // the offset eases back to nadir over ~0.5 s.
+    const fl = this.freeLook;
+    if (!fl.active && (Math.abs(fl.yaw) > 1e-4 || Math.abs(fl.pitch) > 1e-4)) {
+      const k = 1 - Math.exp(-dt * 8);
+      fl.yaw -= fl.yaw * k;
+      fl.pitch -= fl.pitch * k;
+      if (Math.abs(fl.yaw) < 1e-4 && Math.abs(fl.pitch) < 1e-4) { fl.yaw = 0; fl.pitch = 0; }
+    }
+    if (fl.yaw !== 0 || fl.pitch !== 0) {
+      this.camera.quaternion.multiply(
+        this._q.setFromEuler(new THREE.Euler(fl.pitch, fl.yaw, 0, 'YXZ')));
+    }
+
     this._enforceFloors();
   }
 

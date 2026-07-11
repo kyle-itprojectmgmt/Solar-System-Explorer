@@ -153,7 +153,22 @@ html, body {
   text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
 }
 .resonance-hud.aligned { color: var(--blue-light); font-weight: 700; }
-.hud-mode { font-family: var(--font-head); font-weight: 600; letter-spacing: 0.1em; color: var(--blue-light); }
+.hud-mode { font-family: var(--font-head); font-weight: 600; letter-spacing: 0.1em; color: var(--blue-light); pointer-events: auto; }
+.freelook-indicator {
+  position: fixed;
+  top: 84px;
+  right: 64px;
+  font-family: var(--font-head);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--blue-light);
+  text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.freelook-indicator.show { opacity: 1; }
 .hud-target { color: var(--white); margin-top: 2px; }
 .hud-hint { color: var(--gray-light); font-size: 0.7rem; margin-top: 2px; font-style: italic; }
 
