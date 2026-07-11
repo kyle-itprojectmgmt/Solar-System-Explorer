@@ -108,6 +108,18 @@ html, body {
 .hud-date { font-family: var(--font-head); color: var(--gray-light); letter-spacing: 0.06em; }
 .hud-mult { color: var(--blue-light); font-weight: 700; margin-top: 2px; }
 .hud-delay { color: var(--gray-light); font-size: 0.7rem; margin-top: 2px; font-weight: 300; }
+.hud-altitude {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  color: var(--blue-light);
+  text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
+}
 .hud-mode { font-family: var(--font-head); font-weight: 600; letter-spacing: 0.1em; color: var(--blue-light); }
 .hud-target { color: var(--white); margin-top: 2px; }
 .hud-hint { color: var(--gray-light); font-size: 0.7rem; margin-top: 2px; font-style: italic; }

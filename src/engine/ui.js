@@ -69,6 +69,10 @@ export class UI {
     this.modeEl = el('div', 'hud-mode', tr);
     this.targetEl = el('div', 'hud-target', tr);
     this.hintEl = el('div', 'hud-hint', tr);
+
+    // Altitude readout — top center, shown within 50,000 km of any body.
+    this.altEl = el('div', 'hud-altitude', this.hud);
+    this.altEl.style.display = 'none';
   }
 
   _updateModeHUD(mode, target, hint = '') {
@@ -136,6 +140,16 @@ export class UI {
       b.textContent = n;
       b.onclick = () => { this.cam.focusBody(n); this.showInfo(n); };
     }
+
+    // Altitude presets — shown once a body is targeted.
+    this.altSec = section(this.side, 'Altitude');
+    const altGrid = el('div', 'btn-grid', this.altSec);
+    for (const [label, km] of [['Distant', 100000], ['Near', 10000], ['Low Orbit', 500], ['Skim', 50]]) {
+      const b = el('button', 'btn btn-small', altGrid);
+      b.textContent = `${label} · ${km.toLocaleString()} km`;
+      b.onclick = () => this.cam.flyToAltitude(km);
+    }
+    this.altSec.style.display = 'none';
 
     // Toggles
     const togSec = section(this.side, 'Display');
@@ -373,6 +387,18 @@ export class UI {
     // Signal delay bonus readout.
     const mins = this.physics.lightDelayToEarthSeconds() / 60;
     this.delayEl.textContent = `Signal delay to Earth: ${mins.toFixed(0)} min`;
+
+    // Altitude readout.
+    const near = this.r.nearestAltitudeKm(this.r.camera.position);
+    if (near && near.altKm <= 50000) {
+      this.altEl.style.display = '';
+      this.altEl.textContent = `ALT: ${Math.max(0, Math.round(near.altKm)).toLocaleString()} km`;
+    } else {
+      this.altEl.style.display = 'none';
+    }
+
+    // Altitude presets appear once any body has been targeted.
+    this.altSec.style.display = (this.cam.target || this.cam.lastTarget) ? '' : 'none';
 
     // Eclipse notifications.
     for (const b of this.physics.bodies) {

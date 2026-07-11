@@ -80,7 +80,14 @@ export default {
           { name: 'Loki',       latDeg: 12.6,  lonDeg: 308.8 },
           { name: 'Prometheus', latDeg: -1.5,  lonDeg: 153.0 },
         ],
+        // Io's tenuous SO2 atmosphere — faint yellow-white haze at low altitude.
+        thinAtmosphere: { color: 0xfff4d0, intensity: 0.55 },
       },
+      surfaceFeatures: [
+        { name: 'Pele Volcano',      latDeg: -18.7, lonDeg: 255.3 },
+        { name: 'Loki Patera',       latDeg: 12.6,  lonDeg: 308.8 },
+        { name: 'Prometheus Volcano', latDeg: -1.5, lonDeg: 153.0 },
+      ],
       facts: [
         'Io is the most volcanically active body in the solar system',
         'Its volcanoes are driven by tidal heating from Jupiter\'s immense gravity',
@@ -96,6 +103,11 @@ export default {
       textures: { diffuse: 'diffuse.jpg' },
       color: 0xc8d0d8,
       features: { iceCracks: true, subsurfaceGlow: true },
+      surfaceFeatures: [
+        { name: 'Conamara Chaos', latDeg: 9.7,   lonDeg: 87.5 },
+        { name: 'Thera Macula',   latDeg: -46.7, lonDeg: 178.9 },
+        { name: 'Pwyll Crater',   latDeg: -25.2, lonDeg: 271.4 },
+      ],
       facts: [
         'Europa may harbor a liquid water ocean beneath its icy surface',
         'Its ice shell is criss-crossed by reddish fractures called lineae',
@@ -111,6 +123,11 @@ export default {
       textures: { diffuse: 'diffuse.jpg' },
       color: 0x9a8f80,
       features: { magnetosphereGlow: true },
+      surfaceFeatures: [
+        { name: 'Galileo Regio',   latDeg: 35,   lonDeg: 133 },
+        { name: 'Nicholson Regio', latDeg: -20,  lonDeg: 356 },
+        { name: 'Uruk Sulcus',     latDeg: 0.8,  lonDeg: 160.3 },
+      ],
       facts: [
         'Ganymede is larger than the planet Mercury',
         'It is the only moon in the solar system with its own magnetic field',
@@ -126,6 +143,11 @@ export default {
       textures: { diffuse: 'diffuse.jpg' },
       color: 0x6b6258,
       features: {},
+      surfaceFeatures: [
+        { name: 'Valhalla Impact Basin', latDeg: 14.7, lonDeg: 55.4 },
+        { name: 'Asgard Basin',          latDeg: 30,   lonDeg: 140 },
+        { name: 'Heimdall Crater',       latDeg: -62,  lonDeg: 356 },
+      ],
       facts: [
         'Callisto has the most heavily cratered surface in the solar system',
         'Its Valhalla impact basin is nearly 4,000 km across',

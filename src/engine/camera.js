@@ -32,11 +32,12 @@ export class CameraController {
 
     // Free-fly state
     this.yaw = 0; this.pitch = 0;
-    this.speed = 40; // units/s
     this.keys = new Set();
 
     // Orbit state
     this.orbTheta = 0.6; this.orbPhi = 1.2; this.orbDist = 300;
+    this.distTween = null;      // altitude preset animation
+    this.chaseDistMult = 1;
 
     // Surface state
     this.surfLat = 0; this.surfLon = 0; this.surfYaw = 0; this.surfPitch = 0.1;
@@ -224,14 +225,63 @@ export class CameraController {
     }
   }
 
+  // -- Altitude helpers ----------------------------------------------------------
+
+  /** Minimum permitted camera distance from a body's center (scene units). */
+  _floorDist(name) {
+    const entry = this.r.bodyMeshes.get(name);
+    if (!entry) return 0;
+    const minAltKm = entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5;
+    return entry.radiusUnits + minAltKm / 1000;
+  }
+
+  _nearestBodyName() {
+    return this.r.nearestAltitudeKm(this.camera.position)?.name ?? null;
+  }
+
+  /**
+   * Zoom toward/away from the current focus body in any mode.
+   * delta > 0 zooms in. Altitude above the floor scales multiplicatively,
+   * i.e. logarithmically: fast when far, fine-grained when close, and the
+   * floor (min safe altitude) can never be crossed.
+   */
   _pinch(delta) {
+    if (this.mode === 'surface') return; // standing on the ground
+    const f = Math.exp(-delta * 0.0016);
+
     if (this.mode === 'orbit' || this.mode === 'system') {
       const name = this.mode === 'system' ? this.r.system.primary.name : this.target;
-      const minD = this.r.bodyRadius(name) * 1.6;
-      this.orbDist = THREE.MathUtils.clamp(this.orbDist * (1 - delta * 0.002), minD, 3e5);
-    } else if (this.mode === 'free') {
-      this.speed = THREE.MathUtils.clamp(this.speed * (1 + delta * 0.002), 0.5, 5000);
+      const floor = this._floorDist(name);
+      this.distTween = null;
+      // Seed a small epsilon so zooming out from exactly the floor works.
+      const above = Math.max(this.orbDist - floor, floor * 0.002);
+      this.orbDist = Math.min(floor + above * f, 3e5);
+    } else if (this.mode === 'chase') {
+      this.chaseDistMult = THREE.MathUtils.clamp(this.chaseDistMult * f, 1, 60);
+    } else {
+      // Free fly / cinematic (which hands off to free on input anyway):
+      // dolly along the line to the nearest or targeted body.
+      const name = this.target || this._nearestBodyName();
+      if (!name) return;
+      const center = this.r.bodyWorldPos(name, new THREE.Vector3());
+      const cur = this.camera.position.distanceTo(center);
+      const floor = this._floorDist(name);
+      const next = Math.min(floor + Math.max(cur - floor, floor * 0.002) * f, 3e5);
+      const dir = center.clone().sub(this.camera.position).normalize();
+      this.camera.position.addScaledVector(dir, cur - next);
+      // Keep the transition origin in step so an in-flight blend doesn't
+      // drag the camera back and swallow the zoom.
+      this.fromPos.addScaledVector(dir, cur - next);
     }
+  }
+
+  /** Animate orbit distance to a preset altitude (km) over 1.5 s. */
+  flyToAltitude(km) {
+    const target = this.target || this.lastTarget || this.r.system.primary.name;
+    if (this.mode !== 'orbit' || this.target !== target) this.setMode('orbit', target);
+    const entry = this.r.bodyMeshes.get(target);
+    const to = Math.max(this._floorDist(target), entry.radiusUnits + km / 1000);
+    this.distTween = { from: this.orbDist, to, t: 0, dur: 1.5 };
   }
 
   // -- Per-frame update ------------------------------------------------------------
@@ -247,13 +297,28 @@ export class CameraController {
       this.camera.position.copy(pose.pos);
       this.camera.quaternion.copy(pose.quat);
     }
+    this._enforceFloors();
+  }
+
+  /** Never let the camera clip inside a body's minimum safe altitude. */
+  _enforceFloors() {
+    if (this.mode === 'surface') return; // surface mode stands on the ground
+    const c = new THREE.Vector3();
+    for (const [name, entry] of this.r.bodyMeshes) {
+      const floor = this._floorDist(name);
+      entry.group.getWorldPosition(c);
+      const d = this.camera.position.distanceTo(c);
+      if (d < floor && d > 1e-9) {
+        this.camera.position.sub(c).setLength(floor).add(c);
+      }
+    }
   }
 
   _computePose(dt) {
     switch (this.mode) {
       case 'free': return this._poseFree(dt);
-      case 'orbit': return this._poseOrbit(this.target);
-      case 'system': return this._poseOrbit(this.r.system.primary.name);
+      case 'orbit': return this._poseOrbit(this.target, dt);
+      case 'system': return this._poseOrbit(this.r.system.primary.name, dt);
       case 'surface': return this._poseSurface();
       case 'chase': return this._poseChase(dt);
       case 'cinematic': return this._poseCinematic(dt);
@@ -265,7 +330,10 @@ export class CameraController {
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
     const pos = this.camera.position.clone();
     const boost = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 5 : 1;
-    const v = this.speed * boost * dt;
+    // Speed auto-scales with proximity: metres per second near a surface,
+    // system-crossing speed out in space.
+    const near = Math.max(this.r.nearestAltitudeKm(pos)?.altKm ?? 5e4, 2) / 1000; // units
+    const v = THREE.MathUtils.clamp(near * 0.9, 0.002, 4000) * boost * dt;
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
     const upv = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
@@ -278,7 +346,14 @@ export class CameraController {
     return { pos, quat };
   }
 
-  _poseOrbit(name) {
+  _poseOrbit(name, dt = 0) {
+    // Altitude preset tween (1.5 s ease-in-out).
+    if (this.distTween) {
+      const tw = this.distTween;
+      tw.t = Math.min(1, tw.t + dt / tw.dur);
+      this.orbDist = tw.from + (tw.to - tw.from) * easeInOut(tw.t);
+      if (tw.t >= 1) this.distTween = null;
+    }
     const center = this.r.bodyWorldPos(name, this._v);
     const pos = new THREE.Vector3(
       center.x + this.orbDist * Math.sin(this.orbPhi) * Math.cos(this.orbTheta),
@@ -286,6 +361,18 @@ export class CameraController {
       center.z + this.orbDist * Math.sin(this.orbPhi) * Math.sin(this.orbTheta)
     );
     const quat = lookQuat(pos, center);
+
+    // Below 500 km, ease in a 15° tilt from pure nadir toward the horizon
+    // for the low-pass flyover feel.
+    const entry = this.r.bodyMeshes.get(name);
+    if (entry) {
+      const altKm = (this.orbDist - entry.radiusUnits) * 1000;
+      if (altKm < 500) {
+        const t = 1 - Math.max(0, altKm) / 500;
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
+        quat.premultiply(new THREE.Quaternion().setFromAxisAngle(right, THREE.MathUtils.degToRad(-15 * t)));
+      }
+    }
     return { pos, quat };
   }
 
@@ -331,7 +418,7 @@ export class CameraController {
     const entry = this.r.bodyMeshes.get(this.target);
     if (!entry) return this._poseFree(0);
     const center = entry.group.getWorldPosition(new THREE.Vector3());
-    const dist = entry.radiusUnits * 7;
+    const dist = entry.radiusUnits * 7 * this.chaseDistMult;
 
     // Trail BEHIND the direction of travel (velocity-derived, so the offset
     // is correct at every point of the orbit).

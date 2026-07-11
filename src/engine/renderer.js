@@ -305,6 +305,36 @@ export class SceneRenderer {
           entry.plumes.push(plume);
         }
       }
+      if (cfg.features?.thinAtmosphere) {
+        const ta = cfg.features.thinAtmosphere;
+        const haze = new THREE.Mesh(
+          new THREE.SphereGeometry(r * 1.035, 48, 32),
+          makeAtmosphereMaterial(new THREE.Color(ta.color), 0)
+        );
+        group.add(haze);
+        entry.haze = haze;
+        entry.hazeIntensity = ta.intensity;
+      }
+      // Named surface features: billboard labels riding the rotating mesh,
+      // faded in below ~500 km altitude.
+      if (cfg.surfaceFeatures?.length) {
+        entry.featureSprites = [];
+        for (const f of cfg.surfaceFeatures) {
+          const sprite = makeTextSprite(f.name);
+          const lat = THREE.MathUtils.degToRad(f.latDeg);
+          const lon = THREE.MathUtils.degToRad(f.lonDeg);
+          sprite.position.set(
+            Math.cos(lat) * Math.cos(lon),
+            Math.sin(lat),
+            -Math.cos(lat) * Math.sin(lon)
+          ).multiplyScalar(r * 1.03);
+          sprite.scale.set(r * 0.26, r * 0.065, 1);
+          sprite.material.opacity = 0;
+          sprite.visible = false;
+          mesh.add(sprite); // rides the tidally-locked rotation
+          entry.featureSprites.push(sprite);
+        }
+      }
 
       this.root.add(group);
       this.bodyMeshes.set(cfg.name, entry);
@@ -421,6 +451,25 @@ export class SceneRenderer {
       }
 
       for (const plume of entry.plumes) plume.update(dt, elapsed);
+
+      // Altitude-driven detail: surface feature labels (<~500 km) and thin
+      // atmospheric haze (<~1000 km).
+      if (entry.featureSprites || entry.haze) {
+        const altKm = (entry.group.getWorldPosition(this._tmpV ??= new THREE.Vector3())
+          .distanceTo(this.camera.position) - entry.radiusUnits) * KM_PER_UNIT;
+        if (entry.featureSprites) {
+          const op = THREE.MathUtils.clamp((800 - altKm) / 300, 0, 1);
+          for (const s of entry.featureSprites) {
+            s.material.opacity = op;
+            s.visible = op > 0.02;
+          }
+        }
+        if (entry.haze) {
+          const h = THREE.MathUtils.clamp((1500 - altKm) / 500, 0, 1);
+          entry.haze.material.uniforms.uIntensity.value = h * entry.hazeIntensity;
+          entry.haze.visible = h > 0.01;
+        }
+      }
     }
 
     // Ring shader uniforms (camera position in root-local space).
@@ -468,6 +517,17 @@ export class SceneRenderer {
 
   bodyRadius(name) {
     return this.bodyMeshes.get(name)?.radiusUnits ?? 1;
+  }
+
+  /** Nearest body and altitude above its surface, in km. */
+  nearestAltitudeKm(pos) {
+    let best = null;
+    const v = new THREE.Vector3();
+    for (const [name, entry] of this.bodyMeshes) {
+      const altKm = (entry.group.getWorldPosition(v).distanceTo(pos) - entry.radiusUnits) * KM_PER_UNIT;
+      if (!best || altKm < best.altKm) best = { name, altKm };
+    }
+    return best;
   }
 
   setOrbitLinesVisible(v) { this.orbitLines.visible = v; }
@@ -660,6 +720,25 @@ function makeVolcanicPlume(moonRadius, volcano, tier) {
   }
 
   return { points, hotspot, update };
+}
+
+/** Billboard label sprite for named surface features. */
+function makeTextSprite(text) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.font = '600 44px Montserrat, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(5,5,16,0.95)';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = '#66b2ff';
+  ctx.fillText(text.toUpperCase(), 256, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 0, depthWrite: false,
+  }));
 }
 
 function makeFlareTexture(size, color, ring = false) {
