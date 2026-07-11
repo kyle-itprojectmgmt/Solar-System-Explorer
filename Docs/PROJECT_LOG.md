@@ -249,13 +249,33 @@ Commit: b1fcdf2 (26 files)
 - Added: Controls help overlay (? key)
 - Created: FUTURE_ENHANCEMENTS.md
 
-### v3 — Procedural Detail Shaders (In Progress)
-- Shared GLSL Simplex noise library
-- Jupiter: cloud turbulence, GRS vortex, atmospheric haze
-- Io: sulfur palette, lava flows, calderas, hot spot glow
-- Europa: fractal ice cracks, chaos terrain, subsurface ocean glow
-- Ganymede: grooved terrain, dark cratered terrain, polar auroras
-- Callisto: multi-scale fractal cratering, Valhalla basin
+### v3 — Procedural Detail Shaders (Complete — deployed 2026-07-10)
+Commits: 2091c7a (infra), 9be0608 (Jupiter), 193093c (Io), 5a971a5
+(Europa), 7729be3 (Ganymede), 1317e3a (Callisto)
+- Shared GLSL Simplex noise library (2D/3D, ridged, fBm 2–4 octaves,
+  cellular/crater helpers; mobile tier drops one octave)
+- onBeforeCompile injection into MeshPhongMaterial; bodies opt in via
+  config `detail: { style, activationKm, fullKm, params }`; blend is 0
+  above activation altitude (no visual cost when far)
+- Jupiter: zone/belt cloud turbulence with altitude-staged octaves,
+  latitude-stretched wisps, GRS spiral vortex (anchored to scanned map
+  UV, differs between 2K and 4K maps), blue-grey limb haze <10,000 km
+- Io: sulfur palette zones, stretched lava flows, cellular calderas
+  with sulfur rims, pulsing hot-spot emissive <200 km, SO2 frost
+- Europa: domain-warped 3-scale crack network, ice-plain flexing,
+  Voronoi chaos rafts, near-subliminal pulsing ocean glow <1,000 km
+- Ganymede: luminance-split dark regolith/craters vs grooved bands,
+  polar aurora emissive <2,000 km; added Osiris + Gilgamesh labels
+- Callisto: 4-octave crater-on-crater fields, bright ice crater
+  floors, Valhalla multi-ring basin anchored to scanned map UV;
+  added Lofn + Burr labels
+- Green "Surface Detail Active" dot in body info panel
+- Fixed: DoF focused on body center, blurring every low-altitude view
+  (now focuses on the near surface)
+- Fixed: quality tier used maxTouchPoints, demoting touchscreen
+  laptops to tablet tier (now uses pointer:coarse media query)
+- Verified per body at spec altitudes; ~50–60 fps at full detail even
+  in software GL; all v1/v2 regression checks passing
 
 ### v3b — Orbit Surface Movement Fix (In Progress)
 - Fixed: Orbit mode — camera advances along path, surface sweeps beneath
@@ -273,8 +293,8 @@ Commit: b1fcdf2 (26 files)
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Backlog | — |
-| 2 | Surface stationary during orbit (camera doesn't advance along path) | In Progress | V3b_ORBIT_FIX.md |
-| 3 | Texture resolution exhaustion on zoom (no detail up close) | In Progress | V3_DETAIL_SHADERS.md |
+| 2 | Surface stationary during orbit (camera doesn't advance along path) | Queued (v3b, not started) | V3b_ORBIT_FIX.md |
+| 3 | ~~Texture resolution exhaustion on zoom~~ | RESOLVED in v3 — procedural detail shaders | V3_DETAIL_SHADERS.md |
 
 ---
 
