@@ -546,6 +546,16 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
   camera.js implementation intact for V5). Chase Height remains
   contextual in the CAM panel (its new home was unspecified).
 - Verified: 13-check v4d suite + 22-check regression, zero errors.
+- Hotfix (post-v4d): the item-1 node anchoring made the nadir view ROLL
+  about the view axis while dragging the slider — the whole scene
+  appeared to rotate (bug report: "inclination rotates the scene").
+  Nothing ever rotated in the scene graph; the camera orientation
+  followed the pivoting tangent. Reverted to a FIXED line of nodes
+  (+X of the equatorial frame, explicit x/y/z form), keeping the
+  plane-change transition blend. Measured while dragging 0→90°: max
+  per-step view roll < 2°, body centered (< 0.6 NDC), scene-graph
+  rotation exactly zero, polar sweep ±90°, retrograde preserved, both
+  inclination sliders in sync (tests/incroll.mjs).
 
 ---
 

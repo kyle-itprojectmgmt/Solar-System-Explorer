@@ -58,7 +58,6 @@ export class CameraController {
     this.ins = {
       body: null, altitudeKm: 10000, incDeg: 0, locked: false,
       phase: 0, yaw: 0, pitch: -1.31, // default view: nadir + 15° forward tilt
-      nodePhase: 0,                   // line of nodes: where the plane tilt is anchored
       lockOffset: 0,                  // geosync: phase − body rotation angle
       velKmS: 0, periodS: 0, surfaceKmS: 0, // computed each frame for the HUD
     };
@@ -708,16 +707,12 @@ export class CameraController {
   /** Update insertion parameters from the UI (body/altitude/inclination/lock). */
   setInsertion(params) {
     const wasLocked = this.ins.locked;
-    // Plane change (V4d item 1): when inclination changes, the camera's
-    // CURRENT position becomes the line of nodes — the orbital path tilts
-    // around the camera (like a real plane-change burn) instead of the
-    // camera snapping onto a circle tilted about a fixed axis, which read
-    // as Jupiter lurching sideways. A short transition smooths the rest.
+    // Plane change: blend the camera smoothly onto the newly tilted path.
+    // (The node is FIXED — anchoring it at the camera's position made the
+    // tangent, and with it the whole nadir view, roll about the view axis
+    // while dragging: the scene appeared to rotate. Bodies never move;
+    // only the camera glides to its new orbital plane.)
     if (params.incDeg !== undefined && params.incDeg !== this.ins.incDeg) {
-      // Anchor the node at the camera's current bearing when tilting away
-      // from equatorial; keep it stable while the slider keeps moving so a
-      // continuous drag pivots one plane instead of wandering.
-      if (this.ins.incDeg === 0) this.ins.nodePhase = this.ins.phase;
       this._startTransition();
     }
     Object.assign(this.ins, params);
@@ -790,18 +785,27 @@ export class CameraController {
       : Math.abs(orbitSign * omega - this._bodyRotationRateRadS(ins.body)) * entry.radiusUnits * KM_PER_UNIT;
 
     // Orbit plane: a great circle inclined by |incDeg| from the equator,
-    // tilted about the line of nodes — the radial direction at nodePhase
-    // (root frame). At 90° this is a true polar orbit passing over both
-    // poles; the body stays at the circle's center at every inclination.
+    // tilted about a FIXED line of nodes (the +X axis of the body's
+    // equatorial frame). Written out explicitly — position only, nothing
+    // in the scene is ever rotated:
+    //   x = r·cosφ, y = r·sinφ·sinI, z = -r·sinφ·cosI
+    // At 0° the camera rides the equator; at 90° y sweeps ±r — a true
+    // polar orbit over both poles. The body stays at the circle's center
+    // (and centered in view) at every inclination.
     const inc = THREE.MathUtils.degToRad(Math.abs(ins.incDeg));
-    const nodeAxis = new THREE.Vector3(
-      Math.cos(ins.nodePhase || 0), 0, -Math.sin(ins.nodePhase || 0));
-    const local = new THREE.Vector3(Math.cos(ins.phase), 0, -Math.sin(ins.phase))
-      .multiplyScalar(rUnits).applyAxisAngle(nodeAxis, inc);
-    // Travel direction reverses with retrograde traversal.
-    const tangent = new THREE.Vector3(-Math.sin(ins.phase), 0, -Math.cos(ins.phase))
-      .multiplyScalar(orbitSign)
-      .applyAxisAngle(nodeAxis, inc);
+    const cosP = Math.cos(ins.phase), sinP = Math.sin(ins.phase);
+    const cosI = Math.cos(inc), sinI = Math.sin(inc);
+    const local = new THREE.Vector3(
+      rUnits * cosP,
+      rUnits * sinP * sinI,
+      -rUnits * sinP * cosI
+    );
+    // Travel direction = d(position)/dφ, reversed for retrograde traversal.
+    const tangent = new THREE.Vector3(
+      -sinP,
+      cosP * sinI,
+      -cosP * cosI
+    ).multiplyScalar(orbitSign);
     local.applyQuaternion(this.r.root.quaternion);
     tangent.applyQuaternion(this.r.root.quaternion).normalize();
 
