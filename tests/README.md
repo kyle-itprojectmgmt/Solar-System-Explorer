@@ -73,3 +73,12 @@ SMOKE_URL=http://localhost:5173 node tests/earthtest.mjs
 # Earth+Moon end-to-end (14 checks): terra/luna shaders compile + blend,
 # Rayleigh shell, Apollo markers, ephemeris seasons, Moon orbit radius,
 # NAV travel rows, date jumps. Earth loads via ?system=earth.
+
+# v5a additions:
+SMOKE_URL=http://localhost:5173 node tests/nightlights.mjs
+# City-light placement guard: finds a sim hour with Paris in night, aims
+# the camera at it, projects known lat/lons (cities vs Sahara/Atlantic)
+# and samples screenshot pixels. Passes when the brightest city is > 3x
+# the brightest dark reference. NOTE: the sim's rotation phase at epoch
+# is arbitrary — never assume UTC maps to real subsolar longitude; aim
+# the camera at a body-frame lat/lon instead.

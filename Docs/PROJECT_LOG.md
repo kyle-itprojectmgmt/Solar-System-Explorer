@@ -654,6 +654,49 @@ the NAV panel now travels between Jupiter and Earth.
   Deployed and live-verified in a fresh headless browser: both
   systems load at v5.0.0 with zero console errors.
 
+### v5a — Cloud Circulation + 8K Textures + City Lights (Complete — 2026-07-11, commit 58636f4 + docs)
+Per Kyle's V5a message (4 items). Version 5.1.0.
+
+- Item 1 (critical): earth-clouds.glsl rewritten around a latitude-zone
+  circulation model. The clear subtropical belt is the signature — the
+  alternating ITCZ white band → clear desert zone (Sahara/Australia
+  visible through the gaps) → mid-latitude comma swirls → polar grey
+  is what makes Earth read as Earth instead of a cloud planet. ITCZ
+  meanders and follows the sun into the summer hemisphere (real
+  seasonal migration, driven by the v5 ephemeris); zonal shear rotates
+  the noise field (easterly trades / faster westerlies); hurricanes
+  are basin-aware — fixed anchors over the real warm-water nurseries
+  (NW Pacific, NE Pacific, N Atlantic, S Indian), never over land,
+  active only in that hemisphere's summer, clear eye at the center.
+  Altitude-staged octaves + a below-8,000 km puff-erosion layer.
+  Calibration note: the first cut read as uniform confetti — base
+  noise dropped to continent scale (freq 9 + freq 26 breakup),
+  verified against screenshots at 22,000 and 6,000 km.
+- Item 2: texture sourcing. LANDED: 8K SSS daymap (wired as
+  diffuseHigh — desktop silently upgrades after load; needed a
+  Referer header to clear SSS hotlink protection), 8K nightmap, 8K
+  cloud layer, 8K specular ocean mask (SSS ships it as .tif —
+  converted via GDI+). night/clouds/specular are on disk but not yet
+  wired (lights stay procedural per Item 3). STILL MANUAL: NASA CGI
+  Moon Kit — svs.gsfc.nasa.gov is serving an expired TLS certificate;
+  URL noted in earth.js, retry when NASA fixes their cert.
+- Item 3: earth-lights.glsl — uniform noise replaced with 20 hardcoded
+  population-density gaussians on the sphere. Western Europe, Japan,
+  and the US East Coast are the dominant features from high altitude;
+  Sahara, Amazon, Siberia, and the oceans are near-black. Measured by
+  pixel probe: London 58 / Paris 55 / Milan 49 / Cairo 39 / Moscow 30
+  luminance vs Sahara 7, Atlantic 0. tests/nightlights.mjs guards the
+  placement (projects known lat/lons to screen and samples pixels).
+- Item 4: dev-mode calibration logging — each detail shader logs its
+  activation/deactivation with live altitude + blend, and
+  `__sse.renderer.logShaderState()` dumps a per-body uniform table
+  plus pointers to every tuning knob (cloud zone weights, city-light
+  region weights + gain, moon crater amplitudes, per-body
+  normalScale). DEV builds only.
+- Verified: earthtest 14/14, Jupiter regression (smoke 22, incmeasure
+  6, ringfloor 7), zero console errors; deployed and live-verified in
+  a fresh headless browser, both systems at v5.1.0.
+
 ---
 
 ## Known Bugs / In Progress
@@ -684,8 +727,8 @@ the NAV panel now travels between Jupiter and Earth.
 | 23 | "Camera Speed" naming unclear | Resolved v4d (renamed Orbit Speed) | V4d_PROMPT.md |
 | 24 | Inclination plane change lurched the camera (planet appeared to shift sideways) | Resolved v4d (line-of-nodes anchored at current bearing) | V4d_PROMPT.md |
 | 25 | Polar orbit at 90° reported as not working — could not be reproduced; measured -89.7°..+90° latitude sweep both before and after the v4d change (verify on hardware) | Resolved v4d (verified) | V4d_PROMPT.md |
-| 27 | Earth/Moon shader calibration done from headless screenshots — cloud speckle density, city-light brightness, moon crater relief may need real-hardware tuning. Knobs: layer weights in earth-clouds/lights.glsl, crater amplitudes in moon-detail.glsl. | Needs review | V5_PROMPT.md |
-| 28 | Earth day texture is 5400px Blue Marble (topo/bathy) — 8K daymap download failed during build; manual upgrade step noted in earth.js texture comments. Black Marble night texture + cloud/specular/normal maps also not yet sourced (night lights are procedural for now). | Fix before launch | V5_PROMPT.md |
+| 27 | Earth/Moon shader calibration done from headless screenshots — cloud zone coverage, city-light brightness, moon crater relief may need real-hardware tuning. v5a added the tooling: `__sse.renderer.logShaderState()` in dev builds lists live uniforms + all knob locations. | Needs review | V5_PROMPT.md |
+| 28 | Earth textures: 8K daymap WIRED in v5a (progressive diffuseHigh swap). night.jpg / clouds.jpg / specular.jpg downloaded (8K) but not yet wired into materials — lights are procedural by design (v5a Item 3). NASA CGI Moon Kit still manual (expired TLS cert at svs.gsfc.nasa.gov, URL in earth.js). | Partially resolved v5a | — |
 | 26 | Replace Ko-fi with Stripe for donations — create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Optionally keep free Ko-fi page as secondary community presence with Saturn funding goal. | Fix before launch | — |
 
 ---
