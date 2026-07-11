@@ -38,7 +38,9 @@ export class CameraController {
     // Orbit state
     this.orbTheta = 0.6; this.orbPhi = 1.2; this.orbDist = 300;
     this.distTween = null;      // altitude preset animation
+    this.orbSpeedMult = 1;      // "Orbital Speed" slider, orbit mode
     this.chaseDistMult = 1;
+    this.chaseHeightMult = 1.5; // "Chase Height" slider, chase mode
 
     // Surface state
     this.surfLat = 0; this.surfLon = 0; this.surfYaw = 0; this.surfPitch = 0.1;
@@ -324,6 +326,13 @@ export class CameraController {
   // -- Per-frame update ------------------------------------------------------------
 
   update(dt) {
+    // Simulated seconds elapsed this frame — the same accumulator physics and
+    // the renderer advanced earlier in the frame, so every orbital phase
+    // derived from it stays in step with body rotation and moon motion.
+    const sim = this.physics.simSeconds;
+    this._simDelta = sim - (this._lastSimSec ?? sim);
+    this._lastSimSec = sim;
+
     const pose = this._computePose(dt);
     if (this.blend < 1) {
       this.blend = Math.min(1, this.blend + dt / TRANSITION_S);
@@ -392,6 +401,16 @@ export class CameraController {
       this.orbDist = tw.from + (tw.to - tw.from) * easeInOut(tw.t);
       if (tw.t >= 1) this.distTween = null;
     }
+    // Advance along the orbital path so the surface sweeps beneath the
+    // camera. Visual period: 60 s of simulated time per revolution (so it
+    // scales with the time multiplier and freezes on pause), adjusted by the
+    // Orbital Speed slider, and capped at one revolution per 5 wall-clock
+    // seconds so high multipliers sweep dramatically instead of strobing.
+    if (this.mode === 'orbit') {
+      const adv = (Math.PI * 2 / 60) * this.orbSpeedMult * this._simDelta;
+      this.orbTheta += Math.min(adv, (Math.PI * 2 / 5) * dt);
+    }
+
     const center = this.r.bodyWorldPos(name, this._v);
     const pos = new THREE.Vector3(
       center.x + this.orbDist * Math.sin(this.orbPhi) * Math.cos(this.orbTheta),
@@ -400,15 +419,20 @@ export class CameraController {
     );
     const quat = lookQuat(pos, center);
 
-    // Below 500 km, ease in a 15° tilt from pure nadir toward the horizon
-    // for the low-pass flyover feel.
+    // Below 500 km, ease in a 15° tilt from pure nadir toward the direction
+    // of orbital travel — horizon ahead, surface sweeping beneath and behind.
     const entry = this.r.bodyMeshes.get(name);
     if (entry) {
       const altKm = (this.orbDist - entry.radiusUnits) * 1000;
       if (altKm < 500) {
         const t = 1 - Math.max(0, altKm) / 500;
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
-        quat.premultiply(new THREE.Quaternion().setFromAxisAngle(right, THREE.MathUtils.degToRad(-15 * t)));
+        const nadir = center.clone().sub(pos).normalize();
+        const travel = new THREE.Vector3(-Math.sin(this.orbTheta), 0, Math.cos(this.orbTheta));
+        const axis = nadir.cross(travel); // rotating about n×t tips the view from nadir toward travel
+        if (axis.lengthSq() > 1e-9) {
+          quat.premultiply(new THREE.Quaternion().setFromAxisAngle(
+            axis.normalize(), THREE.MathUtils.degToRad(15 * t)));
+        }
       }
     }
     return { pos, quat };
