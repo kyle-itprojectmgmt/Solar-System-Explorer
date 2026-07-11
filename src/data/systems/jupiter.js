@@ -116,6 +116,7 @@ export default {
         { name: 'Thera Macula',   latDeg: -46.7, lonDeg: 178.9 },
         { name: 'Pwyll Crater',   latDeg: -25.2, lonDeg: 271.4 },
       ],
+      detail: { style: 'ice', activationKm: 10000, fullKm: 500 },
       facts: [
         'Europa may harbor a liquid water ocean beneath its icy surface',
         'Its ice shell is criss-crossed by reddish fractures called lineae',

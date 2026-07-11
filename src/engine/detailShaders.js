@@ -146,6 +146,59 @@ DETAIL_STYLES.volcanic = {
   `,
 };
 
+// -- Ice shell (Europa): fractal cracks, chaos terrain, ocean glow ---------------
+
+DETAIL_STYLES.ice = {
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    float t1 = uTime * 0.00002;
+    float dLum = dot(dBase, vec3(0.299, 0.587, 0.114));
+
+    // LAYER 2 — subtle blue-white flexing of the ice plains.
+    float plain = fbm2(vObjPos * 9.0 + vec3(t1));
+    vec3 iceCold = vec3(0.910, 0.957, 0.973); // #E8F4F8
+    vec3 iceBlue = vec3(0.690, 0.831, 0.910); // #B0D4E8
+    detail = mix(detail, mix(iceBlue, iceCold, 0.5 + 0.5 * plain), 0.05 + 0.03 * plain);
+
+    // LAYER 1 — fractal micro-crack network at three scales, following a
+    // slowly-rotating regional stress field.
+    float stress = snoise(vObjPos * 2.2) * 1.3; // stress field orientation
+    vec2 sUv = mat2(cos(stress), -sin(stress), sin(stress), cos(stress)) * dUv;
+    vec3 crackCol = vec3(0.545, 0.271, 0.075); // #8B4513 organic deposits
+    // Domain-warp the crack field so ridged zero-sets meander like real
+    // lineae instead of closing into concentric loops.
+    vec2 wUv = sUv + 0.06 * vec2(fbm2(vObjPos * 7.0 + t1), fbm2(vObjPos * 7.0 + 27.3));
+    float c1 = smoothstep(0.90, 0.985, ridged(vec3(wUv * 34.0, 1.7)));
+    float c2 = smoothstep(0.92, 0.990, ridged(vec3(wUv * 110.0, 5.1)));
+    float c3 = smoothstep(0.94, 0.995, ridged(vec3(wUv * 320.0, 9.3)));
+    float cracks = clamp(c1 * 0.6 + c2 * 0.4 + c3 * 0.25, 0.0, 1.0);
+    detail = mix(detail, crackCol, cracks * 0.55);
+
+    // LAYER 3 — chaos terrain: jumbled refrozen ice rafts in mid-tone regions.
+    float chaosZone = smoothstep(0.35, 0.42, dLum) * (1.0 - smoothstep(0.58, 0.65, dLum));
+    if (chaosZone > 0.001) {
+      vec2 w = worley2(dUv * 150.0);
+      float block = 0.94 + 0.12 * (w.y - 0.5);            // per-raft brightness
+      float edge = 0.85 + 0.15 * smoothstep(0.0, 0.12, w.x); // soft seams
+      detail = mix(detail, detail * block * edge, chaosZone * 0.55);
+    }
+
+    // LAYER 5 — fresh impact sites: bright exposed water ice.
+    float fresh = smoothstep(0.86, 0.97, snoise(vObjPos * 70.0 + 41.2));
+    detail = mix(detail, vec3(1.0), fresh * 0.5);
+
+    // LAYER 4 — subsurface ocean glow below 1,000 km. Almost subliminal.
+    float oceanAct = 1.0 - smoothstep(300.0, 1000.0, uAltitude);
+    if (oceanAct > 0.001) {
+      float pulse = sin(uTime * 0.1) * 0.025 + 0.025;
+      float thin = 0.5 + 0.5 * snoise(vObjPos * 6.0);     // thinner ice glows more
+      gDetailEmissive += vec3(0.267, 0.533, 1.0)          // #4488FF
+        * (0.025 + pulse) * thin * oceanAct * uDetailBlend;
+    }
+    ${DETAIL_FINAL}
+  `,
+};
+
 // -- Gas giant: banded cloud turbulence + vortex + limb haze ---------------------
 
 DETAIL_STYLES.gasGiant = {
