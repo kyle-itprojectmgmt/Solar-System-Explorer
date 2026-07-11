@@ -221,6 +221,7 @@ export class SceneRenderer {
 
     this.primaryMesh = new THREE.Mesh(geo, mat);
     this.primaryMesh.scale.set(rEq, rPol, rEq);
+    this.primaryMesh.renderOrder = 0; // opaque planet draws before the rings
     this.primaryMesh.name = p.name;
     this.root.add(this.primaryMesh);
     this.pickables.push(this._makePicker(p.name, this.primaryMesh, rEq));
@@ -268,6 +269,12 @@ export class SceneRenderer {
 
   _buildRings() {
     this.ringMeshes = [];
+    // Planet shadow inputs (2a): sun direction in world space and the
+    // primary's radius — ring segments inside the shadow cylinder go dark,
+    // so the lit band no longer "cuts across" the night-side disc.
+    const sunWorld = new THREE.Vector3()
+      .copy(this.sunDir).applyQuaternion(this.root.quaternion).normalize();
+    const planetR = this.system.primary.radiusKm * K;
     for (const ring of this.system.rings || []) {
       const inner = ring.innerKm * K, outer = ring.outerKm * K;
       let mesh;
@@ -276,19 +283,19 @@ export class SceneRenderer {
         const tube = (outer - inner) / 2;
         mesh = new THREE.Mesh(
           new THREE.TorusGeometry(mid, tube, 24, 128),
-          makeHaloMaterial(new THREE.Color(ring.color), ring.opacity)
+          makeHaloMaterial(new THREE.Color(ring.color), ring.opacity, sunWorld, planetR)
         );
         mesh.rotation.x = Math.PI / 2;
         mesh.scale.z = (ring.thicknessKm * K) / tube; // squash torus vertically
       } else {
         mesh = new THREE.Mesh(
           new THREE.RingGeometry(inner, outer, 192, 4),
-          makeRingMaterial(new THREE.Color(ring.color), ring.opacity, inner, outer)
+          makeRingMaterial(new THREE.Color(ring.color), ring.opacity, inner, outer, sunWorld, planetR)
         );
         mesh.rotation.x = -Math.PI / 2;
       }
       mesh.name = ring.name;
-      mesh.renderOrder = 2;
+      mesh.renderOrder = 1; // after the planet (renderOrder 0), no depth writes
       this.root.add(mesh);
       this.ringMeshes.push(mesh);
     }
@@ -705,36 +712,52 @@ function makeLimbScatterMaterial(atm) {
  * Diffuse dust-cloud look for the halo torus: brightest where the surface
  * faces the camera, fading to nothing at the silhouette — no hard edges.
  */
-function makeHaloMaterial(color, opacity) {
+function makeHaloMaterial(color, opacity, sunDirWorld, planetR) {
   return new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: color }, uOpacity: { value: opacity } },
+    uniforms: {
+      uColor: { value: color },
+      uOpacity: { value: opacity },
+      uSunW: { value: sunDirWorld },
+      uPlanetR: { value: planetR },
+    },
     vertexShader: /* glsl */ `
       varying vec3 vNormal;
       varying vec3 vPos;
+      varying vec3 vWorld;
       void main() {
         vNormal = normalize(normalMatrix * normal);
         vPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+        vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uColor;
       uniform float uOpacity;
+      uniform vec3 uSunW;
+      uniform float uPlanetR;
       varying vec3 vNormal;
       varying vec3 vPos;
+      varying vec3 vWorld;
       void main() {
         float facing = abs(dot(normalize(-vPos), normalize(vNormal)));
-        gl_FragColor = vec4(uColor, uOpacity * pow(facing, 2.0));
+        // Planet shadow (2a): the primary sits at the world origin — ring
+        // material inside its anti-sun shadow cylinder is eclipsed.
+        float along = dot(vWorld, uSunW);
+        float perp = length(vWorld - along * uSunW);
+        float lit = along > 0.0 ? 1.0 : smoothstep(uPlanetR * 0.98, uPlanetR * 1.08, perp);
+        gl_FragColor = vec4(uColor, uOpacity * pow(facing, 2.0) * lit);
       }
     `,
     transparent: true,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
     depthWrite: false,
+    depthTest: true,
   });
 }
 
-function makeRingMaterial(color, opacity, inner, outer) {
+function makeRingMaterial(color, opacity, inner, outer, sunDirWorld, planetR) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uColor: { value: color },
@@ -743,6 +766,8 @@ function makeRingMaterial(color, opacity, inner, outer) {
       uOuter: { value: outer },
       uCamPos: { value: new THREE.Vector3() },
       uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+      uSunW: { value: sunDirWorld },
+      uPlanetR: { value: planetR },
     },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
@@ -760,6 +785,8 @@ function makeRingMaterial(color, opacity, inner, outer) {
       uniform float uOuter;
       uniform vec3 uCamPos;
       uniform vec3 uSunDir;
+      uniform vec3 uSunW;
+      uniform float uPlanetR;
       varying vec3 vWorld;
       varying float vR;
       void main() {
@@ -771,7 +798,13 @@ function makeRingMaterial(color, opacity, inner, outer) {
         vec3 toCam = normalize(uCamPos - vWorld);
         float back = pow(max(dot(-toCam, uSunDir), 0.0), 6.0);
         float bright = uOpacity * band * (1.0 + back * 10.0);
-        gl_FragColor = vec4(uColor * (1.0 + back * 2.0), bright);
+        // Planet shadow (2a): ring material inside the primary's anti-sun
+        // shadow cylinder is eclipsed — the lit band no longer appears to
+        // cut across the night-side disc.
+        float along = dot(vWorld, uSunW);
+        float perp = length(vWorld - along * uSunW);
+        float lit = along > 0.0 ? 1.0 : smoothstep(uPlanetR * 0.98, uPlanetR * 1.08, perp);
+        gl_FragColor = vec4(uColor * (1.0 + back * 2.0), bright * lit);
       }
     `,
     transparent: true,
