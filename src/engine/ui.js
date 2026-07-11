@@ -13,7 +13,9 @@ const CAMERA_MODES = [
   { id: 'cinematic', label: 'Cinematic', key: 'C', targeted: false },
   { id: 'free', label: 'Free Fly', key: 'F', targeted: false },
   { id: 'orbit', label: 'Orbit', key: 'O', targeted: true },
-  { id: 'surface', label: 'Surface', key: 'S', targeted: true },
+  // Surface hidden until V5 (needs realistic starfield + ground rendering);
+  // the camera.js implementation stays intact.
+  { id: 'surface', label: 'Surface', key: 'S', targeted: true, hidden: true },
   { id: 'chase', label: 'Chase', key: 'H', targeted: true },
   { id: 'insertion', label: 'Orbit Insertion', key: 'I', targeted: false },
   { id: 'system', label: 'System View', key: 'G', targeted: false },
@@ -228,7 +230,6 @@ export class UI {
       b.classList.toggle('active', b.dataset.camMode === mode);
     });
     if (this.insPanel) this.insPanel.style.display = mode === 'insertion' ? '' : 'none';
-    if (this.orbSec) this.orbSec.style.display = mode === 'orbit' ? '' : 'none';
     if (this.chaseSec) this.chaseSec.style.display = mode === 'chase' ? '' : 'none';
   }
 
@@ -253,7 +254,7 @@ export class UI {
     this.stackContents = {};
     this.stackButtons = {};
     this.openPanelId = null;
-    this._panelOrder = ['camera', 'time', 'bodies', 'presets', 'display', 'help'];
+    this._panelOrder = ['camera', 'time', 'bodies', 'presets', 'display', 'help', 'alt', 'inc', 'spd'];
 
     // Text labels, not emoji (V4d item 2) — mission-control style.
     const defs = [
@@ -272,12 +273,33 @@ export class UI {
       this.stackContents[id] = c;
     }
 
+    // Parameter controls (V4d item 3): divider, then ALT / INC / SPD as
+    // peer buttons opening focused single-control panels.
+    el('div', 'stack-divider', this.stack);
+    const paramDefs = [
+      ['alt', 'ALT', 'Altitude'], ['inc', 'INC', 'Inclination'], ['spd', 'SPD', 'Orbit Speed'],
+    ];
+    for (const [id, label, title] of paramDefs) {
+      const b = el('button', 'stack-btn', this.stack);
+      b.textContent = label;
+      b.dataset.panel = id;
+      b.onclick = () => this.togglePanel(id);
+      this.stackButtons[id] = b;
+      const c = el('div', 'stack-content', this.stackPanel);
+      c.style.display = 'none';
+      el('h2', 'side-title', c).textContent = title.toUpperCase();
+      this.stackContents[id] = c;
+    }
+
     this._buildCameraPanel(this.stackContents.camera);
     this._buildTimePanel(this.stackContents.time);
     this._buildBodiesPanel(this.stackContents.bodies);
     this._buildPresetsPanel(this.stackContents.presets);
     this._buildDisplayPanel(this.stackContents.display);
     this._buildHelpPanel(this.stackContents.help);
+    this._buildAltPanel(this.stackContents.alt);
+    this._buildIncPanel(this.stackContents.inc);
+    this._buildSpdPanel(this.stackContents.spd);
   }
 
   /** One panel open at a time; the ghost clock dims while any is open. */
@@ -307,32 +329,34 @@ export class UI {
     };
     const list = el('div', 'mode-list', c);
     for (const m of CAMERA_MODES) {
+      if (m.hidden) continue;
       const row = el('button', 'mode-row', list);
       row.dataset.camMode = m.id;
       row.innerHTML = `<span class="mode-ico">${icons[m.id]}</span>`
         + `<span class="mode-label">${m.label}</span><span class="key">${m.key}</span>`;
       row.onclick = () => this._activateMode(m);
     }
-    this._buildCameraSliders(c);
+    // Chase Height stays contextual here (appears only in Chase mode) —
+    // the V4d spec moved ALT/INC/SPD to their own panels but left this
+    // slider's home unspecified.
+    this._buildChaseSlider(c);
   }
 
-  // Altitude / inclination / camera speed / chase height — preserved from
-  // the old Mission Control, now contextual sections of the Camera panel.
-  _buildCameraSliders(parent) {
+  // -- ALT / INC / SPD focused panels (V4d item 3) --------------------------------
 
-    // Altitude — continuous logarithmic slider (replaces the old presets).
-    // Equal slider travel = equal zoom factor; readout tracks the camera live.
+  _buildAltPanel(c) {
+    // Continuous logarithmic altitude slider — equal travel = equal zoom
+    // factor; readout tracks the camera live (see update()).
     const ALT_MIN = 50, ALT_MAX = 500000;
     this._altT = (km) => Math.log10(km / ALT_MIN) / Math.log10(ALT_MAX / ALT_MIN);
     this._altKm = (t) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, t);
-    this.altSec = section(parent, 'Altitude');
+    this.altSec = el('div', 'side-section', c);
     this.mcAltReadout = el('div', 'alt-readout', this.altSec);
     this.mcAltSlider = el('input', 'slider', this.altSec);
     Object.assign(this.mcAltSlider, { type: 'range', min: 0, max: 1, step: 0.001, value: 0.5 });
     const altScale = el('div', 'ins-scale', this.altSec);
     altScale.innerHTML = '<span>50 km</span><span>500,000 km</span>';
-    // While dragging, the slider drives the camera; otherwise the camera
-    // drives the slider (see update()).
+    el('p', 'panel-desc', this.altSec).textContent = 'Camera altitude above surface';
     this.mcAltSlider.addEventListener('pointerdown', () => { this._altDragging = true; });
     window.addEventListener('pointerup', () => { this._altDragging = false; });
     this.mcAltSlider.oninput = () => {
@@ -343,42 +367,50 @@ export class UI {
       if (this.cam.mode === 'insertion') this.cam.setInsertion({ altitudeKm: km });
       else this.cam.setAltitudeDirect(km);
     };
-    this.altSec.style.display = 'none';
+  }
 
-    // Quick-access inclination — mirrors the Orbit Insertion panel control.
-    this.incSecMC = section(parent, 'Inclination');
-    this.mcIncLabel = el('div', 'ins-label', this.incSecMC);
+  _buildIncPanel(c) {
+    this.incSecMC = el('div', 'side-section', c);
+    this.mcIncLabel = el('div', 'alt-readout', this.incSecMC);
     this.mcIncSlider = el('input', 'slider', this.incSecMC);
     Object.assign(this.mcIncSlider, { type: 'range', min: -90, max: 90, step: 1, value: this.cam.ins.incDeg });
     this.mcIncSlider.oninput = () => {
       // Read first: entering insertion mode syncs this slider from the old
       // ins state, which would clobber the value being dragged.
       const incDeg = +this.mcIncSlider.value;
-      // Dragging inclination outside Orbit Insertion used to silently do
-      // nothing (bug #23) — the intent is clearly "orbit at this angle".
+      // Dragging inclination outside Orbit Insertion auto-switches (bug #23)
+      // — the intent is clearly "orbit at this angle".
       if (this.cam.mode !== 'insertion') {
         const target = this.cam.target || this.cam.lastTarget || this.system.primary.name;
         this.cam.setMode('insertion', target);
         this.notify('Switched to Orbit Insertion for inclination');
       }
       this.cam.setInsertion({ incDeg });
+      this.mcIncLabel.textContent = incShort(incDeg);
     };
     const mcIncScale = el('div', 'ins-scale', this.incSecMC);
     mcIncScale.innerHTML = '<span>-90° retro</span><span>0° equatorial</span><span>90° polar</span>';
-    this.mcIncLabel.textContent = incText(this.cam.ins.incDeg);
-    this.incSecMC.style.display = 'none';
+    this.mcIncLabel.textContent = incShort(this.cam.ins.incDeg);
+    this.incNote = el('p', 'panel-desc', this.incSecMC);
+    this.incNote.textContent = 'Orbital plane tilt — dragging switches to Orbit Insertion';
+  }
 
-    // Orbit mode tuning — how fast the camera sweeps along its orbital path,
-    // independent of the time multiplier.
-    this.orbSec = section(parent, 'Camera Speed');
-    const orbLabel = el('div', 'ins-label', this.orbSec);
+  _buildSpdPanel(c) {
+    // How fast the camera sweeps along its orbital path — independent of
+    // the simulation time multiplier.
+    this.orbSec = el('div', 'side-section', c);
+    const orbLabel = el('div', 'alt-readout', this.orbSec);
     const orbSlider = el('input', 'slider', this.orbSec);
     Object.assign(orbSlider, { type: 'range', min: 0, max: 4, step: 0.05, value: this.cam.orbSpeedMult });
-    const syncOrb = () => { orbLabel.textContent = `Camera Speed: ${this.cam.orbSpeedMult.toFixed(2)}×`; };
+    const syncOrb = () => { orbLabel.textContent = `${this.cam.orbSpeedMult.toFixed(2)}×`; };
     orbSlider.oninput = () => { this.cam.orbSpeedMult = +orbSlider.value; syncOrb(); };
     syncOrb();
-    this.orbSec.style.display = 'none';
+    el('p', 'panel-desc', this.orbSec).textContent =
+      'Camera orbit speed — independent of simulation time';
+    this.spdSlider = orbSlider;
+  }
 
+  _buildChaseSlider(parent) {
     // Chase mode tuning — camera height above the chased moon.
     this.chaseSec = section(parent, 'Chase Camera');
     const chaseLabel = el('div', 'ins-label', this.chaseSec);
@@ -716,7 +748,7 @@ export class UI {
     };
     sec('KEYBOARD SHORTCUTS', [
       ['C', 'Cinematic (auto)'], ['F', 'Free Fly'], ['O', 'Orbit'],
-      ['S', 'Surface'], ['H', 'Chase'], ['G', 'System View'], ['I', 'Orbit Insertion'],
+      ['H', 'Chase'], ['G', 'System View'], ['I', 'Orbit Insertion'],
       ['W A S D', 'Move (Free Fly)'], ['Shift', 'Speed boost 5×'],
       ['Alt (hold)', 'Free look while orbiting'],
       [',  .', 'Time slower / faster'], ['Space', 'Pause / Resume'],
@@ -815,7 +847,7 @@ export class UI {
       incLabel.textContent = incText(ins.incDeg);
       if (this.mcIncSlider) {
         this.mcIncSlider.value = ins.incDeg;
-        this.mcIncLabel.textContent = incText(ins.incDeg);
+        this.mcIncLabel.textContent = incShort(ins.incDeg);
       }
       lockToggle.checked = ins.locked;
       this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
@@ -1255,11 +1287,6 @@ export class UI {
           if (this.openPanelId) this.togglePanel(this.openPanelId, false);
           this.toggleAudioFlyout(false); this.toggleDatePicker(false);
           break;
-        case 'KeyS':
-          // S is both surface-mode select and free-fly backward; only treat
-          // as surface select when not flying.
-          if (this.cam.mode !== 'free') this._activateMode(CAMERA_MODES[3]);
-          break;
         default: break;
       }
     });
@@ -1318,7 +1345,7 @@ export class UI {
     // Mission Control sliders
     t.attach(this.mcAltSlider, 'Camera altitude above the surface — drag to fly closer or further');
     t.attach(this.mcIncSlider, 'Orbital tilt — 0° equatorial, 90° polar, negative values = retrograde orbit');
-    t.attach(this.orbSec.querySelector('input.slider'), 'How fast the camera orbits the target — independent of simulation time');
+    t.attach(this.spdSlider, 'Orbit Speed — how fast the camera orbits the target, independent of simulation time');
     t.attach(this.chaseSec.querySelector('input.slider'), 'Camera height above the chased moon — from surface-skim to wide overview');
 
     // Orbit Insertion panel
@@ -1423,8 +1450,6 @@ export class UI {
     // Altitude + inclination sliders appear once any body has been targeted.
     // Outside a drag, the slider follows the camera's actual altitude.
     const tgt = this.cam.target || this.cam.lastTarget;
-    this.altSec.style.display = tgt ? '' : 'none';
-    this.incSecMC.style.display = tgt ? '' : 'none';
     if (tgt && !this._altDragging) {
       const entry = this.r.bodyMeshes.get(tgt);
       if (entry) {
@@ -1466,6 +1491,11 @@ export class UI {
 
     // Upcoming-event toasts.
     this._updateEventToasts(dt);
+
+    // INC panel note: only shown while outside Orbit Insertion.
+    if (this.openPanelId === 'inc') {
+      this.incNote.style.display = this.cam.mode === 'insertion' ? 'none' : '';
+    }
 
     // Time panel date button mirrors the HUD clock.
     if (this.openPanelId === 'time') {
@@ -1582,6 +1612,14 @@ function fmtTempRange([a, b]) {
 
 function humanizeKey(k) {
   return k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+}
+
+function incShort(v) {
+  if (v <= -80) return `${v}° retrograde polar`;
+  if (v < 0) return `${v}° retrograde`;
+  if (v >= 80) return `${v}° polar`;
+  if (v < 10) return `${v}° equatorial`;
+  return `${v}°`;
 }
 
 function incText(v) {

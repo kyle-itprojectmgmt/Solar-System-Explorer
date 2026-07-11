@@ -343,6 +343,18 @@ html, body {
 }
 .stack-btn:hover { color: var(--blue-light); }
 .stack-btn.active { background: var(--blue); color: var(--white); }
+.stack-divider {
+  height: 1px;
+  margin: 2px 6px;
+  background: rgba(217, 217, 217, 0.25);
+}
+.panel-desc {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 300;
+  color: var(--gray-light);
+  margin-top: 8px;
+}
 .stack-panel {
   position: fixed;
   right: 76px;
