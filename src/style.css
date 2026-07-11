@@ -582,6 +582,25 @@ body.presentation-mode .presentation-btn:hover { opacity: 0.9; }
   .help-cols { grid-template-columns: 1fr; }
 }
 
+/* -- Tooltips ---------------------------------------------------------------------------------------- */
+
+.sse-tooltip {
+  position: fixed;
+  background: rgba(77, 77, 77, 0.95);
+  color: var(--gray-light);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 119, 204, 0.3);
+  pointer-events: none;
+  z-index: 9999;
+  max-width: 220px;
+  line-height: 1.4;
+  display: none;
+  white-space: normal;
+}
+
 /* -- Labels ---------------------------------------------------------------------------------------- */
 
 .label-layer { position: fixed; inset: 0; pointer-events: none; }

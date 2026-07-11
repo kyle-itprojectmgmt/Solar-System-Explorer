@@ -51,6 +51,7 @@ export class UI {
     this._buildEmbedDrawer();
     this._buildLabels();
     this._bindKeys();
+    this._attachTooltips();
 
     this.cam.onModeChange = (mode, target, hint) => {
       this._updateModeHUD(mode, target, hint);
@@ -234,10 +235,6 @@ export class UI {
     this.labelToggle = toggle(togSec, 'Body labels', false, (v) => this.setLabelsVisible(v));
     this.ringToggle = toggle(togSec, 'Rings', true, (v) => this.r.setRingsVisible(v));
     this.resonanceToggle = toggle(togSec, 'Resonance lines', false, (v) => this.r.setResonanceVisible(v && this.cam.mode === 'system'));
-    this.resonanceToggle.parentElement.title =
-      'Shows the gravitational resonance between Io, Europa, and Ganymede. '
-      + 'They orbit Jupiter in a precise 1:2:4 ratio — for every orbit Ganymede completes, '
-      + 'Europa completes 2 and Io completes 4. Lines pulse when moons align.';
 
     // Voyager preset
     const presetSec = section(this.side, 'Presets');
@@ -710,6 +707,84 @@ export class UI {
     });
   }
 
+  // -- Tooltips (Group 4) -----------------------------------------------------------------------------
+
+  _attachTooltips() {
+    const t = this.tooltip = new Tooltip();
+    const q = (sel) => this.rootEl.querySelector(sel);
+    const find = (root, re) => root
+      ? [...root.querySelectorAll('button')].find((b) => re.test(b.textContent))
+      : null;
+
+    // Sound modes
+    const audioTips = {
+      silent: 'No audio — complete silence',
+      voyager: 'Procedural plasma wave sounds inspired by NASA Voyager recordings',
+      ambient: 'Generative ambient drone — evolves continuously, never repeats',
+      psychedelic: 'Slow evolving micro-tonal pads — designed for long hypnotic sessions',
+      electronic: 'Slow-pulse generative electronic — rhythmic but cosmic',
+      spotify: 'Connect your Spotify playlist — paste URL and click Load',
+      youtube: 'Connect your YouTube playlist — paste URL and click Load',
+    };
+    this.rootEl.querySelectorAll('[data-audio-mode]').forEach((b) => t.attach(b, audioTips[b.dataset.audioMode]));
+
+    // Camera modes
+    const camTips = {
+      cinematic: 'Auto-scripted cinematic pans — press any key to take control',
+      free: 'Full 6DOF flight — WASD to move, mouse to look, Shift for boost',
+      orbit: 'Orbit around a body — click any body to target it',
+      surface: 'Land on a moon surface — watch Jupiter rise and set',
+      chase: 'Follow a moon from behind — see its surface and Jupiter ahead',
+      system: 'Pull back to see the full Jupiter system with orbital paths',
+      insertion: 'Insert into a physically accurate orbit — set altitude, inclination, and geosync',
+    };
+    this.rootEl.querySelectorAll('[data-cam-mode]').forEach((b) => t.attach(b, camTips[b.dataset.camMode]));
+
+    // Time controls
+    const timeTips = [
+      'Pause simulation — freeze all orbital motion',
+      'Real time — 1 second of simulation per second',
+      '10× faster — see moons drift visibly',
+      '100× faster — moon orbits become apparent',
+      '1,000× faster — watch eclipses and resonances',
+      '10,000× faster — full orbital cycles in minutes',
+    ];
+    this.rootEl.querySelectorAll('[data-time-index]').forEach((b) => t.attach(b, timeTips[+b.dataset.timeIndex]));
+    t.attach(this.timeSlider, 'Controls simulation speed — how fast moons orbit and Jupiter rotates');
+
+    // Display checkboxes
+    t.attach(this.orbitToggle.parentElement, 'Show orbital path lines for all moons');
+    t.attach(this.labelToggle.parentElement, 'Show name labels on Jupiter and all moons');
+    t.attach(this.ringToggle.parentElement, "Show Jupiter's four-component ring system");
+    t.attach(this.resonanceToggle.parentElement,
+      'Shows the gravitational resonance between Io, Europa, and Ganymede. '
+      + 'They orbit Jupiter in a precise 1:2:4 ratio — for every orbit Ganymede '
+      + 'completes, Europa completes 2 and Io completes 4. Lines pulse when moons align.');
+
+    // Mission Control sliders
+    t.attach(this.mcAltSlider, 'Camera altitude above the surface — drag to fly closer or further');
+    t.attach(this.mcIncSlider, 'Orbital tilt — 0° equatorial, 90° polar, negative values = retrograde orbit');
+    t.attach(this.orbSec.querySelector('input.slider'), 'How fast the camera orbits the target — independent of simulation time');
+    t.attach(this.chaseSec.querySelector('input.slider'), 'Camera height above the chased moon — from surface-skim to wide overview');
+
+    // Orbit Insertion panel
+    const lockRow = [...this.insPanel.querySelectorAll('.toggle-row')]
+      .find((r) => /geosync/i.test(r.textContent));
+    t.attach(lockRow, 'Lock camera to body rotation — clouds appear stationary below');
+    t.attach(find(this.insPanel, /GeoSync/), "Jump to geosynchronous orbit — 160,000 km above Jupiter's clouds");
+    for (const b of this.insNavBtns) t.attach(b, "Navigate to the Great Red Spot — Jupiter's ancient storm");
+
+    // Corner / footer buttons
+    t.attach(q('[title="Screenshot"]'), 'Capture a clean screenshot — hides UI, saves image, restores UI');
+    t.attach(this.presBtn, 'Hide all UI for TV or big-screen display — press P again to restore');
+    t.attach(this.fsBtn, 'Enter fullscreen — press F11 or Escape to exit');
+    t.attach(q('.kofi-btn'), 'Enjoyed exploring the cosmos? Support this project');
+    t.attach(q('.help-btn'), 'Show keyboard shortcuts and control reference');
+
+    // Presets
+    t.attach(find(this.side, /Voyager/), 'Recreate the Voyager 1 flyby of Jupiter — March 5, 1979');
+  }
+
   // -- Per-frame update ------------------------------------------------------------------------------
 
   update(dt) {
@@ -827,6 +902,57 @@ export class UI {
     }
   }
 
+}
+
+// -- Tooltip system (Group 4) -----------------------------------------------------
+// One shared floating element; hover 500 ms on desktop, long-press on touch.
+// Appended to <body> (outside #ui-root) and styled by .sse-tooltip.
+
+class Tooltip {
+  constructor() {
+    this.el = document.createElement('div');
+    this.el.className = 'sse-tooltip';
+    document.body.appendChild(this.el);
+  }
+
+  attach(element, text) {
+    if (!element || !text) return;
+    element.removeAttribute?.('title'); // no double tooltip from native title
+    let timer;
+    element.addEventListener('mouseenter', (e) => {
+      timer = setTimeout(() => {
+        this.el.textContent = text;
+        this.el.style.display = 'block';
+        this._pos(e.clientX, e.clientY);
+      }, 500);
+    });
+    element.addEventListener('mousemove', (e) => this._pos(e.clientX, e.clientY));
+    element.addEventListener('mouseleave', () => {
+      clearTimeout(timer);
+      this.el.style.display = 'none';
+    });
+    // Mobile long-press: anchored to the element (no cursor to follow).
+    let touchTimer;
+    element.addEventListener('touchstart', () => {
+      touchTimer = setTimeout(() => {
+        this.el.textContent = text;
+        this.el.style.display = 'block';
+        const r = element.getBoundingClientRect();
+        this._pos(r.left, r.top - 8);
+      }, 600);
+    }, { passive: true });
+    element.addEventListener('touchend', () => {
+      clearTimeout(touchTimer);
+      setTimeout(() => { this.el.style.display = 'none'; }, 1500);
+    });
+  }
+
+  _pos(cx, cy) {
+    const x = Math.min(cx + 12, window.innerWidth - 240);
+    const y = Math.max(cy - 36, 8);
+    this.el.style.left = `${x}px`;
+    this.el.style.top = `${y}px`;
+  }
 }
 
 // -- Brand icons (inline SVG — no external image loads, works offline) -----------
