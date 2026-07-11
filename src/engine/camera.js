@@ -848,14 +848,22 @@ export class CameraController {
     const center = entry.group.getWorldPosition(new THREE.Vector3());
     const pos = center.clone().add(local);
 
-    // Nadir-referenced orientation: up = radial out, forward = along-track,
-    // then the user's look-around yaw/pitch (default pitch looks down at the
-    // surface ahead — nadir plus horizon).
+    // Nadir-referenced orientation: look-around yaw spins about the radial,
+    // pitch about the local right axis (default pitch looks down at the
+    // surface ahead). Screen-up is the ORBIT-PLANE NORMAL, not the radial:
+    // with the radial as the lookAt up, a near-nadir view's screen-up
+    // collapses onto the travel direction (which lies in the orbit plane),
+    // rolling the planet sideways — cloud bands rendered vertically at
+    // every entry phase (measured: spin axis at 90° on screen). The orbit
+    // normal is constant along the orbit, so the view is also roll-free
+    // around a full revolution.
     const up = local.clone().normalize();
+    const north = new THREE.Vector3(0, 1, 0).applyAxisAngle(nodeAxis, inc)
+      .applyQuaternion(this.r.root.quaternion);
     const fwd = tangent.clone().applyAxisAngle(up, ins.yaw);
     const right = fwd.clone().cross(up).normalize();
     fwd.applyAxisAngle(right, ins.pitch);
-    const m = new THREE.Matrix4().lookAt(pos, pos.clone().add(fwd), up);
+    const m = new THREE.Matrix4().lookAt(pos, pos.clone().add(fwd), north);
     return { pos, quat: new THREE.Quaternion().setFromRotationMatrix(m) };
   }
 

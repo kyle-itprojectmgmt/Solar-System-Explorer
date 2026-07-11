@@ -575,6 +575,15 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
   centered) and far entries arrive at a framing distance (3.7 radii,
   ~264,500 km for Jupiter — planet fills ~half the view); in-range
   altitudes still preserved. tests/lookdir.mjs (13 checks).
+- Hotfix 4 (bands vertical on fresh entry): measured first — the entry
+  phase exactly equals the camera bearing (a ±π/2 shift would have
+  moved the camera, not fixed the roll). The spin axis projected at 90°
+  on screen because the lookAt up was the RADIAL: near-nadir views
+  degenerate screen-up onto the travel tangent (in-plane), rolling the
+  planet a quarter turn at every phase. Screen-up is now the
+  orbit-plane normal — bands horizontal at all phases and the view is
+  roll-free around a full revolution. Axis angle measured 90°→0°;
+  entry bearing preserved. tests/bands.mjs.
 
 ---
 
