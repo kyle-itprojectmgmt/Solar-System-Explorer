@@ -584,6 +584,19 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
   orbit-plane normal — bands horizontal at all phases and the view is
   roll-free around a full revolution. Axis angle measured 90°→0°;
   entry bearing preserved. tests/bands.mjs.
+- Hotfix 5 (measurement session): full geometry table (11 inclinations
+  × 4 phases) shows latitude = sin(phase)·sin(inc) exactly for BOTH
+  signs, constant radius, and left/right drags numerically identical —
+  the reported positive-inclination "oval" does not exist in the
+  current build. Only artifact: a 2.4% radius dip from per-step blend
+  restarts — small INC deltas (≤3°) now move directly. Ring floor
+  added: config-driven minInsertionAltKm (Jupiter 160,000 km, above
+  the gossamer edge) clamps free insertion orbits, ALT slider, and
+  pinch zoom, with a one-shot HUD note. Documented exemptions: the
+  GeoSync lock (physical geosync altitude 88,508 km sits inside the
+  gossamer span; unlocking lifts above the rings) and the GRS close
+  pass (now always routed through orbit mode). tests/incmeasure.mjs +
+  tests/ringfloor.mjs.
 
 ---
 

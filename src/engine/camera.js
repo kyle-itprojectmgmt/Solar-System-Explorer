@@ -492,16 +492,9 @@ export class CameraController {
     );
     const dir = local.applyQuaternion(entry.mesh.getWorldQuaternion(this._q)).normalize();
 
-    if (this.mode === 'insertion' && this.ins.body === name) {
-      // Already orbiting this body in insertion mode: park the orbital phase
-      // over the feature's longitude at the preset altitude.
-      const rl = dir.clone().applyQuaternion(this.r.root.quaternion.clone().invert());
-      this.ins.phase = Math.atan2(-rl.z, rl.x);
-      if (this.ins.locked) this.ins.lockOffset = this.ins.phase - this._bodyRotationAngle(name);
-      this.setInsertion({ altitudeKm: preset.altitudeKm });
-      this._startTransition();
-      return;
-    }
+    // Feature close-passes always use ORBIT mode: its detail floors permit
+    // the low altitudes these need (e.g. GRS at 20,000 km), whereas free
+    // insertion orbits are floored above the ring system.
     if (this.mode !== 'orbit' || this.target !== name) this.setMode('orbit', name);
     this.orbTheta = Math.atan2(dir.z, dir.x);
     this.orbPhi = Math.acos(THREE.MathUtils.clamp(dir.y, -1, 1));
@@ -725,8 +718,14 @@ export class CameraController {
   _minInsertionAltKm(name) {
     const entry = this.r.bodyMeshes.get(name);
     if (!entry) return 10;
-    return entry.cfg?.detailFloor?.hardKm
+    const detailKm = entry.cfg?.detailFloor?.hardKm
       ?? (entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5);
+    // Ring-system floor (config-driven): free insertion orbits stay above
+    // the rings. The geosync lock is exempt — Jupiter's geosynchronous
+    // radius (160,000 km from center = 88,508 km altitude) is a physical
+    // constant that sits inside the gossamer span.
+    const ringKm = this.ins.locked ? 0 : (entry.cfg?.minInsertionAltKm ?? 0);
+    return Math.max(detailKm, ringKm);
   }
 
   _bodyRotationRateRadS(name) {
@@ -751,13 +750,12 @@ export class CameraController {
   /** Update insertion parameters from the UI (body/altitude/inclination/lock). */
   setInsertion(params) {
     const wasLocked = this.ins.locked;
-    // Plane change: blend the camera smoothly onto the newly tilted path.
-    // (The node is FIXED — anchoring it at the camera's position made the
-    // tangent, and with it the whole nadir view, roll about the view axis
-    // while dragging: the scene appeared to rotate. Bodies never move;
-    // only the camera glides to its new orbital plane.)
+    // Plane change: large jumps blend smoothly; small slider steps move
+    // directly. (Restarting the 0.8 s blend on every 1° drag step made the
+    // camera lag and cut chords — measured 2.4% radius dip, the only
+    // oval-shaped artifact in the drag data.)
     if (params.incDeg !== undefined && params.incDeg !== this.ins.incDeg) {
-      this._startTransition();
+      if (Math.abs(params.incDeg - this.ins.incDeg) > 3) this._startTransition();
     }
     Object.assign(this.ins, params);
     if (params.body) { this.target = params.body; this.lastTarget = params.body; }

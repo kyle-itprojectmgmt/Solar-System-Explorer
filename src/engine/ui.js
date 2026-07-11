@@ -856,6 +856,16 @@ export class UI {
         this.mcIncLabel.textContent = incShort(ins.incDeg);
       }
       lockToggle.checked = ins.locked;
+      // Ring floor note (one-shot): free orbits are held above the rings.
+      const ringMin = this._bodyCfg(ins.body)?.minInsertionAltKm;
+      if (ringMin && !ins.locked && ins.altitudeKm <= ringMin + 1) {
+        if (!this._ringNoteShown) {
+          this._ringNoteShown = true;
+          this.notify('Minimum safe altitude — above the ring system');
+        }
+      } else if (!ringMin || ins.altitudeKm > ringMin * 1.2) {
+        this._ringNoteShown = false;
+      }
       this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
       this.insNavBtns.forEach((b) => {
         b.style.display = ins.body === this.system.primary.name ? '' : 'none';

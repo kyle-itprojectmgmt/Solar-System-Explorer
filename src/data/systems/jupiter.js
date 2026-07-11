@@ -39,6 +39,10 @@ export default {
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
     normalScale: 2.0,   // cloud band depth (drives procedural relief lighting)
     detailFloor: { softKm: 3000, hardKm: 1500 }, // zoom resistance / hard stop
+    // Free insertion orbits stay above the gossamer ring outer edge
+    // (226,000 km from center − 71,492 km radius = 154,508 km; rounded up).
+    // The geosync lock is exempt (geosync altitude is 88,508 km).
+    minInsertionAltKm: 160000,
     atmosphere: {
       limbEdge: 0xc8824a,     // warm orange-tan at the very limb
       limbMid: 0xe8d4a0,      // pale yellow-white mid falloff

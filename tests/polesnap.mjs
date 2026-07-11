@@ -54,12 +54,13 @@ const r = await page.evaluate(() => {
   out.aMoveUnits = +cameraCtl.camera.position.distanceTo(beforeA).toFixed(1);
   out.aNotPole = Math.abs(out.aLatAfter) < 45;
 
-  // Scenario B: orbit mode -> I. Camera stays approximately put.
+  // Scenario B: orbit mode (above the ring floor) -> I. Camera stays
+  // approximately put within the legal altitude band.
   cameraCtl.setInsertion({ incDeg: 0 });
   cameraCtl.setMode('orbit', 'Jupiter');
   cameraCtl.orbSpeedMult = 0;
   cameraCtl.orbTheta = 2.2; cameraCtl.orbPhi = 1.3;
-  cameraCtl.orbDist = renderer.bodyRadius('Jupiter') * 2.2;
+  cameraCtl.orbDist = renderer.bodyRadius('Jupiter') * 3.5; // ~178,700 km alt
   settle();
   const beforeB = cameraCtl.camera.position.clone();
   cameraCtl.setMode('insertion', 'Jupiter');
@@ -67,8 +68,25 @@ const r = await page.evaluate(() => {
   out.bMoveUnits = +cameraCtl.camera.position.distanceTo(beforeB).toFixed(1);
   // Geometric floor: at inc 0 the insertion orbit is equatorial, so the
   // camera must descend from orbPhi 1.3 rad (~15° latitude) to the plane:
-  // orbDist·sin(15°) ≈ 42u. "Approximately put" = within ~1.3x of that.
-  out.bStays = out.bMoveUnits < renderer.bodyRadius('Jupiter') * 2.2 * Math.cos(1.3) * 1.35;
+  // orbDist·cos(1.3) ≈ 67u. "Approximately put" = within ~1.35x of that.
+  out.bStays = out.bMoveUnits < renderer.bodyRadius('Jupiter') * 3.5 * Math.cos(1.3) * 1.35;
+
+  // Scenario B2: orbit camera INSIDE the ring span -> entry lifts to the
+  // 160,000 km ring floor (deliberate, V4d follow-up Fix B).
+  cameraCtl.setMode('orbit', 'Jupiter');
+  cameraCtl.orbDist = renderer.bodyRadius('Jupiter') * 2.2; // ~85,750 km alt
+  settle();
+  cameraCtl.setMode('insertion', 'Jupiter');
+  out.b2Alt = Math.round(cameraCtl.ins.altitudeKm);
+  out.b2Lifted = out.b2Alt === 160000;
+  out.dbg = {
+    phase: +cameraCtl.ins.phase.toFixed(3),
+    node: +cameraCtl.ins.nodePhase.toFixed(3),
+    relSin: +Math.sin(cameraCtl.ins.phase - cameraCtl.ins.nodePhase).toFixed(3),
+    incDeg: cameraCtl.ins.incDeg,
+    timeIndex: physics.timeIndex,
+  };
+  settle(); // finish the entry transition before scenario C samples state
 
   // Scenario C: in insertion at 0°, drag INC to 7° via the panel slider.
   const phase0 = cameraCtl.ins.phase;
@@ -94,9 +112,11 @@ const r = await page.evaluate(() => {
   return out;
 });
 
+console.log('B2 dbg:', JSON.stringify(r.dbg));
 check('A: enter insertion with stored 90° — no pole snap', r.aNotPole,
   `lat ${r.aLatBefore} -> ${r.aLatAfter}, moved ${r.aMoveUnits}u`);
 check('B: orbit -> I stays approximately put', r.bStays, `${r.bMoveUnits}u`);
+check('B2: entry from inside ring span lifts to 160,000 km floor', r.b2Lifted, r.b2Alt);
 check('C: INC drag 0->7 preserves phase', r.cPhasePreserved);
 check('C: 7° drag tilts ~7°, small move', Math.abs(r.cLatDelta) < 10 && r.cSmallMove, `dLat ${r.cLatDelta}`);
 check('D: back to 0° returns near original', r.dBack, `${r.dReturn}u`);
