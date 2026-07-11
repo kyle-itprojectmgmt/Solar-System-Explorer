@@ -182,8 +182,10 @@ export class UI {
     this.mcAltSlider.oninput = () => {
       const km = this._altKm(+this.mcAltSlider.value);
       this.mcAltReadout.textContent = `ALT: ${Math.round(km).toLocaleString()} km`;
+      // Direct set, not flyToAltitude: restarting its 1.5 s tween on every
+      // input event stalls the camera until release ("catches up" bug #11).
       if (this.cam.mode === 'insertion') this.cam.setInsertion({ altitudeKm: km });
-      else this.cam.flyToAltitude(km);
+      else this.cam.setAltitudeDirect(km);
     };
     this.altSec.style.display = 'none';
 
@@ -204,7 +206,7 @@ export class UI {
     const orbLabel = el('div', 'ins-label', this.orbSec);
     const orbSlider = el('input', 'slider', this.orbSec);
     Object.assign(orbSlider, { type: 'range', min: 0, max: 4, step: 0.05, value: this.cam.orbSpeedMult });
-    const syncOrb = () => { orbLabel.textContent = `Orbital Speed: ${this.cam.orbSpeedMult.toFixed(2)}×`; };
+    const syncOrb = () => { orbLabel.textContent = `Camera Speed: ${this.cam.orbSpeedMult.toFixed(2)}×`; };
     orbSlider.oninput = () => { this.cam.orbSpeedMult = +orbSlider.value; syncOrb(); };
     syncOrb();
     this.orbSec.style.display = 'none';

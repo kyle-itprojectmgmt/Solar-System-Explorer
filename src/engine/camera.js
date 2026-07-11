@@ -345,6 +345,17 @@ export class CameraController {
     }
   }
 
+  /** Set orbit-camera altitude immediately — for live slider drags, where
+   *  restarting a tween on every input event would stall until release. */
+  setAltitudeDirect(km) {
+    const target = this.target || this.lastTarget || this.r.system.primary.name;
+    if (this.mode !== 'orbit' || this.target !== target) this.setMode('orbit', target);
+    const entry = this.r.bodyMeshes.get(target);
+    if (!entry) return;
+    this.distTween = null;
+    this.orbDist = Math.max(this._floorDist(target), entry.radiusUnits + km / 1000);
+  }
+
   /** Animate orbit distance to a preset altitude (km) over 1.5 s. */
   flyToAltitude(km) {
     const target = this.target || this.lastTarget || this.r.system.primary.name;
