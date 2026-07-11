@@ -143,6 +143,7 @@ export class SceneRenderer {
 
     const flareLight = new THREE.PointLight(star.color, 0, 0);
     flareLight.position.copy(this.sunAnchor.position);
+    this.flareLight = flareLight; // repositioned when the ephemeris moves the sun
     this.root.add(flareLight);
     const lensflare = new Lensflare();
     lensflare.addElement(new LensflareElement(flareTex, 220, 0));
@@ -505,6 +506,8 @@ export class SceneRenderer {
     const aspect = window.innerWidth / window.innerHeight;
     if (Math.abs(this.camera.aspect - aspect) > 0.001) this.onResize();
 
+    this._syncSunDirection(physics);
+
     const p = this.system.primary;
     this.primaryMesh.rotation.y = physics.primaryRotation;
     this._updateDetailShaders(physics);
@@ -611,6 +614,24 @@ export class SceneRenderer {
           ? 0.65 + 0.3 * Math.sin(elapsed * 6.0) // conjunction pulse
           : 0.25;
       });
+    }
+  }
+
+  /** Ephemeris (V5): follow physics.sunDir when the date moves the sun —
+   *  light, sun sprite, lens flare and the ring-shadow uniforms all track. */
+  _syncSunDirection(physics) {
+    const d = physics.sunDir;
+    if (Math.abs(d.x - this.sunDir.x) < 1e-5
+      && Math.abs(d.y - this.sunDir.y) < 1e-5
+      && Math.abs(d.z - this.sunDir.z) < 1e-5) return;
+    this.sunDir.set(d.x, d.y, d.z);
+    this.sunLight.position.copy(this.sunDir).multiplyScalar(1000);
+    const sunDist = this.system.star.distanceAU * AU_KM * K;
+    this.sunAnchor.position.copy(this.sunDir).multiplyScalar(sunDist);
+    this.flareLight.position.copy(this.sunAnchor.position);
+    const sunWorld = this.sunDir.clone().applyQuaternion(this.root.quaternion);
+    for (const mesh of this.ringMeshes) {
+      mesh.material.uniforms.uSunW?.value.copy(sunWorld);
     }
   }
 

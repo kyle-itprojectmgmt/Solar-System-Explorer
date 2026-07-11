@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { G } from '../config.js';
+import { sunDirectionAt } from './ephemeris.js';
 
 export const TIME_STEPS = [0, 1, 10, 100, 1000, 10000];
 
@@ -92,6 +93,13 @@ export class PhysicsEngine {
    * time; the n-body integration (and the Laplace resonance) resumes from
    * there.
    */
+  /** Ephemeris (V5): keep the sun direction physically correct for the
+   *  current simulation date. The renderer mirrors this each frame. */
+  updateSunDirection() {
+    const d = sunDirectionAt(this.system, this.simSeconds);
+    this.sunDir.x = d.x; this.sunDir.y = d.y; this.sunDir.z = d.z;
+  }
+
   jumpToSimSeconds(s) {
     this.simSeconds = s;
     const TWO_PI = Math.PI * 2;
@@ -102,6 +110,7 @@ export class PhysicsEngine {
       b.pos.x = b.a * Math.cos(ang); b.pos.y = 0; b.pos.z = -b.a * Math.sin(ang);
       b.vel.x = -v * Math.sin(ang); b.vel.y = 0; b.vel.z = -v * Math.cos(ang);
     }
+    this.updateSunDirection();
     this._computeAccelerations();
     this._updateShadows();
   }
@@ -113,6 +122,7 @@ export class PhysicsEngine {
 
     this.simSeconds += simDt;
     this.primaryRotation = (this.primaryRotation + this.rotationRate * simDt) % TWO_PI;
+    this.updateSunDirection();
 
     // Verlet integration for n-body moons, adaptive substep count so the
     // step never exceeds ~1/60 of the fastest n-body orbit.
