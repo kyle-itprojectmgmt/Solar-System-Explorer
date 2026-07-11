@@ -22,3 +22,6 @@ export const AU_KM = 149597870.7;
 
 // Ko-fi handle for the donate button.
 export const KOFI_URL = 'https://ko-fi.com/YOUR_HANDLE';
+if (import.meta.env.DEV && KOFI_URL.includes('YOUR_HANDLE')) {
+  console.warn('Ko-fi handle not set — update KOFI_URL in config.js');
+}
