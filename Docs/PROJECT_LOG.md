@@ -521,6 +521,32 @@ right edge, persistent bottom tray).
 - Stubs noted for future: Sun corona visuals (backlog), system-wide
   labels and velocity vector toggles are placeholders with toasts.
 
+### v4d — UI Polish + Orbital Mechanics (Complete — 2026-07-11, commits 6916955 → 3abbf9b + docs)
+Per Docs/V4d_PROMPT.md. Version 4.2.1.
+
+- Item 1 (6916955): inclination mechanics investigated before applying
+  the prescribed fix — the existing fixed-axis tilt already produced
+  correct inclined great circles (measured: ±45° latitude sweep at 45°,
+  -89.7°..+90° at 90° = true polar over both poles; Jupiter's screen
+  offset constant at every inclination — the 15° forward-tilt default).
+  The prescribed rotation about (sin φ, 0, -cos φ) is the instantaneous
+  tangent axis and would have produced constant-latitude circles with
+  the camera hovering over one pole at 90°, so it was not applied
+  literally. The real defect was the plane-change lurch: the camera
+  snapped onto the new circle unless it sat at a node. Now the camera's
+  current bearing becomes the line of nodes when tilting away from
+  equatorial (physical plane-change behavior, tilt axis = radial at
+  ins.nodePhase) with a transition blend — measured position jump at a
+  0→60° change: exactly 0 units.
+- Item 2 (c4f6a76): stack emoji replaced with Montserrat text labels
+  CAM / TIME / NAV / SAVE / VIEW / HELP; tooltips updated.
+- Items 3–5 (3abbf9b): ALT / INC / SPD as peer stack buttons below a
+  divider, each a focused single-control panel; "Camera Speed" renamed
+  "Orbit Speed" throughout; Surface mode hidden from UI (S key inert,
+  camera.js implementation intact for V5). Chase Height remains
+  contextual in the CAM panel (its new home was unspecified).
+- Verified: 13-check v4d suite + 22-check regression, zero errors.
+
 ---
 
 ## Known Bugs / In Progress
@@ -545,6 +571,12 @@ right edge, persistent bottom tray).
 | 16 | No free look while orbiting (hold Alt / two-finger drag) | Resolved v4c | V4c_PROMPT.md |
 | 17 | UI layout — controls scattered, time display too prominent, no single home | Resolved v4c (three-zone redesign) | V4c_PROMPT.md |
 | 18 | Ring depth sort — lit ring band crossed Jupiter's dark side (real cause: ring material not eclipsed inside the planet's shadow cylinder; depth flags were already correct) | Resolved v4c | V4c_PROMPT.md |
+| 19 | Surface mode not release-ready (needs realistic starfield + ground rendering) — hidden from UI, implementation kept for V5 | Resolved v4d | V4d_PROMPT.md |
+| 21 | Right-edge stack emoji icons look generic/inconsistent across platforms | Resolved v4d (text labels) | V4d_PROMPT.md |
+| 22 | Altitude/Inclination/Speed sliders buried inside the CAM panel | Resolved v4d (ALT/INC/SPD peer buttons) | V4d_PROMPT.md |
+| 23 | "Camera Speed" naming unclear | Resolved v4d (renamed Orbit Speed) | V4d_PROMPT.md |
+| 24 | Inclination plane change lurched the camera (planet appeared to shift sideways) | Resolved v4d (line-of-nodes anchored at current bearing) | V4d_PROMPT.md |
+| 25 | Polar orbit at 90° reported as not working — could not be reproduced; measured -89.7°..+90° latitude sweep both before and after the v4d change (verify on hardware) | Resolved v4d (verified) | V4d_PROMPT.md |
 
 ---
 

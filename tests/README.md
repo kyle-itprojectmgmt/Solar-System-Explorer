@@ -55,3 +55,7 @@ node tests/tray.mjs       # bottom tray + audio flyout (17 checks)
 node tests/datepicker.mjs # ghost clock, calendar jump, LIVE mode
 node tests/stack.mjs      # icon stack: 6 panels, presets, ?view= URL sharing (23 checks)
 node tests/toast.mjs      # event toasts + Watch navigation
+
+# v4d additions:
+node tests/incline.mjs    # inclination mechanics: latitude sweeps, centering, plane-change continuity
+node tests/v4d.mjs        # text labels, ALT/INC/SPD panels, Surface hidden (13 checks)
