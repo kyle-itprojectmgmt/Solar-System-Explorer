@@ -577,6 +577,7 @@ Per Docs/V4d_PROMPT.md. Version 4.2.1.
 | 23 | "Camera Speed" naming unclear | Resolved v4d (renamed Orbit Speed) | V4d_PROMPT.md |
 | 24 | Inclination plane change lurched the camera (planet appeared to shift sideways) | Resolved v4d (line-of-nodes anchored at current bearing) | V4d_PROMPT.md |
 | 25 | Polar orbit at 90° reported as not working — could not be reproduced; measured -89.7°..+90° latitude sweep both before and after the v4d change (verify on hardware) | Resolved v4d (verified) | V4d_PROMPT.md |
+| 26 | Replace Ko-fi with Stripe for donations — create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Optionally keep free Ko-fi page as secondary community presence with Saturn funding goal. | Fix before launch | — |
 
 ---
 
@@ -642,6 +643,9 @@ generative audio have no equivalent in NASA Eyes.
 | 9 | VR support | WebXR for headset exploration |
 | 10 | Resonance visualizer | Enhanced — already implemented basic version in v4b |
 | 11 | Io volcanic event notifications | Random eruption alerts when near Io |
+| 12 | ESO photographic starfield cubemap | Replace current procedural random starfield with ESO public domain panoramic photograph mapped as skybox cubemap. Stars in correct positions, Milky Way photographically accurate, Southern Cross visible only when looking south. 30-minute swap. Add alongside Earth system (V5) where realistic starfield matters most for surface viewing. |
+| 13 | Re-enable Surface camera mode | Surface mode hidden in v4d — re-enable with V5 when realistic starfield (cubemap), HYG bright star catalog overlay, constellation lines, and proper ground-level rendering are in place. |
+| 14 | HYG bright star catalog overlay | 9,000 brightest stars (magnitude < 6.5) from HYG database as colored point sprites. Correct positions, spectral colors (O-class blue-white through M-class deep red), correct brightness. Named stars get labels when body labels enabled. Constellation line toggle. Add with V5 Earth system. |
 
 ---
 
