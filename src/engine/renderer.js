@@ -333,11 +333,18 @@ export class SceneRenderer {
         mat.emissive = new THREE.Color(0x0e2a3e);
         mat.emissiveIntensity = 0.35;
       }
-      if (cfg.features?.magnetosphereGlow) {
+      // Directional atmospheric limb glow (v4b, bug #13): thin exospheres
+      // respond to the sun direction — lit side only, feathered, no ring.
+      // Same scattering shader as Jupiter's limb, much thinner and fainter.
+      if (cfg.atmosphereLimb) {
+        const al = cfg.atmosphereLimb;
         const shell = new THREE.Mesh(
-          new THREE.SphereGeometry(r * 1.06, 48, 32),
-          makeAtmosphereMaterial(new THREE.Color(0x5588cc), 0.3)
+          new THREE.SphereGeometry(r * (1 + (al.thickness ?? 0.02)), 48, 32),
+          makeLimbScatterMaterial({
+            limbEdge: al.color, limbMid: al.color, intensity: al.intensity ?? 0.3,
+          })
         );
+        shell.material.userData.worldUniforms = true;
         group.add(shell);
       }
       if (cfg.features?.volcanicPlumes && cfg.features.volcanoes) {
@@ -349,16 +356,6 @@ export class SceneRenderer {
           mesh.add(plume.hotspot);
           entry.plumes.push(plume);
         }
-      }
-      if (cfg.features?.thinAtmosphere) {
-        const ta = cfg.features.thinAtmosphere;
-        const haze = new THREE.Mesh(
-          new THREE.SphereGeometry(r * 1.035, 48, 32),
-          makeAtmosphereMaterial(new THREE.Color(ta.color), 0)
-        );
-        group.add(haze);
-        entry.haze = haze;
-        entry.hazeIntensity = ta.intensity;
       }
       // Named surface features: billboard labels riding the rotating mesh,
       // faded in below ~500 km altitude.
@@ -529,22 +526,14 @@ export class SceneRenderer {
 
       for (const plume of entry.plumes) plume.update(dt, elapsed);
 
-      // Altitude-driven detail: surface feature labels (<~500 km) and thin
-      // atmospheric haze (<~1000 km).
-      if (entry.featureSprites || entry.haze) {
+      // Altitude-driven detail: surface feature labels (<~500 km).
+      if (entry.featureSprites) {
         const altKm = (entry.group.getWorldPosition(this._tmpV ??= new THREE.Vector3())
           .distanceTo(this.camera.position) - entry.radiusUnits) * KM_PER_UNIT;
-        if (entry.featureSprites) {
-          const op = THREE.MathUtils.clamp((800 - altKm) / 300, 0, 1);
-          for (const s of entry.featureSprites) {
-            s.material.opacity = op;
-            s.visible = op > 0.02;
-          }
-        }
-        if (entry.haze) {
-          const h = THREE.MathUtils.clamp((1500 - altKm) / 500, 0, 1);
-          entry.haze.material.uniforms.uIntensity.value = h * entry.hazeIntensity;
-          entry.haze.visible = h > 0.01;
+        const op = THREE.MathUtils.clamp((800 - altKm) / 300, 0, 1);
+        for (const s of entry.featureSprites) {
+          s.material.opacity = op;
+          s.visible = op > 0.02;
         }
       }
     }
@@ -566,11 +555,16 @@ export class SceneRenderer {
       u.uSunDir.value.copy(this.sunDir).applyQuaternion(this.root.quaternion);
     }
     for (const [, entry] of this.bodyMeshes) {
-      // moon atmosphere-style shells need camera in their local frame
       for (const child of entry.group?.children || []) {
-        if (child.material?.uniforms?.uCamPos) {
-          child.material.uniforms.uCamPos.value.copy(entry.group.worldToLocal(this.camera.position.clone()));
-          child.material.uniforms.uSunDir.value.copy(this.sunDir);
+        const u = child.material?.uniforms;
+        if (!u?.uCamPos) continue;
+        if (child.material.userData.worldUniforms) {
+          // Limb-scatter shells: varyings come from modelMatrix (world).
+          u.uCamPos.value.copy(this.camera.position);
+          u.uSunDir.value.copy(this.sunDir).applyQuaternion(this.root.quaternion);
+        } else {
+          u.uCamPos.value.copy(entry.group.worldToLocal(this.camera.position.clone()));
+          u.uSunDir.value.copy(this.sunDir);
         }
       }
     }
@@ -624,42 +618,6 @@ export class SceneRenderer {
 // ---------------------------------------------------------------------------
 // Materials & helpers
 // ---------------------------------------------------------------------------
-
-function makeAtmosphereMaterial(color, intensity) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uColor: { value: color },
-      uIntensity: { value: intensity },
-      uCamPos: { value: new THREE.Vector3() },
-      uSunDir: { value: new THREE.Vector3(1, 0, 0) },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vNormal;
-      varying vec3 vPos;
-      void main() {
-        vNormal = normalize(normalMatrix * normal);
-        vPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uColor;
-      uniform float uIntensity;
-      varying vec3 vNormal;
-      varying vec3 vPos;
-      void main() {
-        vec3 viewDir = normalize(-vPos);
-        float rim = 1.0 - abs(dot(viewDir, normalize(vNormal)));
-        float glow = pow(rim, 4.5) * uIntensity * 0.8;
-        gl_FragColor = vec4(uColor, glow);
-      }
-    `,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    side: THREE.BackSide,
-    depthWrite: false,
-  });
-}
 
 /**
  * Atmospheric limb scattering (4b): a thin, feathered haze at the very edge
