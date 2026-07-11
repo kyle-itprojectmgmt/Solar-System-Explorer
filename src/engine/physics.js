@@ -12,6 +12,23 @@ import { G } from '../config.js';
 
 export const TIME_STEPS = [0, 1, 10, 100, 1000, 10000];
 
+// -- Date <-> simulation-seconds utility --------------------------------------
+// ALL conversions between calendar dates and simSeconds (presets, the date
+// picker, HUD display, URL sharing) must go through these two functions, so
+// presets stored as ISO 8601 UTC strings stay valid even if engine internals
+// change. The epoch is NOT hardcoded — it comes from the active system config
+// (system.epoch, e.g. Voyager 1 flyby '1979-03-05T12:00:00Z'; note: noon
+// UTC, so a hardcoded midnight constant would put every date 12 h off) via
+// physics.epochMs, keeping the utility valid for any future system.
+
+export function dateToSimSeconds(isoString, epochMs) {
+  return (new Date(isoString).getTime() - epochMs) / 1000;
+}
+
+export function simSecondsToDate(simSeconds, epochMs) {
+  return new Date(epochMs + simSeconds * 1000).toISOString();
+}
+
 const TWO_PI = Math.PI * 2;
 
 export class PhysicsEngine {
@@ -66,6 +83,28 @@ export class PhysicsEngine {
   togglePause() { this.setTimeIndex(this.paused ? this.pausedIndex : 0); }
 
   get simDate() { return new Date(this.epochMs + this.simSeconds * 1000); }
+
+  /**
+   * Jump the simulation to an arbitrary moment (date picker / presets /
+   * LIVE mode). N-body moons integrate numerically, so a bare simSeconds
+   * write cannot move them across years — positions and velocities are
+   * re-initialized analytically from their circular elements at the target
+   * time; the n-body integration (and the Laplace resonance) resumes from
+   * there.
+   */
+  jumpToSimSeconds(s) {
+    this.simSeconds = s;
+    const TWO_PI = Math.PI * 2;
+    this.primaryRotation = ((this.rotationRate * s) % TWO_PI + TWO_PI) % TWO_PI;
+    for (const b of this.bodies) {
+      const ang = b.phase + TWO_PI * (s / b.period);
+      const v = TWO_PI * b.a / b.period;
+      b.pos.x = b.a * Math.cos(ang); b.pos.y = 0; b.pos.z = -b.a * Math.sin(ang);
+      b.vel.x = -v * Math.sin(ang); b.vel.y = 0; b.vel.z = -v * Math.cos(ang);
+    }
+    this._computeAccelerations();
+    this._updateShadows();
+  }
 
   /** Advance the simulation by realDt seconds of wall-clock time. */
   update(realDt) {
