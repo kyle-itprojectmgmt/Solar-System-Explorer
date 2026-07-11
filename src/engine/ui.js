@@ -291,6 +291,19 @@ export class UI {
     geoBtn.textContent = `🛰 ${this.system.primary.name} GeoSync`;
     geoBtn.onclick = () => this.cam.presetGeoSync();
 
+    // Feature navigation presets (config-driven) — shown when the primary
+    // is the insertion body.
+    this.insNavBtns = (this.system.primary.navPresets || []).map((preset) => {
+      const b = el('button', 'btn btn-primary', p);
+      b.style.width = '100%';
+      b.textContent = preset.label;
+      b.onclick = () => {
+        this.cam.flyToFeature(this.system.primary.name, preset);
+        if (preset.message) this.notify(preset.message);
+      };
+      return b;
+    });
+
     this.insInfo = el('div', 'ins-info', p);
 
     // Keep controls in sync when scroll-zoom or presets change parameters.
@@ -305,6 +318,9 @@ export class UI {
       }
       lockToggle.checked = ins.locked;
       this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
+      this.insNavBtns.forEach((b) => {
+        b.style.display = ins.body === this.system.primary.name ? '' : 'none';
+      });
     };
   }
 
@@ -356,6 +372,15 @@ export class UI {
       el('p', 'info-fact', this.info).textContent = f;
     }
     const row = el('div', 'info-actions', this.info);
+    for (const preset of cfg.navPresets || []) {
+      const nb = el('button', 'btn btn-primary', row);
+      nb.textContent = preset.label;
+      nb.onclick = () => {
+        this.cam.flyToFeature(name, preset);
+        if (preset.message) this.notify(preset.message);
+        this.hideInfo();
+      };
+    }
     const btn = el('button', 'btn btn-primary', row);
     btn.textContent = 'Set as target';
     btn.onclick = () => { this.cam.focusBody(name); this.hideInfo(); };

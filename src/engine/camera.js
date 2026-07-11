@@ -327,6 +327,51 @@ export class CameraController {
     this.distTween = { from: this.orbDist, to, t: 0, dur: 1.5 };
   }
 
+  /**
+   * Fly the camera over a texture-anchored surface feature. Data-driven:
+   * presets live in the system config (cfg.navPresets), the engine only
+   * resolves a UV to the feature's current world bearing — which accounts
+   * for the body's rotation this frame and the primary's axial tilt.
+   */
+  flyToFeature(name, preset) {
+    const entry = this.r.bodyMeshes.get(name);
+    if (!entry) return;
+    // Resolve the anchor UV: a live shader uniform when named (it retargets
+    // when the hi-res texture swaps in), else a literal preset.uv pair.
+    let uv = preset.uv;
+    if (preset.uniformUV) {
+      const de = this.r.detailEntries.find((e) => e.name === name);
+      const u = de?.uniforms?.[preset.uniformUV]?.value;
+      if (u) uv = [u.x, u.y];
+    }
+    if (!uv) return;
+    // Three.js SphereGeometry UV mapping -> unit direction in mesh space.
+    const az = uv[0] * Math.PI * 2;
+    const pol = (1 - uv[1]) * Math.PI;
+    const local = new THREE.Vector3(
+      -Math.cos(az) * Math.sin(pol),
+      Math.cos(pol),
+      Math.sin(az) * Math.sin(pol)
+    );
+    const dir = local.applyQuaternion(entry.mesh.getWorldQuaternion(this._q)).normalize();
+
+    if (this.mode === 'insertion' && this.ins.body === name) {
+      // Already orbiting this body in insertion mode: park the orbital phase
+      // over the feature's longitude at the preset altitude.
+      const rl = dir.clone().applyQuaternion(this.r.root.quaternion.clone().invert());
+      this.ins.phase = Math.atan2(-rl.z, rl.x);
+      if (this.ins.locked) this.ins.lockOffset = this.ins.phase - this._bodyRotationAngle(name);
+      this.setInsertion({ altitudeKm: preset.altitudeKm });
+      this._startTransition();
+      return;
+    }
+    if (this.mode !== 'orbit' || this.target !== name) this.setMode('orbit', name);
+    this.orbTheta = Math.atan2(dir.z, dir.x);
+    this.orbPhi = Math.acos(THREE.MathUtils.clamp(dir.y, -1, 1));
+    this.distTween = { from: this.orbDist, to: entry.radiusUnits + preset.altitudeKm / 1000, t: 0, dur: 2 };
+    this._startTransition();
+  }
+
   // -- Per-frame update ------------------------------------------------------------
 
   update(dt) {
