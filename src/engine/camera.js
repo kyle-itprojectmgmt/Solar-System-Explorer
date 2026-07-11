@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three';
+import { G, KM_PER_UNIT } from '../config.js';
 
 const TRANSITION_S = 0.8;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -45,6 +46,14 @@ export class CameraController {
     // Chase spring (smoothed position and look-at point)
     this.chasePos = new THREE.Vector3();
     this.chaseLook = new THREE.Vector3();
+
+    // Orbit insertion state (mode 7)
+    this.ins = {
+      body: null, altitudeKm: 10000, incDeg: 0, locked: false,
+      phase: 0, yaw: 0, pitch: -0.5,
+      velKmS: 0, periodS: 0, // computed each frame for the HUD
+    };
+    this.onInsertionChange = null; // UI sync hook
 
     // Cinematic
     this.cineIndex = 0;
@@ -88,6 +97,25 @@ export class CameraController {
     }
     if (mode === 'cinematic') {
       this.cineIndex = 0; this.cineTime = 0;
+    }
+    if (mode === 'insertion') {
+      this.ins.body = target || this.ins.body || this.lastTarget || this.r.system.primary.name;
+      this.target = this.ins.body;
+      this.lastTarget = this.ins.body;
+      // Start the orbit at the camera's current bearing for continuity.
+      const entry = this.r.bodyMeshes.get(this.ins.body);
+      if (entry) {
+        const center = entry.group.getWorldPosition(new THREE.Vector3());
+        const local = this.camera.position.clone().sub(center)
+          .applyQuaternion(this.r.root.quaternion.clone().invert());
+        this.ins.phase = Math.atan2(-local.z, local.x);
+        this.ins.altitudeKm = Math.max(
+          this._minInsertionAltKm(this.ins.body),
+          Math.min(500000, (local.length() - entry.radiusUnits) * KM_PER_UNIT)
+        );
+      }
+      this.ins.yaw = 0; this.ins.pitch = -0.5;
+      this.onInsertionChange?.(this.ins);
     }
     if (mode === 'free') {
       // Adopt current orientation so there's no snap.
@@ -218,6 +246,10 @@ export class CameraController {
         this.surfYaw -= dx * s;
         this.surfPitch = THREE.MathUtils.clamp(this.surfPitch + dy * s, -1.4, 1.5);
         break;
+      case 'insertion':
+        this.ins.yaw -= dx * s;
+        this.ins.pitch = THREE.MathUtils.clamp(this.ins.pitch - dy * s, -1.55, 0.6);
+        break;
       case 'chase':
         break;
       default:
@@ -258,6 +290,11 @@ export class CameraController {
       this.orbDist = Math.min(floor + above * f, 3e5);
     } else if (this.mode === 'chase') {
       this.chaseDistMult = THREE.MathUtils.clamp(this.chaseDistMult * f, 1, 60);
+    } else if (this.mode === 'insertion') {
+      const min = this._minInsertionAltKm(this.ins.body);
+      this.ins.altitudeKm = THREE.MathUtils.clamp(
+        Math.max(this.ins.altitudeKm, min * 1.001) * f, min, 500000);
+      this.onInsertionChange?.(this.ins);
     } else {
       // Free fly / cinematic (which hands off to free on input anyway):
       // dolly along the line to the nearest or targeted body.
@@ -321,6 +358,7 @@ export class CameraController {
       case 'system': return this._poseOrbit(this.r.system.primary.name, dt);
       case 'surface': return this._poseSurface();
       case 'chase': return this._poseChase(dt);
+      case 'insertion': return this._poseInsertion(dt);
       case 'cinematic': return this._poseCinematic(dt);
       default: return { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone() };
     }
@@ -445,6 +483,97 @@ export class CameraController {
       this.chaseLook.copy(center);
     }
     return { pos: this.chasePos.clone(), quat: lookQuat(this.chasePos, this.chaseLook) };
+  }
+
+  // -- Orbit insertion (mode 7) ----------------------------------------------------
+
+  _minInsertionAltKm(name) {
+    const entry = this.r.bodyMeshes.get(name);
+    if (!entry) return 10;
+    return entry.isPrimary ? 500 : entry.cfg.radiusKm >= 500 ? 10 : 5;
+  }
+
+  _bodyRotationRateRadS(name) {
+    const entry = this.r.bodyMeshes.get(name);
+    if (!entry) return 0;
+    if (entry.isPrimary) return this.physics.rotationRate;
+    // Tidally locked moons rotate once per orbit.
+    return (Math.PI * 2) / (entry.cfg.periodDays * 86400);
+  }
+
+  /** Update insertion parameters from the UI (body/altitude/inclination/lock). */
+  setInsertion(params) {
+    Object.assign(this.ins, params);
+    if (params.body) { this.target = params.body; this.lastTarget = params.body; }
+    const min = this._minInsertionAltKm(this.ins.body);
+    this.ins.altitudeKm = THREE.MathUtils.clamp(this.ins.altitudeKm, min, 500000);
+    this.onInsertionChange?.(this.ins);
+  }
+
+  /** One-click stationary orbit: camera hangs over a fixed longitude. */
+  presetGeoSync() {
+    const primary = this.r.system.primary;
+    // Enter the mode first — setMode auto-derives phase/altitude from the
+    // camera, so the preset values must be applied after.
+    if (this.mode !== 'insertion') this.setMode('insertion', primary.name);
+    // Geosynchronous radius 160,000 km from the center => altitude above
+    // the cloud tops is radius-dependent, not hardcoded.
+    this.setInsertion({
+      body: primary.name,
+      altitudeKm: 160000 - primary.radiusKm,
+      incDeg: 0,
+      locked: true,
+    });
+    // Park over the subsolar longitude (daylit clouds below), looking down.
+    this.ins.phase = Math.atan2(-this.r.sunDir.z, this.r.sunDir.x);
+    this.ins.pitch = -0.8;
+    this._startTransition();
+  }
+
+  _poseInsertion(dt) {
+    const ins = this.ins;
+    const entry = this.r.bodyMeshes.get(ins.body);
+    if (!entry) return this._poseFree(0);
+
+    const rUnits = entry.radiusUnits + ins.altitudeKm / 1000;
+    const rKm = rUnits * KM_PER_UNIT;
+    const mass = entry.isPrimary ? this.r.system.primary.massKg : entry.cfg.massKg;
+
+    // Circular orbital mechanics: v = sqrt(GM/r). Locked mode pins the
+    // angular rate to the body's rotation instead (geosynchronous).
+    let omega;
+    if (ins.locked) {
+      omega = this._bodyRotationRateRadS(ins.body);
+      ins.velKmS = omega * rKm;
+    } else {
+      ins.velKmS = Math.sqrt((G * mass) / rKm);
+      omega = ins.velKmS / rKm;
+    }
+    ins.periodS = omega > 0 ? (Math.PI * 2) / omega : 0;
+    ins.phase += omega * dt * this.physics.timeMultiplier;
+
+    // Orbit plane: equatorial, inclined about X by incDeg (root frame).
+    const inc = THREE.MathUtils.degToRad(ins.incDeg);
+    const X = new THREE.Vector3(1, 0, 0);
+    const local = new THREE.Vector3(Math.cos(ins.phase), 0, -Math.sin(ins.phase))
+      .multiplyScalar(rUnits).applyAxisAngle(X, inc);
+    const tangent = new THREE.Vector3(-Math.sin(ins.phase), 0, -Math.cos(ins.phase))
+      .applyAxisAngle(X, inc);
+    local.applyQuaternion(this.r.root.quaternion);
+    tangent.applyQuaternion(this.r.root.quaternion).normalize();
+
+    const center = entry.group.getWorldPosition(new THREE.Vector3());
+    const pos = center.clone().add(local);
+
+    // Nadir-referenced orientation: up = radial out, forward = along-track,
+    // then the user's look-around yaw/pitch (default pitch looks down at the
+    // surface ahead — nadir plus horizon).
+    const up = local.clone().normalize();
+    const fwd = tangent.clone().applyAxisAngle(up, ins.yaw);
+    const right = fwd.clone().cross(up).normalize();
+    fwd.applyAxisAngle(right, ins.pitch);
+    const m = new THREE.Matrix4().lookAt(pos, pos.clone().add(fwd), up);
+    return { pos, quat: new THREE.Quaternion().setFromRotationMatrix(m) };
   }
 
   // -- Cinematic auto mode -------------------------------------------------------

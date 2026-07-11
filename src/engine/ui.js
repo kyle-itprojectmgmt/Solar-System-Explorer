@@ -15,6 +15,7 @@ const CAMERA_MODES = [
   { id: 'orbit', label: 'Orbit', key: 'O', targeted: true },
   { id: 'surface', label: 'Surface', key: 'S', targeted: true },
   { id: 'chase', label: 'Chase', key: 'H', targeted: true },
+  { id: 'insertion', label: 'Orbit Insertion', key: 'I', targeted: false },
   { id: 'system', label: 'System View', key: 'G', targeted: false },
 ];
 
@@ -39,6 +40,7 @@ export class UI {
 
     this._buildHUD();
     this._buildSidePanel();
+    this._buildInsertionPanel();
     this._buildInfoPanel();
     this._buildAudioControls();
     this._buildCornerButtons();
@@ -83,6 +85,7 @@ export class UI {
     this.rootEl.querySelectorAll('[data-cam-mode]').forEach((b) => {
       b.classList.toggle('active', b.dataset.camMode === mode);
     });
+    if (this.insPanel) this.insPanel.style.display = mode === 'insertion' ? '' : 'none';
   }
 
   _syncSystemViewExtras(mode) {
@@ -184,6 +187,75 @@ export class UI {
   toggleSidePanel() {
     const open = this.side.classList.toggle('open');
     this.sideTab.innerHTML = open ? '▸' : '◂';
+  }
+
+  // -- Orbit insertion panel --------------------------------------------------------
+
+  _buildInsertionPanel() {
+    const ALT_MIN = 10, ALT_MAX = 500000;
+    const altToT = (km) => Math.log10(km / ALT_MIN) / Math.log10(ALT_MAX / ALT_MIN);
+    const tToAlt = (t) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, t);
+
+    const p = el('div', 'insertion-panel panel', this.rootEl);
+    this.insPanel = p;
+    p.style.display = 'none';
+    el('h2', 'side-title', p).textContent = 'ORBITAL INSERTION';
+
+    // Parent body selector: primary + major moons.
+    const bodyRow = el('div', 'btn-grid', p);
+    const bodies = [this.system.primary.name,
+      ...this.system.bodies.filter((b) => b.physics === 'nbody').map((b) => b.name)];
+    this.insBodyBtns = bodies.map((n) => {
+      const b = el('button', 'btn btn-small', bodyRow);
+      b.textContent = n;
+      b.onclick = () => this.cam.setInsertion({ body: n });
+      return b;
+    });
+
+    const altLabel = el('div', 'ins-label', p);
+    const altSlider = el('input', 'slider', p);
+    Object.assign(altSlider, { type: 'range', min: 0, max: 1, step: 0.001 });
+    altSlider.oninput = () => this.cam.setInsertion({ altitudeKm: tToAlt(+altSlider.value) });
+
+    const incLabel = el('div', 'ins-label', p);
+    const incSlider = el('input', 'slider', p);
+    Object.assign(incSlider, { type: 'range', min: 0, max: 90, step: 1 });
+    incSlider.oninput = () => this.cam.setInsertion({ incDeg: +incSlider.value });
+
+    const lockToggle = toggle(p, 'Lock to body rotation (geosync)', false,
+      (v) => this.cam.setInsertion({ locked: v }));
+
+    const geoBtn = el('button', 'btn btn-primary', p);
+    geoBtn.style.width = '100%';
+    geoBtn.style.marginTop = '8px';
+    geoBtn.textContent = `🛰 ${this.system.primary.name} GeoSync`;
+    geoBtn.onclick = () => this.cam.presetGeoSync();
+
+    this.insInfo = el('div', 'ins-info', p);
+
+    // Keep controls in sync when scroll-zoom or presets change parameters.
+    this.cam.onInsertionChange = (ins) => {
+      altSlider.value = altToT(ins.altitudeKm);
+      altLabel.textContent = `Altitude: ${Math.round(ins.altitudeKm).toLocaleString()} km`;
+      incSlider.value = ins.incDeg;
+      incLabel.textContent = `Inclination: ${ins.incDeg}°${ins.incDeg < 10 ? ' (equatorial)' : ins.incDeg > 80 ? ' (polar)' : ''}`;
+      lockToggle.checked = ins.locked;
+      this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
+    };
+  }
+
+  _updateInsertionInfo() {
+    const ins = this.cam.ins;
+    const h = Math.floor(ins.periodS / 3600);
+    const m = Math.floor((ins.periodS % 3600) / 60);
+    const s = Math.floor(ins.periodS % 60);
+    const isPrimary = ins.body === this.system.primary.name;
+    this.insInfo.innerHTML = `
+      <div class="ins-row"><span>Altitude</span><span>${Math.round(ins.altitudeKm).toLocaleString()} km above ${isPrimary ? 'clouds' : 'surface'}</span></div>
+      <div class="ins-row"><span>Velocity</span><span>${ins.velKmS.toFixed(1)} km/s</span></div>
+      <div class="ins-row"><span>Period</span><span>${h}h ${m}m ${s}s</span></div>
+      <div class="ins-row"><span>Inc</span><span>${ins.incDeg}°</span></div>
+      ${isPrimary ? '<div class="ins-warn">⚠️ Extreme radiation environment</div>' : ''}`;
   }
 
   // -- Info panel -----------------------------------------------------------------
@@ -356,6 +428,7 @@ export class UI {
         case 'KeyF': this.cam.setMode('free'); break;
         case 'KeyO': this._activateMode(CAMERA_MODES[2]); break;
         case 'KeyH': this._activateMode(CAMERA_MODES[4]); break;
+        case 'KeyI': this.cam.setMode('insertion'); break;
         case 'KeyG': this.cam.setMode('system'); break;
         case 'Space': e.preventDefault(); this.physics.togglePause(); break;
         case 'Comma': this.physics.slower(); break;
@@ -399,6 +472,9 @@ export class UI {
 
     // Altitude presets appear once any body has been targeted.
     this.altSec.style.display = (this.cam.target || this.cam.lastTarget) ? '' : 'none';
+
+    // Orbit insertion live readout.
+    if (this.cam.mode === 'insertion') this._updateInsertionInfo();
 
     // Eclipse notifications.
     for (const b of this.physics.bodies) {

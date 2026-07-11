@@ -227,6 +227,39 @@ html, body {
 .tick-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(217,217,217,0.08); }
 .tick-time { color: var(--blue-light); font-weight: 700; }
 
+/* -- Orbit insertion panel ---------------------------------------------------------------- */
+
+.insertion-panel {
+  position: fixed;
+  left: 16px;
+  top: 110px;
+  width: 264px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ins-label {
+  font-family: var(--font-head);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--gray-light);
+}
+.ins-info { margin-top: 8px; border-top: 1px solid rgba(217,217,217,0.12); padding-top: 8px; }
+.ins-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  padding: 2px 0;
+}
+.ins-row span:first-child { color: var(--gray-light); font-family: var(--font-head); letter-spacing: 0.06em; }
+.ins-row span:last-child { color: var(--blue-light); }
+.ins-warn { margin-top: 6px; font-size: 0.7rem; color: #ffb84d; font-family: var(--font-head); letter-spacing: 0.04em; }
+
+@media (max-width: 720px) {
+  .insertion-panel { width: min(264px, calc(100vw - 32px)); top: 96px; }
+}
+
 /* -- Info panel ------------------------------------------------------------------------ */
 
 .info-panel {
