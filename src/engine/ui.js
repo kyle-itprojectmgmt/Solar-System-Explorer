@@ -157,7 +157,10 @@ export class UI {
 
   _activateMode(m) {
     if (m.targeted) {
-      if (this.cam.target) this.cam.setMode(m.id, this.cam.target);
+      // Reuse the current or last-used target so a bare keypress works;
+      // only ask for a click when there has never been a target.
+      const target = this.cam.target || this.cam.lastTarget;
+      if (target) this.cam.setMode(m.id, target);
       else this.cam.requestTargetedMode(m.id);
     } else {
       this.cam.setMode(m.id);

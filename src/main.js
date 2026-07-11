@@ -66,7 +66,7 @@ async function boot() {
   const renderer = new SceneRenderer(system, quality, (p) => loader.progress(p));
   document.getElementById('app').appendChild(renderer.renderer.domElement);
 
-  const cameraCtl = new CameraController(renderer, renderer.renderer.domElement);
+  const cameraCtl = new CameraController(renderer, renderer.renderer.domElement, physics);
   const postfx = createPostFX(renderer.renderer, renderer.scene, renderer.camera, quality);
   const audio = new AudioEngine();
 

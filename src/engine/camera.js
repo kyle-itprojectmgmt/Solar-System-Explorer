@@ -12,13 +12,15 @@ const TRANSITION_S = 0.8;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export class CameraController {
-  constructor(sceneRenderer, dom) {
+  constructor(sceneRenderer, dom, physics) {
     this.r = sceneRenderer;
     this.camera = sceneRenderer.camera;
     this.dom = dom;
+    this.physics = physics;
 
     this.mode = 'cinematic';
     this.target = null;          // body name for orbit/surface/chase
+    this.lastTarget = null;      // remembered across mode switches
     this.pendingMode = null;     // waiting for a click to choose target
     this.onModeChange = null;    // (mode, target) => void
     this.onBodyPicked = null;    // (name) => void — for info panel
@@ -39,8 +41,9 @@ export class CameraController {
     // Surface state
     this.surfLat = 0; this.surfLon = 0; this.surfYaw = 0; this.surfPitch = 0.1;
 
-    // Chase spring
+    // Chase spring (smoothed position and look-at point)
     this.chasePos = new THREE.Vector3();
+    this.chaseLook = new THREE.Vector3();
 
     // Cinematic
     this.cineIndex = 0;
@@ -61,6 +64,7 @@ export class CameraController {
     if (mode === this.mode && target === this.target) return;
     this.mode = mode;
     this.target = target;
+    if (target) this.lastTarget = target;
     this.pendingMode = null;
 
     if (mode === 'orbit' || mode === 'system') {
@@ -79,6 +83,7 @@ export class CameraController {
     }
     if (mode === 'chase' && target) {
       this.chasePos.copy(this.camera.position);
+      this.chaseLook.copy(this.r.bodyWorldPos(target, new THREE.Vector3()));
     }
     if (mode === 'cinematic') {
       this.cineIndex = 0; this.cineTime = 0;
@@ -308,21 +313,51 @@ export class CameraController {
     return { pos, quat: new THREE.Quaternion().setFromRotationMatrix(m) };
   }
 
+  /** Body's velocity direction in world space (from physics, not geometry). */
+  _bodyVelocityWorld(name, out = new THREE.Vector3()) {
+    const b = this.physics?.getBody(name);
+    if (!b) return out.set(0, 0, 0); // primary or unknown
+    if (b.nbody) {
+      out.set(b.vel.x, b.vel.y, b.vel.z);
+    } else {
+      // Kepler bodies: analytic tangent of the circular orbit.
+      const ang = b.phase + (Math.PI * 2) * (this.physics.simSeconds / b.period);
+      out.set(-Math.sin(ang), 0, -Math.cos(ang));
+    }
+    return out.applyQuaternion(this.r.root.quaternion); // equatorial -> world
+  }
+
   _poseChase(dt) {
     const entry = this.r.bodyMeshes.get(this.target);
     if (!entry) return this._poseFree(0);
     const center = entry.group.getWorldPosition(new THREE.Vector3());
-    // Behind the moon along its orbital motion (approx: tangent of position).
-    const tangent = new THREE.Vector3(-center.z, 0, center.x).normalize().negate();
     const dist = entry.radiusUnits * 7;
-    const desired = center.clone()
-      .addScaledVector(tangent, -dist)
-      .add(new THREE.Vector3(0, entry.radiusUnits * 2.2, 0));
-    // Spring-lag follow for the cinematic feel.
-    if (this.blend >= 1) this.chasePos.lerp(desired, Math.min(1, dt * 2.4));
-    else this.chasePos.copy(desired);
-    const quat = lookQuat(this.chasePos, center);
-    return { pos: this.chasePos.clone(), quat };
+
+    // Trail BEHIND the direction of travel (velocity-derived, so the offset
+    // is correct at every point of the orbit).
+    const vel = this._bodyVelocityWorld(this.target);
+    let desired;
+    if (vel.lengthSq() > 1e-12) {
+      vel.normalize();
+      desired = center.clone()
+        .addScaledVector(vel, -dist)
+        .add(new THREE.Vector3(0, entry.radiusUnits * 2.2, 0));
+    } else {
+      // Static target (the primary): hold the current bearing, station-keeping.
+      const dir = this.chasePos.clone().sub(center);
+      if (dir.lengthSq() < 1e-9) dir.set(0.3, 0.25, 1);
+      desired = center.clone().addScaledVector(dir.normalize(), dist);
+    }
+
+    if (this.blend >= 1) {
+      // Frame-rate-independent exponential spring on both position and look.
+      this.chasePos.lerp(desired, 1 - Math.exp(-dt * 3.0));
+      this.chaseLook.lerp(center, 1 - Math.exp(-dt * 5.0));
+    } else {
+      this.chasePos.copy(desired);
+      this.chaseLook.copy(center);
+    }
+    return { pos: this.chasePos.clone(), quat: lookQuat(this.chasePos, this.chaseLook) };
   }
 
   // -- Cinematic auto mode -------------------------------------------------------
