@@ -312,8 +312,10 @@ export class SceneRenderer {
       if (cfg.features?.volcanicPlumes && cfg.features.volcanoes) {
         for (const v of cfg.features.volcanoes) {
           const plume = makeVolcanicPlume(r, v, this.quality.tier);
-          group.add(plume.points);
-          group.add(plume.hotspot);
+          // Parent to the mesh, not the group: tidal-lock rotation is applied
+          // to mesh.rotation.y, so only mesh children stay pinned to the surface.
+          mesh.add(plume.points);
+          mesh.add(plume.hotspot);
           entry.plumes.push(plume);
         }
       }
