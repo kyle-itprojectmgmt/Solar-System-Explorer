@@ -22,6 +22,15 @@ SMOKE_URL=http://localhost:5173 node tests/visual.mjs
 
 # Jupiter limb glow from day / terminator / night / insertion horizon
 SMOKE_URL=http://localhost:5173 node tests/limb.mjs
+
+# v4b additions:
+node tests/flicker.mjs    # temporal shimmer probe (mean |pixel diff| under tiny rotation)
+node tests/moonlimb.mjs   # directional moon halos (lit side only)
+node tests/metis.mjs      # inner moon zoom floor + geometry
+node tests/card.mjs       # expanded body info cards; no GRS button on card
+node tests/music.mjs      # music collapse persistence + Spotify/YouTube embeds
+node tests/resonance.mjs  # 1:2:4 conjunction pulse + HUD readout
+node tests/tooltip.mjs    # tooltip hover behavior (7 checks)
 ```
 
 `CHROME_PATH` overrides the browser binary (defaults to the standard

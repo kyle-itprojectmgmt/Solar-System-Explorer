@@ -1,9 +1,9 @@
-﻿// Sharpness-pass visual verification: screenshots at spec altitudes.
+// Sharpness-pass visual verification: screenshots at spec altitudes.
 // Settles transitions via cameraCtl.update() (headless ~4 fps).
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'fs';
 
-const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const URL = process.env.SMOKE_URL || 'http://localhost:5175';
 const OUT = new globalThis.URL('./shots/', import.meta.url).pathname.slice(1);
 mkdirSync(OUT, { recursive: true });

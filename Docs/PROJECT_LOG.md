@@ -206,9 +206,16 @@ Distance: 5.2 AU from Jupiter. Rendered as distant point light
 
 **Mission Control Panel (Tab key):**
 Camera mode switcher, time controls, body selector, orbital paths
-toggle, body labels toggle, ring visibility toggle, eclipse event
-ticker with countdown, altitude presets (Distant/Near/Low Orbit/Skim),
-orbital speed slider (Orbit mode), chase height slider (Chase mode)
+toggle, body labels toggle, ring visibility toggle, resonance lines
+toggle (with alignment HUD), eclipse event ticker with countdown,
+continuous log altitude slider (50 km–500,000 km, live ALT readout),
+inclination slider (-90°..90°, synced with insertion panel), Camera
+Speed slider (Orbit mode), chase height slider (Chase mode)
+
+**View controls:**
+Fullscreen — F11 or top-right button. Presentation mode — P or the
+subtle bottom-right eye icon (hides all UI; screenshots use it).
+Tooltips on every control (hover 500 ms / mobile long-press).
 
 **Body Info Panel (click any body):**
 Name, radius, mass, orbital period, distance from Jupiter, 2-3 facts,
@@ -385,12 +392,51 @@ Verified by fetching deployed JS and confirming all v4 feature strings.
 - Note: not yet deployed — live site still v3. Deploy when ready:
   update Ko-fi handle in config.js first, then npm run deploy.
 
+### v4b — Hardware Review Fixes + UI Polish (Complete — 2026-07-11, commits a09d06a → see final)
+Per Docs/V4b_PROMPT.md. Version 4.1.0. Deployed after Group 3 and at
+session end.
+
+- Group 1 (a09d06a): slider live-drag investigated — every slider
+  already used the input event; the "catches up on release" symptom
+  (bug #11) was the Mission Control altitude slider restarting its
+  1.5 s tween per input event. It now sets orbit distance directly
+  while dragging. "Orbital Speed" renamed "Camera Speed".
+- Group 2 (48c3122, b8680b6, 5ac0669, 00c4865):
+  - Bug #12 flicker: NOT z-fighting (detail shaders inject into the
+    base material — no second mesh exists). Real cause: v4 sharpness
+    noise going sub-pixel (temporal shimmer) + sub-pixel thresholded
+    lines. Fixed with footprint-faded fbmN octaves, dtlFreqFade on the
+    finest layers, and derivative-widened dtlAAstep thresholds.
+    Measured shimmer (mean |px diff| under 0.00025 rad rotation):
+    Io 17.98→11.71, Europa 24.23→11.10 (≈ legitimate-parallax floor).
+  - Bug #13: Ganymede/Io uniform halos replaced with the Jupiter limb
+    scattering shader via per-body atmosphereLimb config; Europa added.
+    Lit-side only, verified day/night/terminator.
+  - Bug #14: inner moons at 64-segment spheres (config geometrySegments);
+    the actual "hole" was camera.near = 50 km clipping bodies whose
+    floors sit 20 km up — near lowered to 10 km (log depth buffer).
+  - Bug #8: plume particles now use a radial-gradient sprite — soft
+    orange-yellow sparks, no more white squares.
+- Group 3 (22f9810, 0459dff, 6e20a0c): body info cards expanded from
+  config (type badge, gravity, temp range, orbital distance, notable
+  features, collapsible More Info; diameter/periods derive from the
+  sim-driving radiusKm/periodDays); GRS button removed from the Jupiter
+  card (kept in Orbit Insertion); music player collapse chevron with
+  localStorage persistence (independent of presentation mode); Spotify
+  #1DB954 / YouTube #FF0000 inline-SVG brand icons, embeds verified
+  end-to-end; resonance lines rebuilt — connecting lines between Io/
+  Europa/Ganymede, Primary Blue conjunction pulse within 15°, and a
+  "Resonance: N% aligned" HUD readout.
+- Group 4 (b30b950): shared tooltip system (500 ms hover, mobile
+  long-press, viewport-clamped, native titles stripped) attached to all
+  sound modes, camera modes, time controls, display checkboxes, sliders,
+  insertion controls, corner buttons, and the Voyager preset.
+- Testing: all verification scripts committed under tests/ (flicker
+  probe, moon halos, inner-moon floor, body cards, music flow,
+  resonance conjunction, tooltips) alongside the 22-check smoke suite.
+
 ---
 
-## Known Bugs / In Progress
-
-| # | Issue | Status | Prompt File |
-|---|-------|--------|-------------|
 ## Known Bugs / In Progress
 
 | # | Issue | Status | Prompt File |
@@ -402,13 +448,13 @@ Verified by fetching deployed JS and confirming all v4 feature strings.
 | 5 | GRS vortex detail not discoverable | Resolved v4 | — |
 | 6 | instructions.md in wrong location | Resolved v4 | — |
 | 7 | Moons appear egg-shaped / oval | Resolved v4 | — |
-| 8 | Io plume particles render as white squares up close — particle material issue, not parenting | Backlog | — |
-| 9 | Sharpness calibration done from headless screenshots — Callisto crater darkness and Io frost speckle may need real-hardware tuning. Knobs: normalScale in jupiter.js, gDetailHeight in detailShaders.js | Needs review | — |
+| 8 | Io plume particles render as white squares up close | Resolved v4b | V4b_PROMPT.md |
+| 9 | Sharpness calibration done from headless screenshots — Callisto crater darkness and Io frost speckle may need real-hardware tuning. Knobs: normalScale in jupiter.js, gDetailHeight in detailShaders.js. (v4b anti-shimmer pass softened the worst of it — re-review.) | Needs review | — |
 | 10 | Ko-fi handle still placeholder YOUR_HANDLE in src/config.js | Fix before launch | — |
-| 11 | All sliders (inclination, altitude, orbit camera, time) use change event — no live update while dragging, catches up on release. Fix: change all slider addEventListener('change') to addEventListener('input') across ui.js | Bug — easy fix | — |
-| 12 | Io and Europa flickering artifacts — z-fighting between base mesh and procedural detail shader geometry at nearly identical depth. Fix: increase polygonOffset on detail shader material or scale detail mesh outward by 0.1% | Bug | — |
-| 13 | Ganymede atmosphere halo uniform ring regardless of sun direction — needs same directional atmospheric scattering shader applied to Jupiter in v4. Also apply to Europa (thin O2/O3 atmosphere) and Io (thin SO2 atmosphere). All bodies with atmosphere flag must respond to sun direction | Bug | — |
-| 14 | Hole forms in Metis and Adrastea at super close zoom — geometry too low-poly at near distances + zoom floor not enforced tightly enough for inner moons. Fix: (1) increase sphere subdivisions for inner moons in config, (2) enforce zoom floor hard stop for all bodies including inner moons | Bug | — |
+| 11 | Sliders don't update live while dragging (real cause: altitude slider re-tweening per input event, not a change-vs-input listener issue) | Resolved v4b | V4b_PROMPT.md |
+| 12 | Io and Europa flickering artifacts (real cause: sub-pixel procedural noise shimmer from the v4 sharpness pass, not z-fighting — no separate detail mesh exists) | Resolved v4b | V4b_PROMPT.md |
+| 13 | Moon atmosphere halos uniform regardless of sun direction (Ganymede, Io; Europa had none) | Resolved v4b | V4b_PROMPT.md |
+| 14 | Hole in Metis/Adrastea at close zoom (real causes: 24×12-segment spheres + camera near plane at 50 km clipping bodies whose zoom floors sit 20 km up) | Resolved v4b | V4b_PROMPT.md |
 
 ---
 
@@ -416,26 +462,19 @@ Verified by fetching deployed JS and confirming all v4 feature strings.
 
 | # | Feature | Notes |
 |---|---------|-------|
-| 1 | Full screen mode | TV/presentation mode, hide all UI |
-| 2 | Hide all text / clean display mode | Big screen / screenshot mode, combine with fullscreen |
-| 3 | Jupiter limb glow fix | Replace solid halo with proper atmospheric scattering shader — feathered, lit-side only, color transitions warm orange to transparent |
-| 4 | KTX2 compressed textures | Add Basis encoder to build pipeline for faster mobile loading |
-| 5 | WebGPU renderer upgrade | When postprocessing library adds WebGPU support |
-| 6 | Orbit Insertion inclination range fix | Extend inclination slider from 0–90° to -90°–90°. Slider center = 0° (equatorial). Negative = retrograde orbit. Label: "-90° (retrograde)" left, "0° (equatorial)" center, "90° (polar)" right. Physics: negative inclination reverses orbital direction. |
-| 7 | GRS navigation preset | Add "Jump to Great Red Spot" button in Jupiter body info panel and/or Orbit Insertion panel. Rotates camera longitude to align with GRS position (23°S, current simulated longitude). Solves discoverability — GRS vortex detail exists but user has no way to find it without knowing Jupiter's rotation state. |
-| 8 | Detail-aware zoom floor | Minimum zoom altitude adapts to where procedural detail + texture resolution runs out. Resistance zoom: quadratic taper below soft floor, hard stop at floor. Per-body floors stored in body config (not engine). Floors: Jupiter 1,500 km, Io 150 km, Europa 150 km, Ganymede 200 km, Callisto 300 km, inner moons 50 km. HUD feedback: "Maximum surface detail reached" fades in at soft floor, ALT readout pulses once at hard floor. |
-| 9 | Dynamic version display on loading screen | Pull version from package.json via Vite define plugin. Loading screen subtitle reads "Jupiter System — v{version}" dynamically. Bump package.json version each session so loading screen always reflects current build. Add __APP_VERSION__ constant to vite.config.js. |
-| 10 | Replace altitude presets with altitude slider in Mission Control | Remove Distant/Near/Low Orbit/Skim preset buttons from Mission Control panel. Replace with a continuous logarithmic altitude slider (10 km to 500,000 km). Slider in Mission Control right panel, always visible when a body is targeted. Current ALT value shown as readout next to slider. Logarithmic scale: fine-grained control at low altitude, fast movement at high altitude. |
-| 11 | Add inclination slider to Mission Control right panel | Move inclination control out of Orbit Insertion panel into Mission Control right panel so it's always accessible. Range: -90° to +90°. Slider center = 0° (equatorial). Labels: "-90° retrograde" left, "0° equatorial" center, "90° polar" right. Negative = retrograde orbit (reverses orbital direction). Works in both Orbit mode and Orbit Insertion mode. |
-| 12 | Release preparation — supporting pages | Add About page (project story, AI-built in 48hrs narrative, tech stack, author bio linking to ITprojectMGMT.com and LinkedIn), Contact page (kyle@itprojectmgmt.com), Legal/Disclaimer page (NASA texture credits and CC BY 4.0 attribution, Solar System Scope CC BY 4.0, Björn Jónsson public domain credits, no warranty disclaimer, not affiliated with NASA or any space agency), Privacy Policy (no tracking, no user data collected, localStorage only for user preferences, no cookies, no analytics). All pages accessible from a minimal persistent footer. Style matches brand. Mobile-friendly. |
-| 13 | Release preparation — security hardening | Before any public promotion or LinkedIn post: (1) Content Security Policy headers via Cloudflare Worker — restrict script-src to self, block inline scripts and eval; (2) Add /.well-known/security.txt with contact info; (3) Subresource Integrity (SRI) on Google Fonts CDN links; (4) Security response headers: X-Frame-Options SAMEORIGIN, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy restricting unused browser APIs; (5) Audit all source code for exposed secrets, API keys, or tokens before public release; (6) Review localStorage usage — confirm no sensitive data stored; (7) Rate limiting on ISS position API endpoint when built; (8) HTTPS-only already enforced by Cloudflare. Run Mozilla Observatory scan and target A+ rating before launch. |
-| 14 | Remove GRS button from Jupiter body info card | GRS navigation already available in Orbit Insertion panel. Card button is redundant clutter. Remove from the body info panel only — keep in Orbit Insertion panel. |
-| 15 | Expand body info cards with detailed data | Add to each body card: diameter (km), mass (kg, scientific notation), surface gravity (m/s²), orbital distance from parent (min/max km for elliptical orbits), orbital period, rotation period, surface temperature range, notable features list. Add expandable "More Info" section for longer content. Jupiter card: Great Red Spot stats, magnetic field, ring system summary. Moon cards: tidal locking status, geological activity level, potential habitability notes (Europa, Enceladus). |
-| 16 | Resonance lines — improve or remove | DECISION: Keep and improve. Implement proper 1:2:4 resonance visualization showing Io/Europa/Ganymede position relationships in real time. Animated highlight when moons align. Tooltip explains what it shows. Do not remove — valuable scientific feature once properly explained. |
-| 17 | Orbit Camera slider vs Time slider — clarify or consolidate | DECISION: Keep both. Rename "Orbit Camera" to "Camera Speed". Add tooltip: "How fast the camera orbits around the target — independent of simulation time." Tooltip on Time slider: "Controls simulation speed — how fast moons orbit, Jupiter rotates, and eclipses occur." |
-| 18 | Music player — minimize/hide toggle independent of presentation mode | Music player panel needs its own collapse button (chevron or minus icon in panel header). Collapsed state: shows only the sound mode icon row and volume slider — no Spotify/YouTube URL input or expanded player. State saved to localStorage. Collapsing music player must be independent of P-key presentation mode which hides ALL UI. Expanded/collapsed state persists across page reloads. |
-| 19 | Music player — official Spotify and YouTube brand icons and colors | Replace current generic headphone/play icons with official brand icons: Spotify icon (green #1DB954, official Spotify logo SVG), YouTube icon (red #FF0000, official YouTube play button logo SVG). Widely used in UIs for platform identification. Current icons are ambiguous — users won't know which connects to which service. Also verify Spotify and YouTube modes function correctly end-to-end: paste URL → load → play. Fix any broken functionality before launch. |
-| 20 | Tooltip hover help for all UI controls | Add tooltip on hover (desktop, 500ms delay) and long-press (mobile, 600ms) for every icon and control. One sentence max per tooltip. Key tooltips needed: each sound mode icon (Silent / Voyager Radio / Deep Space Ambient / Psychedelic Journey / Cosmic Electronic / Spotify / YouTube), each camera mode button, time multiplier buttons, display checkboxes (Orbital paths, Body labels, Rings, Resonance lines — especially resonance since nobody knows what it does), altitude slider, inclination slider, GeoSync button, Voyager preset, screenshot button, Ko-fi button, presentation mode (P), fullscreen (F11). Style: Dark Gray #4D4D4D background, Light Gray #D9D9D9 text, Lato font, 8px border radius, appears after delay, disappears on mouseout/touchend. |
+| 1 | KTX2 compressed textures | Add Basis encoder to build pipeline for faster mobile loading |
+| 2 | WebGPU renderer upgrade | When postprocessing library adds WebGPU support |
+| 3 | Moon 8K texture upgrades | Jupiter already at SSS's max (8K). Galilean moon candidates need GeoTIFF conversion: Björn Jónsson (bjj.is/3d/planetary-maps), USGS Astrogeology. Priority: Europa, Io, Ganymede, Callisto. URLs noted in renderer.js. |
+| 4 | Release preparation — supporting pages | Add About page (project story, AI-built in 48hrs narrative, tech stack, author bio linking to ITprojectMGMT.com and LinkedIn), Contact page (kyle@itprojectmgmt.com), Legal/Disclaimer page (NASA texture credits and CC BY 4.0 attribution, Solar System Scope CC BY 4.0, Björn Jónsson public domain credits, no warranty disclaimer, not affiliated with NASA or any space agency), Privacy Policy (no tracking, no user data collected, localStorage only for user preferences, no cookies, no analytics). All pages accessible from a minimal persistent footer. Style matches brand. Mobile-friendly. |
+| 5 | Release preparation — security hardening | Before any public promotion or LinkedIn post: (1) Content Security Policy headers via Cloudflare Worker — restrict script-src to self, block inline scripts and eval; (2) Add /.well-known/security.txt with contact info; (3) Subresource Integrity (SRI) on Google Fonts CDN links; (4) Security response headers: X-Frame-Options SAMEORIGIN, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy restricting unused browser APIs; (5) Audit all source code for exposed secrets, API keys, or tokens before public release; (6) Review localStorage usage — confirm no sensitive data stored; (7) Rate limiting on ISS position API endpoint when built; (8) HTTPS-only already enforced by Cloudflare. Run Mozilla Observatory scan and target A+ rating before launch. |
+| 6 | Sharpness calibration eyeball pass | Bug #9 — review relief/crater/speckle strength on real hardware; knobs: normalScale in jupiter.js, gDetailHeight weights in detailShaders.js |
+
+Completed in v4 (removed from backlog): fullscreen, presentation mode,
+limb glow shader, retrograde inclination, GRS preset, zoom floor,
+dynamic version display, altitude + inclination sliders in Mission
+Control. Completed in v4b: GRS button off the body card, expanded body
+cards, resonance visualization, Camera Speed rename, music collapse,
+brand icons, tooltips.
 
 ---
 

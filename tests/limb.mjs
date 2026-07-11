@@ -1,8 +1,8 @@
-﻿// 4b limb glow verification: Jupiter disk from day / terminator / night.
+// 4b limb glow verification: Jupiter disk from day / terminator / night.
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'fs';
 
-const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const URL = process.env.SMOKE_URL || 'http://localhost:5175';
 const OUT = new globalThis.URL('./shots/', import.meta.url).pathname.slice(1);
 mkdirSync(OUT, { recursive: true });
