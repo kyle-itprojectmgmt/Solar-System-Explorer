@@ -468,19 +468,23 @@ export class SceneRenderer {
   }
 
   _buildResonanceLines() {
-    // Subtle radius lines from the primary to the three resonant moons
-    // (shown only in System View when enabled).
+    // 1:2:4 Laplace resonance visualizer (3e): connecting lines between the
+    // three resonant moons. Each line pulses Primary Blue when its pair
+    // approaches conjunction (< 15°); the UI reads resonanceInfo for the
+    // "Resonance: N% aligned" HUD readout.
     this.resonance = new THREE.Group();
     this.resonanceTargets = this.system.bodies.filter((b) => b.physics === 'nbody').slice(0, 3);
-    const colors = [0xffaa55, 0x66b2ff, 0xd9d9d9];
-    this.resonanceLines = this.resonanceTargets.map((cfg, i) => {
-      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(1, 0, 0)]);
+    this.resonancePairs = [[0, 1], [1, 2], [0, 2]];
+    this.resonanceLines = this.resonancePairs.map(() => {
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
       const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
-        color: colors[i % 3], transparent: true, opacity: 0.4,
+        color: 0x66b2ff, transparent: true, opacity: 0.25,
+        blending: THREE.AdditiveBlending, depthWrite: false,
       }));
       this.resonance.add(line);
       return line;
     });
+    this.resonanceInfo = { pct: 0, aligned: false };
     this.resonance.visible = false;
     this.root.add(this.resonance);
   }
@@ -575,14 +579,30 @@ export class SceneRenderer {
       }
     }
 
-    // Resonance visualizer.
-    if (this.resonance.visible) {
-      this.resonanceTargets.forEach((cfg, i) => {
-        const b = physics.getBody(cfg.name);
-        const line = this.resonanceLines[i];
-        const posAttr = line.geometry.attributes.position;
-        posAttr.setXYZ(1, b.pos.x * K, b.pos.y * K, b.pos.z * K);
-        posAttr.needsUpdate = true;
+    // Resonance visualizer: line endpoints track the moons; pairs within
+    // 15° of conjunction pulse in Primary Blue.
+    if (this.resonance.visible && this.resonanceTargets.length >= 3) {
+      const moons = this.resonanceTargets.map((cfg) => physics.getBody(cfg.name));
+      const theta = moons.map((b) => Math.atan2(-b.pos.z, b.pos.x));
+      const sep = (i, j) => {
+        const d = theta[i] - theta[j];
+        return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+      };
+      // Alignment across the two resonant pairs (Io–Europa, Europa–Ganymede).
+      const a = sep(0, 1), b = sep(1, 2);
+      this.resonanceInfo.pct = Math.max(0, Math.round(100 * (1 - (a + b) / (2 * Math.PI))));
+      this.resonanceInfo.aligned = a < 0.2618 && b < 0.2618; // both < 15°
+      this.resonancePairs.forEach(([i, j], k) => {
+        const line = this.resonanceLines[k];
+        const pa = line.geometry.attributes.position;
+        pa.setXYZ(0, moons[i].pos.x * K, moons[i].pos.y * K, moons[i].pos.z * K);
+        pa.setXYZ(1, moons[j].pos.x * K, moons[j].pos.y * K, moons[j].pos.z * K);
+        pa.needsUpdate = true;
+        const pairAligned = sep(i, j) < 0.2618;
+        line.material.color.setHex(pairAligned ? 0x0077cc : 0x66b2ff);
+        line.material.opacity = pairAligned
+          ? 0.65 + 0.3 * Math.sin(elapsed * 6.0) // conjunction pulse
+          : 0.25;
       });
     }
   }

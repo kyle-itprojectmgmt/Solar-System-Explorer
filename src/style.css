@@ -141,6 +141,18 @@ html, body {
   pointer-events: none;
 }
 .detail-floor-msg.show { opacity: 1; }
+.resonance-hud {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--gray-light);
+  text-shadow: 0 0 8px rgba(5, 5, 16, 0.9);
+}
+.resonance-hud.aligned { color: var(--blue-light); font-weight: 700; }
 .hud-mode { font-family: var(--font-head); font-weight: 600; letter-spacing: 0.1em; color: var(--blue-light); }
 .hud-target { color: var(--white); margin-top: 2px; }
 .hud-hint { color: var(--gray-light); font-size: 0.7rem; margin-top: 2px; font-style: italic; }

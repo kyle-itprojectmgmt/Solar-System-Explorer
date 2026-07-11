@@ -82,6 +82,10 @@ export class UI {
     // Detail-floor feedback (4a): one-time message below the ALT readout.
     this.floorMsg = el('div', 'detail-floor-msg', this.hud);
     this.floorMsg.textContent = 'Maximum surface detail reached';
+
+    // 1:2:4 resonance alignment readout — visible while resonance lines are on.
+    this.resEl = el('div', 'resonance-hud', this.hud);
+    this.resEl.style.display = 'none';
   }
 
   _bodyCfg(name) {
@@ -230,6 +234,10 @@ export class UI {
     this.labelToggle = toggle(togSec, 'Body labels', false, (v) => this.setLabelsVisible(v));
     this.ringToggle = toggle(togSec, 'Rings', true, (v) => this.r.setRingsVisible(v));
     this.resonanceToggle = toggle(togSec, 'Resonance lines', false, (v) => this.r.setResonanceVisible(v && this.cam.mode === 'system'));
+    this.resonanceToggle.parentElement.title =
+      'Shows the gravitational resonance between Io, Europa, and Ganymede. '
+      + 'They orbit Jupiter in a precise 1:2:4 ratio — for every orbit Ganymede completes, '
+      + 'Europa completes 2 and Io completes 4. Lines pulse when moons align.';
 
     // Voyager preset
     const presetSec = section(this.side, 'Presets');
@@ -764,6 +772,15 @@ export class UI {
         this.mcAltSlider.value = Math.min(1, Math.max(0, this._altT(Math.max(altKm, 50))));
         this.mcAltReadout.textContent = `ALT: ${Math.round(altKm).toLocaleString()} km`;
       }
+    }
+
+    // Resonance alignment readout.
+    if (this.r.resonance?.visible && this.r.resonanceInfo) {
+      this.resEl.style.display = '';
+      this.resEl.textContent = `Resonance: ${this.r.resonanceInfo.pct}% aligned`;
+      this.resEl.classList.toggle('aligned', this.r.resonanceInfo.aligned);
+    } else {
+      this.resEl.style.display = 'none';
     }
 
     // Orbit insertion live readout.
