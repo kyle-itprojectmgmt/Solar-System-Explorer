@@ -141,6 +141,17 @@ export class UI {
 
     this.dpGrid = el('div', 'dp-grid', p);
 
+    // Time row (V5.1.2): date clicks only highlight; Apply commits the
+    // selected date + entered time together as one UTC instant.
+    const timeRow = el('div', 'dp-timerow', p);
+    el('span', 'af-label', timeRow).textContent = 'Time (UTC)';
+    this.dpTime = el('input', 'dp-time embed-input', timeRow);
+    Object.assign(this.dpTime, { type: 'time', step: 1, required: true });
+    this.dpTime.onkeydown = (e) => { if (e.key === 'Enter') this._dpApply(); };
+    const apply = el('button', 'btn btn-small dp-apply', timeRow);
+    apply.textContent = 'Apply';
+    apply.onclick = () => this._dpApply();
+
     // Close on click-away / Escape (Escape handled in _bindKeys).
     document.addEventListener('pointerdown', (e) => {
       if (this.datePicker.style.display !== 'none'
@@ -156,6 +167,12 @@ export class UI {
       const d = this.physics.simDate;
       this._dpY = Math.max(1950, Math.min(2050, d.getUTCFullYear()));
       this._dpM = d.getUTCMonth();
+      // Selection starts at the current sim instant: changing only the date
+      // keeps the time, changing only the time keeps the date.
+      this._dpSel = { y: d.getUTCFullYear(), m: d.getUTCMonth(), day: d.getUTCDate() };
+      const pad = (n) => String(n).padStart(2, '0');
+      this.dpTime.value =
+        `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
       this._dpRender();
     }
     this.datePicker.style.display = show ? '' : 'none';
@@ -182,23 +199,38 @@ export class UI {
     for (let i = 0; i < first.getUTCDay(); i++) el('span', '', this.dpGrid);
     const sim = this.physics.simDate;
     const isSimMonth = sim.getUTCFullYear() === this._dpY && sim.getUTCMonth() === this._dpM;
+    const sel = this._dpSel;
+    const isSelMonth = sel && sel.y === this._dpY && sel.m === this._dpM;
     for (let d = 1; d <= days; d++) {
       const b = el('button', 'dp-day', this.dpGrid);
       b.textContent = d;
       if (isSimMonth && sim.getUTCDate() === d) b.classList.add('today');
+      if (isSelMonth && sel.day === d) b.classList.add('selected');
       b.onclick = () => this._dpPick(d);
     }
   }
 
-  /** Jump the simulation to the picked date (time-of-day preserved). */
+  /** Highlight the picked date — Apply commits date + time together. */
   _dpPick(day) {
-    const sim = this.physics.simDate;
+    this._dpSel = { y: this._dpY, m: this._dpM, day };
+    this._dpRender();
+  }
+
+  /** Jump the simulation to the selected date at the entered UTC time. */
+  _dpApply() {
+    const sel = this._dpSel;
+    if (!sel) return;
     const pad = (n) => String(n).padStart(2, '0');
-    const iso = `${this._dpY}-${pad(this._dpM + 1)}-${pad(day)}`
-      + `T${pad(sim.getUTCHours())}:${pad(sim.getUTCMinutes())}:${pad(sim.getUTCSeconds())}Z`;
+    // type=time yields HH:MM when seconds are 0 (and '' when cleared —
+    // fall back to the current sim time-of-day).
+    const sim = this.physics.simDate;
+    let t = this.dpTime.value
+      || `${pad(sim.getUTCHours())}:${pad(sim.getUTCMinutes())}:${pad(sim.getUTCSeconds())}`;
+    if (t.length === 5) t += ':00';
+    const iso = `${sel.y}-${pad(sel.m + 1)}-${pad(sel.day)}T${t}Z`;
     this.setLive(false);
     this.physics.jumpToSimSeconds(dateToSimSeconds(iso, this.physics.epochMs));
-    this.notify(`Jumped to ${iso.slice(0, 10)}`);
+    this.notify(`Jumped to ${iso.slice(0, 10)} ${t} UTC`);
     this.toggleDatePicker(false);
   }
 
@@ -209,10 +241,9 @@ export class UI {
     this.liveBtn.textContent = v ? '🔴 LIVE' : '🔴';
     this.liveBtn.classList.toggle('on', v);
     if (v) {
-      this.physics.jumpToSimSeconds(
-        dateToSimSeconds(new Date().toISOString(), this.physics.epochMs));
+      this.physics.jumpToSimSeconds((Date.now() - this.physics.epochMs) / 1000);
       this.physics.setTimeIndex(1);
-      this._liveSync = 0;
+      this._liveSyncMs = Date.now();
       if (!silent) this.notify('LIVE — tracking real-world time');
     }
   }
@@ -1522,15 +1553,21 @@ export class UI {
   // -- Per-frame update ------------------------------------------------------------------------------
 
   update(dt) {
-    // LIVE mode: multiplier locked to 1x, gentle re-sync to the wall clock
-    // once a minute (frame-time drift correction).
+    // LIVE mode: multiplier locked to 1x, re-sync to the wall clock on
+    // WALL-CLOCK criteria, never accumulated frame time. The old 60 s of
+    // accumulated rAF dt could only elapse while the tab was visible — a
+    // backgrounded tab stalls the sim clock for hours, then keeps showing
+    // the stall time for a further minute after waking (reported as "HUD
+    // shows local time": the stalled value happened to trail real UTC by
+    // the tab-hidden duration). Drift > 2 s snaps on the first frame back.
     if (this.liveMode) {
       if (this.physics.timeIndex !== 1) this.physics.setTimeIndex(1);
-      this._liveSync = (this._liveSync ?? 0) + dt;
-      if (this._liveSync > 60) {
-        this._liveSync = 0;
-        this.physics.jumpToSimSeconds(
-          dateToSimSeconds(new Date().toISOString(), this.physics.epochMs));
+      const nowMs = Date.now();
+      const driftS = Math.abs(
+        (this.physics.epochMs + this.physics.simSeconds * 1000 - nowMs) / 1000);
+      if (driftS > 2 || nowMs - (this._liveSyncMs ?? 0) > 60000) {
+        this._liveSyncMs = nowMs;
+        this.physics.jumpToSimSeconds((nowMs - this.physics.epochMs) / 1000);
       }
     }
 

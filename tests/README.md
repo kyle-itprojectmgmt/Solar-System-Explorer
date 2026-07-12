@@ -52,7 +52,9 @@ script's own directory) — git-ignored.
 # v4c additions:
 node tests/freelook.mjs   # Alt free-look + inclination auto-switch
 node tests/tray.mjs       # bottom tray + audio flyout (17 checks)
-node tests/datepicker.mjs # ghost clock, calendar jump, LIVE mode
+node tests/datepicker.mjs # ghost clock, calendar highlight + time-row Apply
+                          # (V5.1.2), Apollo date+time exact jump, LIVE mode
+                          # + tab-stall wall-clock resync (18 checks)
 node tests/stack.mjs      # icon stack: 6 panels, presets, ?view= URL sharing (23 checks)
 node tests/toast.mjs      # event toasts + Watch navigation
 

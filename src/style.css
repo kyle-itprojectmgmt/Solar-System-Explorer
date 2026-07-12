@@ -215,6 +215,10 @@ html, body {
 }
 .dp-day:hover { background: rgba(0, 119, 204, 0.35); }
 .dp-day.today { border-color: var(--blue-light); color: var(--blue-light); font-weight: 700; }
+.dp-day.selected { background: rgba(0, 119, 204, 0.55); border-color: var(--blue-light); }
+.dp-timerow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.dp-time { flex: 1; min-width: 0; color-scheme: dark; }
+.dp-apply { flex: none; }
 .hud-altitude {
   position: fixed;
   top: 16px;
