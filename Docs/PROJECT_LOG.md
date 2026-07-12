@@ -1064,6 +1064,28 @@ multiplying the whole height field; reversed-arg smoothstep (GLSL UB).
   the live URL. **Mozilla Observatory: A+ (score 130, 10/10 tests,
   scanned 2026-07-12)** — exceeds the launch target.
 
+### v7.0.1 — Saturn Hardware-Review Fixes (2026-07-12, commits 769edae + 5e484ab)
+Kyle's real-hardware pass, two fixes:
+- Ring particles REMOVED entirely (769edae): the fly-through overlay
+  read as white blob snowflakes, not ice. _buildRingParticles + the
+  plane-proximity gate + the point shader deleted; the textured disc
+  alone carries the ring plane. saturntest now asserts particle ABSENCE.
+- Cloud bands (5e484ab): measured 4% zone/belt contrast (uniform tan).
+  LAYER 2 rewritten as a per-latitude palette — cream zones / warm brown
+  belts via fract(lat·3.5) with fbm edge meander, blue-grey polar caps,
+  strengthened north hexagon-region tint; base texture kept as
+  brightness modulation. Terminator widened via shaderParams
+  (−0.25/0.20 — thick-atmosphere scatter past the shadow line). After:
+  11–13% band contrast at formula latitudes, Hubble-style banding
+  confirmed by screenshot. Ring shadow measured unchanged (2.2×).
+  Probe gotcha logged: framing evaluates must setMode('free') + settle
+  BEFORE the screenshot evaluate — cinematic flies the camera between
+  evaluates. NOTE: prescribed probe latitudes vs the fract(lat·3.5)
+  band map disagree — sample where the formula actually puts belts.
+- Deployed (ab19da60) after two transient Cloudflare API 5xxs (522/520
+  — their side; first backoff retry succeeded). Live bundle verified:
+  particle strings gone, palette + terminator strings present.
+
 ---
 
 ## Known Bugs / In Progress
