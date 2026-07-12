@@ -77,20 +77,19 @@ float ia_lum = dot(detail, vec3(0.299, 0.587, 0.114));
 // EQUATORIAL RIDGE (the walnut seam): |latitude| < 5° (abs(vObjPos.y) < 0.087)
 // ONE place where positive relief is allowed — this is a real 20 km mountain range.
 {
-  float ia_ridgeSpan = 1.0 - smoothstep(0.0, 0.087, abs(vObjPos.y));
+  // Narrow band, ±3° latitude. Amplitude lesson (measured, v6 class):
+  // 0.5 relief rendered as a giant black cracked canyon ring around the
+  // whole moon — derivative shading saturates on long steep ridges. The
+  // ridge must be a SUBTLE seam; 0.06 with gentle low-frequency
+  // modulation reads as terrain, not a stamp.
+  float ia_ridgeSpan = 1.0 - smoothstep(0.0, 0.052, abs(vObjPos.y));
   if (ia_ridgeSpan > 0.001) {
-    // Ridge height: fbm3 variation modulates the mountain. The dark-
-    // hemisphere gate scales THE RIDGE ONLY — the first cut multiplied the
-    // whole accumulated height field, warping crater relief and stepping
-    // discontinuously at the ±5° boundary (review fix).
+    // Dark-hemisphere gate scales THE RIDGE ONLY (review fix: the first
+    // cut multiplied the whole accumulated height field).
     float ia_ridgeDarkGate = 1.0 - smoothstep(0.3, 0.5, ia_lum) * 0.5;
-    float ia_ridge = ia_ridgeSpan * (0.55 + 0.45 * fbm3(vObjPos * 14.0)) * ia_ridgeDarkGate;
-
-    // Add positive relief (allowed here only — a real mountain range).
-    gDetailHeight += ia_ridge * 0.5;
-
-    // Brighten sun-facing paint slightly (×1.06).
-    detail = mix(detail, detail * 1.06, ia_ridgeSpan * 0.4);
+    float ia_ridge = ia_ridgeSpan * (0.7 + 0.3 * fbm3(vObjPos * 6.0)) * ia_ridgeDarkGate;
+    gDetailHeight += ia_ridge * 0.06;
+    detail = mix(detail, detail * 1.04, ia_ridgeSpan * 0.3);
   }
 }
 

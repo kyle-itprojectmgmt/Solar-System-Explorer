@@ -36,19 +36,32 @@ float en_grazeFade = sse_grazeFade(dot(vObjPos, uSunObj), uGrazeFade0, uGrazeFad
   if (en_southPole > 0.001) {
     vec2 en_sp = en_tigerStriPole(vObjPos);
 
-    // Stripe ridges: sub-parallel fracture lines from ridged noise.
-    float en_stripe = dtlAAstep(0.93, 0.985, ridged(vec3(en_sp * 3.5, 2.7)));
+    // Real tiger stripes are FOUR thin sub-parallel fractures ~35 km
+    // apart, confined near the pole — the first cut's ridged-noise maze
+    // painted giant angular worms across the whole region (measured).
+    // Rotate the polar frame, meander gently, then draw periodic thin
+    // troughs and clip to a 4-stripe band + polar patch radius.
+    float en_ca = cos(0.6), en_sa = sin(0.6);
+    vec2 en_rp = mat2(en_ca, -en_sa, en_sa, en_ca) * en_sp;
+    float en_warp = snoise(vec3(en_rp * 2.2, 4.2)) * 0.05;
+    float en_y = en_rp.y + en_warp;
+    // Distance to the nearest stripe line (period 0.16 in polar coords).
+    float en_band = abs(fract(en_y / 0.16 + 0.5) - 0.5) * 0.16;
+    float en_stripe = 1.0 - smoothstep(0.006, 0.018, en_band);
+    en_stripe *= step(abs(en_y), 0.34);                        // exactly 4 stripes
+    en_stripe *= 1.0 - smoothstep(0.30, 0.55, length(en_rp));  // polar patch only
+    en_stripe *= en_southPole;
 
-    // Blue-grey tint along stripes: #88AACC.
+    // Blue-grey tint along stripes: #88AACC — thin, subtle.
     vec3 en_stripeTint = vec3(0.533, 0.667, 0.8);
-    detail = mix(detail, en_stripeTint, en_stripe * 0.5 * en_southPole);
+    detail = mix(detail, en_stripeTint, en_stripe * 0.35);
 
-    // Trough depth: cut the relief into the surface.
-    gDetailHeight -= en_stripe * 0.35 * en_southPole;
+    // Shallow trough relief.
+    gDetailHeight -= en_stripe * 0.12;
 
     // Faint blue-green emissive glow along stripes, below 2000 km.
     float en_glowAltFade = 1.0 - smoothstep(500.0, 2000.0, uAltitude);
-    gDetailEmissive += vec3(0.2, 0.45, 0.5) * en_stripe * 0.02 * en_glowAltFade * uDetailBlend * en_southPole;
+    gDetailEmissive += vec3(0.2, 0.45, 0.5) * en_stripe * 0.02 * en_glowAltFade * uDetailBlend;
   }
 }
 

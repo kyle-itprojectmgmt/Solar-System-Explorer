@@ -4,6 +4,14 @@
 //           uAltitude (km), uIntensity (default 1.0)
 
 // === VERTEX ===
+// Log-depth chunks (V7 fix, measured): the renderer uses a logarithmic
+// depth buffer — built-in materials write log-encoded depth, and without
+// these chunks this shell's conventional depth ALWAYS loses the depth
+// test against the moon underneath (the haze rendered as a rim donut
+// around a bare surface). The other shells never hit this: limb glows
+// only need to draw outside the disc silhouette.
+#include <common>
+#include <logdepthbuf_pars_vertex>
 varying vec3 vWPos;
 varying vec3 vWNormal;
 
@@ -11,9 +19,12 @@ void main() {
   vWPos = (modelMatrix * vec4(position, 1.0)).xyz;
   vWNormal = normalize(mat3(modelMatrix) * normal);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  #include <logdepthbuf_vertex>
 }
 
 // === FRAGMENT ===
+#include <common>
+#include <logdepthbuf_pars_fragment>
 uniform vec3 uSunW;
 uniform vec3 uCamPos;
 uniform float uAltitude;
@@ -23,6 +34,7 @@ varying vec3 vWPos;
 varying vec3 vWNormal;
 
 void main() {
+  #include <logdepthbuf_fragment>
   vec3 n = normalize(vWNormal);
   vec3 viewDir = normalize(uCamPos - vWPos);
 

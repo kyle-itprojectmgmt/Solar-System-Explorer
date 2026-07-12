@@ -476,6 +476,9 @@ const KRONOS_RING_SHADOW = /* glsl */ `
   // D 1.110–1.236 (0.04), C 1.236–1.527 (0.18), B 1.527–1.951 (0.90),
   // Cassini gap, A 2.027–2.269 (0.65). Soft edges; fades near sun-in-plane
   // (equinox) where the shadow thins to a line in reality.
+  // Multiplies diffuseColor AFTER the detail mix: a real shadow does not
+  // scale with uDetailBlend (measured: the first placement diluted the
+  // 63% band to 7% at 120,000 km viewing distance).
   if (abs(uSunObj.y) > 2e-3) {
     float krs_t = -vObjPos.y / uSunObj.y;
     if (krs_t > 0.0) {
@@ -488,7 +491,7 @@ const KRONOS_RING_SHADOW = /* glsl */ `
       krs_op += 0.65 * (smoothstep(2.017, 2.037, krs_r) - smoothstep(2.259, 2.279, krs_r));
       // Shadow softens as the sun approaches the ring plane.
       krs_op *= smoothstep(0.002, 0.03, abs(uSunObj.y));
-      detail *= 1.0 - clamp(krs_op, 0.0, 1.0) * 0.7;
+      diffuseColor.rgb *= 1.0 - clamp(krs_op, 0.0, 1.0) * 0.7;
     }
   }
 `;
@@ -499,8 +502,8 @@ DETAIL_STYLES.kronos = {
   apply: /* glsl */ `
     ${DETAIL_PREAMBLE}
     { ${kronosClouds.apply} }
-    { ${KRONOS_RING_SHADOW} }
     ${DETAIL_FINAL}
+    { ${KRONOS_RING_SHADOW} }
   `,
 };
 

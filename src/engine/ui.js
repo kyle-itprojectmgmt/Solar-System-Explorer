@@ -23,6 +23,12 @@ const CAMERA_MODES = [
 const modeById = (id) => CAMERA_MODES.find((m) => m.id === id);
 
 export class UI {
+  // Optics (V7 3c): the renderer's default 48° is "normal" (wide FOVs
+  // oval-stretch spheres — v2 lesson); 10° is the telephoto preset.
+  static FOV_NORMAL = 48;
+  static FOV_TELE = 10;
+  static FOV_TELE_THRESHOLD = 30;
+
   constructor({ system, physics, sceneRenderer, cameraCtl, audio, onScreenshot, onVoyagerPreset }) {
     this.system = system;
     this.physics = physics;
@@ -239,6 +245,25 @@ export class UI {
     this.physics.jumpToSimSeconds(dateToSimSeconds(iso, this.physics.epochMs));
     this.notify(`Jumped to ${iso.slice(0, 10)} ${t} UTC`);
     this.toggleDatePicker(false);
+  }
+
+  /** Field of view (V7 3c): live camera update + slider/🔭 sync.
+   *  `silent` skips the toast (slider drags, initial load). */
+  setFov(deg, silent = false) {
+    const f = Math.min(90, Math.max(5, deg));
+    this.r.camera.fov = f;
+    this.r.camera.updateProjectionMatrix();
+    localStorage.setItem('sse-fov', String(f));
+    if (this.fovSlider) {
+      this.fovSlider.value = this._fovToSlider(f);
+      this._fovReadout.textContent = `FIELD OF VIEW: ${f}°${
+        f < UI.FOV_TELE_THRESHOLD ? ' (telephoto)' : ''}`;
+    }
+    this.teleBtn?.classList.toggle('active', f < UI.FOV_TELE_THRESHOLD);
+    if (!silent) {
+      this.notify(f < UI.FOV_TELE_THRESHOLD
+        ? `Telephoto — ${f}° field of view` : `Normal optics — ${f}° field of view`);
+    }
   }
 
   /** 🔴 LIVE: track the real-world UTC clock at 1x. */
@@ -716,7 +741,10 @@ export class UI {
         this.cam.playSequence([
           { target: 'Moon', dist: 2.2, height: 0.3, orbitRate: 0.025, duration: 40, startTheta: phiE + 2.72, lookAt: 'Earth' },
         ]);
-        this.notify('Earthrise — Earth climbs over the lunar horizon');
+        // Telephoto (V7 3c): Earth is 1.9° across from the Moon — the
+        // Apollo 8 look needs the compression. Slider/🔭 stay in sync.
+        this.setFov(UI.FOV_TELE, true);
+        this.notify('Earthrise — Earth climbs over the lunar horizon (telephoto)');
       } },
       // Earth's epoch moment (V5.1.2: LIVE-by-default means the sim no
       // longer OPENS at the epoch — this is now the way back to it).
@@ -781,6 +809,49 @@ export class UI {
         this.cam.setMode('insertion', this.system.primary.name);
         this.cam.setInsertion({ altitudeKm: 2000, incDeg: 85 });
         this.notify('Polar orbit — water-ice cap and spiral troughs');
+      } },
+      // — Saturn (V7). Insertion presets: setMode FIRST, then setInsertion
+      // (entry re-derives altitude from camera distance — house rule).
+      { label: '💍 Ring Plane View', system: 'saturn', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 150000, incDeg: 30 });
+        this.notify('Ring plane view — 30° above the rings at 150,000 km');
+      } },
+      { label: '➖ Ring Edge-On', system: 'saturn', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 80000, incDeg: 0 });
+        this.notify('Edge-on — the rings collapse to a razor-thin line');
+      } },
+      { label: '✨ Through the Rings', system: 'saturn', fn: () => {
+        // Orbit mode is the documented ring-floor exemption (insertion
+        // clamps at 80,000 km): park INSIDE the ring span, a hair off the
+        // plane, so the fly-through particle layer activates. Wider FOV
+        // for the surrounding particle field.
+        this.cam.setMode('orbit', this.system.primary.name);
+        this.cam.orbDist = 110;               // 110,000 km — B/A ring region
+        this.cam.orbPhi = Math.PI / 2 - 0.02; // ~2,200 km above the plane
+        this.setFov(25, true);
+        this.notify('Inside the ring plane — ice particles all around');
+      } },
+      { label: '🟠 Titan Close Pass', system: 'saturn', fn: () => {
+        this.cam.setMode('insertion', 'Titan');
+        this.cam.setInsertion({ altitudeKm: 500, incDeg: 20 });
+        this.notify('Skimming Titan\'s orange haze at 500 km');
+      } },
+      { label: '💨 Enceladus Geysers', system: 'saturn', fn: () => {
+        this.cam.setMode('insertion', 'Enceladus');
+        this.cam.setInsertion({ altitudeKm: 200, incDeg: 80 });
+        this.notify('Polar pass — geyser plumes over the tiger stripes');
+      } },
+      { label: '⚫⚪ Iapetus Boundary', system: 'saturn', fn: () => {
+        this.cam.setMode('orbit', 'Iapetus');
+        this.cam.orbDist = this.r.bodyRadius('Iapetus') + 1.0; // 1,000 km up
+        this.notify('The dark-light boundary of the yin-yang moon');
+      } },
+      { label: '💫 Death Star View', system: 'saturn', fn: () => {
+        this.cam.setMode('orbit', 'Mimas');
+        this.cam.orbDist = this.r.bodyRadius('Mimas') + 0.5; // 500 km up
+        this.notify('Mimas — the Herschel crater face');
       } },
       { label: '🌌 Aurora from Orbit', system: 'earth', fn: () => {
         // Magnetic poles carry the auroral ovals (earth-aurora.glsl); the
@@ -1012,6 +1083,29 @@ export class UI {
         this.notify('Velocity vectors — coming soon');
       }
     });
+
+    // Optics (V7 3c, backlog #12): field-of-view control. NORMAL here is
+    // 48° — the renderer's deliberate default (wide FOVs perspective-
+    // stretch spheres into ovals, v2 lesson) — NOT the common 75°.
+    // Telephoto compression is what makes Earthrise read like Apollo 8.
+    const optics = section(c, 'Optics');
+    const fovReadout = el('div', 'alt-readout', optics);
+    this.fovSlider = el('input', 'slider', optics);
+    // Logarithmic: slider is linear in log(fov), 5°..90°.
+    Object.assign(this.fovSlider, { type: 'range', min: 0, max: 1, step: 0.001 });
+    el('div', 'ins-scale', optics).innerHTML = '<span>5° telephoto</span><span>90° wide</span>';
+    el('p', 'panel-desc', optics).textContent =
+      'Field of view — telephoto compresses distance, filling the frame with far-away worlds';
+    const fovToSlider = (f) => Math.log(f / 5) / Math.log(90 / 5);
+    this._fovReadout = fovReadout;
+    this._fovToSlider = fovToSlider;
+    this.fovSlider.oninput = () => {
+      const f = 5 * Math.pow(90 / 5, +this.fovSlider.value);
+      this.setFov(Math.round(f * 10) / 10, true);
+    };
+    const storedFov = parseFloat(localStorage.getItem('sse-fov'));
+    this.setFov(Number.isFinite(storedFov)
+      ? Math.min(90, Math.max(5, storedFov)) : UI.FOV_NORMAL, true);
 
     // Quick-jump altitude presets (restored from the pre-v4 Mission Control,
     // now compact buttons alongside the continuous slider).
@@ -1331,6 +1425,13 @@ export class UI {
     this.presBtn.dataset.tray = 'presentation';
     this.presBtn.onclick = () => this.setPresentation(!this.presentationMode);
 
+    // 🔭 telephoto quick toggle (V7 3c): normal 48° ↔ telephoto 10°.
+    this.teleBtn = el('button', 'tray-btn', tray);
+    this.teleBtn.textContent = '🔭';
+    this.teleBtn.dataset.tray = 'telephoto';
+    this.teleBtn.onclick = () => this.setFov(
+      this.r.camera.fov < UI.FOV_TELE_THRESHOLD ? UI.FOV_NORMAL : UI.FOV_TELE);
+
     const kofi = el('a', 'tray-btn kofi-btn', tray);
     kofi.href = KOFI_URL;
     kofi.target = '_blank';
@@ -1640,6 +1741,7 @@ export class UI {
 
     // Sound modes
     t.attach(this.musicBtn, 'Music and soundscapes — generative modes, Spotify, YouTube');
+    t.attach(this.teleBtn, 'Telephoto zoom — narrows the field of view for distant objects. Makes Earth fill the frame from lunar orbit.');
     t.attach(this.trayVol, 'Volume');
     t.attach(this.muteBtn, 'Mute / unmute all audio');
     t.attach(this.genSelect, 'Generative space soundscapes — evolve continuously, never repeat');

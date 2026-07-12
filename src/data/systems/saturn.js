@@ -118,7 +118,10 @@ export default {
     // dust-storm lesson): the ring shadow band across the cloud tops is a
     // signature feature that must read well before close approach; the
     // cloud layers stage themselves in lower via their own altitude gates.
-    detail: { style: 'kronos', activationKm: 150000, fullKm: 5000 },
+    // Activation covers the NAV-entry framing distance (~264,500 km) so
+    // the ring shadow — full strength independent of blend — is present
+    // from first approach; cloud layers still stage in via their own gates.
+    detail: { style: 'kronos', activationKm: 400000, fullKm: 5000 },
 
     navPresets: [
       {

@@ -545,11 +545,18 @@ export class SceneRenderer {
       if (cfg.atmosphere?.style === 'titan') {
         const shellMat = makeShellAtmosphereMaterial(TITAN_GLSL, cfg.atmosphere);
         shellMat.blending = THREE.NormalBlending;
+        // FrontSide, unlike the limb-glow shells: a BackSide shell's far
+        // hemisphere is depth-occluded by the moon itself, so the disc
+        // fill never renders (measured: orange donut around a bare
+        // surface). The NEAR hemisphere sits in front of the moon and
+        // composites the opaque haze over the whole disc.
+        shellMat.side = THREE.FrontSide;
         shellMat.userData.worldUniforms = true;
         shellMat.userData.altitudeBody = cfg.name; // per-frame uAltitude source
         const shell = new THREE.Mesh(
           new THREE.SphereGeometry(r * (1 + (cfg.atmosphere.thickness ?? 0.06)), 64, 48),
           shellMat);
+        shell.renderOrder = 1; // after the opaque moon beneath
         group.add(shell);
       }
       if (cfg.features?.volcanicPlumes && cfg.features.volcanoes) {
