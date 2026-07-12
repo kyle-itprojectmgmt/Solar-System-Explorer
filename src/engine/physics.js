@@ -57,23 +57,45 @@ export class PhysicsEngine {
       const period = cfg.periodDays * 86400;
       const phase = ((cfg.phaseDeg || 0) * Math.PI) / 180;
       const v = TWO_PI * a / period; // circular orbital speed, km/s
-      return {
+      // Orbital inclination (V7): Kepler orbits tilt about the +X node
+      // line. Inclinations > 90° flip cos(i) negative, so retrograde
+      // orbits (Phoebe, 175.2°) emerge from the same rotation — the moon
+      // genuinely circles backwards, no special casing.
+      const inc = ((cfg.inclinationDeg || 0) * Math.PI) / 180;
+      const b = {
         cfg,
         name: cfg.name,
         a,
         period,
         phase,
+        cosI: Math.cos(inc),
+        sinI: Math.sin(inc),
         nbody: cfg.physics === 'nbody',
         mass: cfg.massKg,
-        pos: { x: a * Math.cos(phase), y: 0, z: -a * Math.sin(phase) },
-        vel: { x: -v * Math.sin(phase), y: 0, z: -v * Math.cos(phase) },
+        pos: { x: 0, y: 0, z: 0 },
+        vel: { x: 0, y: 0, z: 0 },
         acc: { x: 0, y: 0, z: 0 },
         eclipseFactor: 0,   // 0 = sunlit, 1 = fully in primary's shadow
         inTransit: false,
         transitPoint: null, // surface point of shadow on primary (km, primary frame)
       };
+      this._keplerState(b, phase, b.pos, b.vel);
+      return b;
     });
     this._computeAccelerations();
+  }
+
+  /**
+   * Circular-orbit position + velocity at orbit angle `ang`, inclined
+   * about the +X node line (V7). Writes into pos/vel in place.
+   * Rx(i): y' = −z·sin i, z' = z·cos i for in-plane (x, 0, z) vectors.
+   */
+  _keplerState(b, ang, pos, vel) {
+    const v = TWO_PI * b.a / b.period;
+    const px = b.a * Math.cos(ang), pz = -b.a * Math.sin(ang);
+    const vx = -v * Math.sin(ang), vz = -v * Math.cos(ang);
+    pos.x = px; pos.y = -pz * b.sinI; pos.z = pz * b.cosI;
+    vel.x = vx; vel.y = -vz * b.sinI; vel.z = vz * b.cosI;
   }
 
   get timeMultiplier() { return TIME_STEPS[this.timeIndex]; }
@@ -110,9 +132,7 @@ export class PhysicsEngine {
     this.primaryRotation = ((this.rotationPhase0 + this.rotationRate * s) % TWO_PI + TWO_PI) % TWO_PI;
     for (const b of this.bodies) {
       const ang = b.phase + TWO_PI * (s / b.period);
-      const v = TWO_PI * b.a / b.period;
-      b.pos.x = b.a * Math.cos(ang); b.pos.y = 0; b.pos.z = -b.a * Math.sin(ang);
-      b.vel.x = -v * Math.sin(ang); b.vel.y = 0; b.vel.z = -v * Math.cos(ang);
+      this._keplerState(b, ang, b.pos, b.vel);
     }
     this.updateSunDirection();
     this._computeAccelerations();
@@ -134,12 +154,12 @@ export class PhysicsEngine {
     const dt = simDt / steps;
     for (let s = 0; s < steps; s++) this._verletStep(dt);
 
-    // Kepler moons: analytic circular orbit.
+    // Kepler moons: analytic circular orbit (inclined about +X, V7).
+    // Velocity kept current too — chase mode and travel tangents read it.
     for (const b of this.bodies) {
       if (b.nbody) continue;
       const ang = b.phase + TWO_PI * (this.simSeconds / b.period);
-      b.pos.x = b.a * Math.cos(ang);
-      b.pos.z = -b.a * Math.sin(ang);
+      this._keplerState(b, ang, b.pos, b.vel);
     }
 
     this._updateShadows();

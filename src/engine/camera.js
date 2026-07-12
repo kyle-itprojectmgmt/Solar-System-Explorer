@@ -629,13 +629,10 @@ export class CameraController {
   _bodyVelocityWorld(name, out = new THREE.Vector3()) {
     const b = this.physics?.getBody(name);
     if (!b) return out.set(0, 0, 0); // primary or unknown
-    if (b.nbody) {
-      out.set(b.vel.x, b.vel.y, b.vel.z);
-    } else {
-      // Kepler bodies: analytic tangent of the circular orbit.
-      const ang = b.phase + (Math.PI * 2) * (this.physics.simSeconds / b.period);
-      out.set(-Math.sin(ang), 0, -Math.cos(ang));
-    }
+    // Both integrators keep b.vel current (V7: kepler velocities update
+    // every tick and carry orbital inclination — the old analytic tangent
+    // here assumed an equatorial orbit and broke on Iapetus/Phoebe).
+    out.set(b.vel.x, b.vel.y, b.vel.z);
     return out.applyQuaternion(this.r.root.quaternion); // equatorial -> world
   }
 

@@ -46,52 +46,47 @@ void main() {
     color = tex.rgb;
     opacity = tex.a;
   } else {
-    // Procedural fallback: build from landmark bands.
+    // Procedural fallback: landmark bands for the CALIBRATED mesh span
+    // 69,075–140,715 km (measured from the SSS strip's alpha profile —
+    // Cassini Division dip at t ≈ 0.71, B onset at t ≈ 0.32).
     // Base warm grey-white color.
     vec3 baseColor = vec3(0.88, 0.84, 0.78);
 
-    // D ring (t 0.0–0.104): very faint
-    if (t < 0.104) {
-      color = mix(vec3(0.70, 0.68, 0.65), baseColor, t / 0.104);
-      opacity = 0.04;
+    // C ring (t 0.076–0.320): translucent grey
+    if (t < 0.076) {
+      color = vec3(0.70, 0.68, 0.65);
+      opacity = 0.03;
     }
-    // C ring (t 0.104–0.341): translucent grey
-    else if (t < 0.341) {
-      float ct = (t - 0.104) / (0.341 - 0.104);
+    else if (t < 0.320) {
+      float ct = (t - 0.076) / (0.320 - 0.076);
       color = mix(vec3(0.55, 0.52, 0.47), baseColor, ct);
       opacity = 0.18;
     }
-    // B ring (t 0.341–0.689): dense, brightest
-    else if (t < 0.689) {
+    // B ring (t 0.320–0.677): dense, brightest
+    else if (t < 0.677) {
       color = baseColor;
       opacity = 0.90;
     }
-    // Cassini Division (t 0.689–0.752): near-transparent THROUGHOUT —
+    // Cassini Division (t 0.677–0.741): near-transparent THROUGHOUT —
     // the gap is the signature feature; soft edges only at its walls.
     // (Review fix: first cut ramped opacity back to 0.90 across the gap.)
-    else if (t < 0.752) {
+    else if (t < 0.741) {
       color = baseColor;
-      float wall = smoothstep(0.689, 0.694, t) * (1.0 - smoothstep(0.747, 0.752, t));
+      float wall = smoothstep(0.677, 0.683, t) * (1.0 - smoothstep(0.735, 0.741, t));
       opacity = mix(0.65, 0.02, wall);
     }
-    // A ring (t 0.752–0.950): dense, with the Encke gap at FULL-SPAN
-    // t ≈ 0.915 (review fix: was compared in A-ring-relative coords).
-    else if (t < 0.950) {
+    // A ring (t 0.741–0.945): dense, with the Encke gap at FULL-SPAN
+    // t ≈ 0.900 (review fix: was compared in A-ring-relative coords).
+    else if (t < 0.945) {
       color = baseColor;
       opacity = 0.65;
-      float enckeGap = smoothstep(0.004, 0.0, abs(t - 0.915));
+      float enckeGap = smoothstep(0.004, 0.0, abs(t - 0.900));
       opacity = mix(opacity, 0.05, enckeGap);
     }
-    // gap (t 0.950–0.993): transparent
-    else if (t < 0.993) {
-      color = baseColor;
-      opacity = 0.0;
-    }
-    // F ring (t 0.993–1.0): thin, kinked
+    // Beyond the A ring: faint sheen out to the mesh edge.
     else {
-      float ft = (t - 0.993) / (1.0 - 0.993);
-      color = mix(vec3(0.72, 0.70, 0.66), baseColor, 1.0 - ft);
-      opacity = 0.25;
+      color = baseColor;
+      opacity = 0.02;
     }
   }
 

@@ -27,6 +27,9 @@ import LUNA_DETAIL from './shaders/moon-detail.glsl?raw';
 import ARES_SURFACE from './shaders/mars-surface.glsl?raw';
 import ARES_DUST from './shaders/mars-dust.glsl?raw';
 import ARES_POLAR from './shaders/mars-polar.glsl?raw';
+import KRONOS_CLOUDS from './shaders/saturn-clouds.glsl?raw';
+import ENCELADUS_DETAIL from './shaders/enceladus.glsl?raw';
+import IAPETUS_DETAIL from './shaders/iapetus.glsl?raw';
 
 /** Registry of detail styles. Populated per body type below. */
 export const DETAIL_STYLES = {};
@@ -453,6 +456,67 @@ DETAIL_STYLES.ares = {
     { ${aresSurface.apply} }
     { ${aresPolar.apply} }
     { ${aresDust.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+// -- Kronos (Saturn) + Enceladus + Iapetus — V7 worker shader chunks ---------------
+// Same brace-isolated chunk pattern as terra/ares. The kronos style appends
+// the orchestrator's analytical RING SHADOW after the cloud chunk: for each
+// fragment, a ray toward the sun that crosses the equatorial plane (y = 0 in
+// object space) inside the ring spans darkens the clouds by that ring's
+// opacity. Radii are in Saturn radii (object space is the unit sphere).
+
+const kronosClouds = splitChunk(KRONOS_CLOUDS);
+const enceladusDetail = splitChunk(ENCELADUS_DETAIL);
+const iapetusDetail = splitChunk(IAPETUS_DETAIL);
+
+const KRONOS_RING_SHADOW = /* glsl */ `
+  // Ring shadow on the cloud tops (V7 3b). Ring spans / 60,268 km:
+  // D 1.110–1.236 (0.04), C 1.236–1.527 (0.18), B 1.527–1.951 (0.90),
+  // Cassini gap, A 2.027–2.269 (0.65). Soft edges; fades near sun-in-plane
+  // (equinox) where the shadow thins to a line in reality.
+  if (abs(uSunObj.y) > 2e-3) {
+    float krs_t = -vObjPos.y / uSunObj.y;
+    if (krs_t > 0.0) {
+      vec2 krs_hit = vObjPos.xz + uSunObj.xz * krs_t;
+      float krs_r = length(krs_hit);
+      float krs_op = 0.0;
+      krs_op += 0.04 * (smoothstep(1.105, 1.115, krs_r) - smoothstep(1.231, 1.241, krs_r));
+      krs_op += 0.18 * (smoothstep(1.231, 1.241, krs_r) - smoothstep(1.517, 1.537, krs_r));
+      krs_op += 0.90 * (smoothstep(1.517, 1.537, krs_r) - smoothstep(1.941, 1.961, krs_r));
+      krs_op += 0.65 * (smoothstep(2.017, 2.037, krs_r) - smoothstep(2.259, 2.279, krs_r));
+      // Shadow softens as the sun approaches the ring plane.
+      krs_op *= smoothstep(0.002, 0.03, abs(uSunObj.y));
+      detail *= 1.0 - clamp(krs_op, 0.0, 1.0) * 0.7;
+    }
+  }
+`;
+
+DETAIL_STYLES.kronos = {
+  fns: kronosClouds.fns,
+  octaves: OCTAVES_GAS_GIANT,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${kronosClouds.apply} }
+    { ${KRONOS_RING_SHADOW} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.enceladus = {
+  fns: enceladusDetail.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${enceladusDetail.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.iapetus = {
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${iapetusDetail.apply} }
     ${DETAIL_FINAL}
   `,
 };

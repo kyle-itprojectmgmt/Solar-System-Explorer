@@ -102,7 +102,7 @@ export default {
       limbMid: 0xf5ecd0,      // cream mid-falloff
       thickness: 0.02,        // thinner haze shell than Jupiter's
       intensity: 0.9,
-      // style: 'saturn' — wired in Phase 3 (Worker 1's shader)
+      style: 'saturn',        // Worker 1's saturn-atmosphere.glsl shell
     },
 
     features: { atmosphericGlow: true, equatorialBulge: true },
@@ -113,8 +113,12 @@ export default {
       grazeFade0: 0.15, grazeFade1: 0.50,
     },
 
-    // detail: { style: 'saturn', activationKm: 50000, fullKm: 5000 },
-    // ^ wired in Phase 3 once Worker 1's saturn-clouds.glsl lands.
+    // Kronos detail style: Worker 1's cloud chunk + the orchestrator's
+    // analytical ring shadow. Activation is deliberately HIGH (the Mars
+    // dust-storm lesson): the ring shadow band across the cloud tops is a
+    // signature feature that must read well before close approach; the
+    // cloud layers stage themselves in lower via their own altitude gates.
+    detail: { style: 'kronos', activationKm: 150000, fullKm: 5000 },
 
     navPresets: [
       {
@@ -156,18 +160,26 @@ export default {
     ],
   },
 
-  // Saturn's main ring system — the showpiece. Real radial spans (km from
-  // Saturn's center, NASA/JPL). The Cassini Division is the gap between
-  // B outer and A inner (no mesh — absence is the feature). Rendering uses
-  // the Cassini radial texture (saturn/rings.png) via Worker 2's shader,
-  // wired in Phase 3; opacity/color here are the procedural fallback.
-  rings: [
-    { name: 'D Ring', type: 'flat', innerKm: 66900,  outerKm: 74510,  color: 0x554e44, opacity: 0.04, thicknessKm: 100 },
-    { name: 'C Ring', type: 'flat', innerKm: 74510,  outerKm: 92000,  color: 0x6b6459, opacity: 0.18, thicknessKm: 100 },
-    { name: 'B Ring', type: 'flat', innerKm: 92000,  outerKm: 117580, color: 0xd8cdb8, opacity: 0.90, thicknessKm: 100 },
-    { name: 'A Ring', type: 'flat', innerKm: 122170, outerKm: 136775, color: 0xc4b9a4, opacity: 0.65, thicknessKm: 100 },
-    { name: 'F Ring', type: 'flat', innerKm: 139930, outerKm: 140430, color: 0xb0a898, opacity: 0.25, thicknessKm: 50 },
-  ],
+  // Saturn's main ring system — the showpiece. ONE textured disc (Worker
+  // 2's saturn-rings.glsl) instead of Jupiter's per-band meshes: the SSS
+  // Cassini radial strip carries real color/opacity vs radius, so the
+  // Cassini Division, Encke gap and B/A/C contrast come from data. The
+  // span below is CALIBRATED to the texture (measured alpha profile:
+  // Cassini dip at t ≈ 0.71, B onset at t ≈ 0.32 → strip covers
+  // 69,075–140,715 km). The shader carries a procedural fallback with
+  // the same landmarks if the texture fails. Real spans for reference:
+  // D 66,900–74,510 / C –92,000 / B –117,580 / Cassini –122,170 /
+  // A –136,775 / F 140,180 (F is below the strip's floor — omitted).
+  ringSystem: {
+    shader: 'saturn-rings',
+    texture: 'saturn/rings.png',
+    innerKm: 69075,
+    outerKm: 140715,
+    // Fly-through particle layer (Worker 2's point shader): activates
+    // when the camera is within activationKm of the ring plane and
+    // radially inside the span.
+    particles: { count: 24000, activationKm: 5000 },
+  },
 
   // Worker 4 fills: all 9 moons (Titan, Enceladus, Iapetus, Mimas, Tethys,
   // Dione, Rhea + Hyperion, Phoebe) in the mars.js/jupiter.js body schema.

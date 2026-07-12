@@ -15,6 +15,10 @@ import { TEXTURE_BASE_URL, KM_PER_UNIT, AU_KM } from '../config.js';
 import { applyDetailShader, detailBlend } from './detailShaders.js';
 import EARTH_ATMOSPHERE_GLSL from './shaders/earth-atmosphere.glsl?raw';
 import MARS_ATMOSPHERE_GLSL from './shaders/mars-atmosphere.glsl?raw';
+import SATURN_ATMOSPHERE_GLSL from './shaders/saturn-atmosphere.glsl?raw';
+import TITAN_GLSL from './shaders/titan.glsl?raw';
+import SATURN_RINGS_GLSL from './shaders/saturn-rings.glsl?raw';
+import RING_PARTICLES_GLSL from './shaders/saturn-ring-particles.glsl?raw';
 
 const K = 1 / KM_PER_UNIT; // km -> scene units
 
@@ -349,6 +353,7 @@ export class SceneRenderer {
         new THREE.SphereGeometry(1, 96, 64),
         atm.style === 'rayleigh' ? makeRayleighMaterial(atm)
           : atm.style === 'dust' ? makeDustMaterial(atm)
+          : atm.style === 'saturn' ? makeShellAtmosphereMaterial(SATURN_ATMOSPHERE_GLSL, atm)
           : makeLimbScatterMaterial(atm)
       );
       const s = 1 + (atm.thickness || 0.025);
@@ -373,6 +378,30 @@ export class SceneRenderer {
     const sunWorld = new THREE.Vector3()
       .copy(this.sunDir).applyQuaternion(this.root.quaternion).normalize();
     const planetR = this.system.primary.radiusKm * K;
+
+    // Textured ring system (V7 Saturn): ONE disc spanning the whole ring
+    // family, color/opacity from a Cassini-derived radial strip, with the
+    // shader's procedural fallback if the texture fails to load.
+    const rs = this.system.ringSystem;
+    if (rs) {
+      const inner = rs.innerKm * K, outer = rs.outerKm * K;
+      const mat = makeTexturedRingMaterial(inner, outer, sunWorld, planetR);
+      // Texture flag flips on only when the strip actually arrives.
+      new THREE.TextureLoader().load(this.texUrl(this.system.primary.slug,
+        rs.texture.split('/')[1]), (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        mat.uniforms.uRingTex.value = tex;
+        mat.uniforms.uHasTex.value = 1;
+      });
+      const mesh = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 256, 8), mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.name = 'Ring System';
+      mesh.renderOrder = 1; // after the planet, no depth writes
+      this.root.add(mesh);
+      this.ringMeshes.push(mesh);
+      if (rs.particles) this._buildRingParticles(rs, inner, outer);
+    }
     for (const ring of this.system.rings || []) {
       const inner = ring.innerKm * K, outer = ring.outerKm * K;
       let mesh;
@@ -397,6 +426,47 @@ export class SceneRenderer {
       this.root.add(mesh);
       this.ringMeshes.push(mesh);
     }
+  }
+
+  /** Ring fly-through particles (V7): ice chunks the camera passes when it
+   *  dips near the ring plane. Density weighted by band opacity (B densest);
+   *  vertical spread exaggerated (~±25 km) so the layer reads in scene
+   *  scale — the real rings are thinner than a pixel. Visibility gated per
+   *  frame in update(). */
+  _buildRingParticles(rs, inner, outer) {
+    const count = this.quality.tier === 'mobile' ? 6000 : (rs.particles.count ?? 24000);
+    const pos = new Float32Array(count * 3);
+    const seeds = new Float32Array(count);
+    const rand = mulberry32(60268);
+    // Acceptance weight vs normalized radius — mirrors the shader's bands.
+    const bandWeight = (t) => (t < 0.076 ? 0.05 : t < 0.32 ? 0.3 : t < 0.677 ? 1.0
+      : t < 0.741 ? 0.04 : t < 0.945 ? 0.7 : 0.05);
+    for (let i = 0; i < count; i++) {
+      let t;
+      do { t = rand(); } while (rand() > bandWeight(t));
+      const r = inner + (outer - inner) * t;
+      const ang = rand() * Math.PI * 2;
+      pos[i * 3] = r * Math.cos(ang);
+      pos[i * 3 + 1] = (rand() + rand() + rand() - 1.5) * 0.017; // ±~25 km
+      pos[i * 3 + 2] = r * Math.sin(ang);
+      seeds[i] = rand();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+    const [, rest] = RING_PARTICLES_GLSL.split('// === VERTEX ===');
+    const [vertexShader, fragmentShader] = rest.split('// === FRAGMENT ===');
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uPointScale: { value: 220 } },
+      vertexShader, fragmentShader,
+      transparent: true, depthWrite: false,
+    });
+    this.ringParticles = new THREE.Points(geo, mat);
+    this.ringParticles.frustumCulled = false;
+    this.ringParticles.visible = false;
+    this.ringParticles.renderOrder = 2;
+    this.ringParticleCfg = { inner, outer, activation: (rs.particles.activationKm ?? 5000) * K };
+    this.root.add(this.ringParticles);
   }
 
   // -- Moons -----------------------------------------------------------------------
@@ -469,11 +539,39 @@ export class SceneRenderer {
         shell.material.userData.worldUniforms = true;
         group.add(shell);
       }
+      // Opaque haze shell (V7 Titan): a whole-atmosphere shell that hides
+      // the surface. NORMAL blending — additive glow cannot make an opaque
+      // disc. Altitude-aware (the fill thins below 1,000 km).
+      if (cfg.atmosphere?.style === 'titan') {
+        const shellMat = makeShellAtmosphereMaterial(TITAN_GLSL, cfg.atmosphere);
+        shellMat.blending = THREE.NormalBlending;
+        shellMat.userData.worldUniforms = true;
+        shellMat.userData.altitudeBody = cfg.name; // per-frame uAltitude source
+        const shell = new THREE.Mesh(
+          new THREE.SphereGeometry(r * (1 + (cfg.atmosphere.thickness ?? 0.06)), 64, 48),
+          shellMat);
+        group.add(shell);
+      }
       if (cfg.features?.volcanicPlumes && cfg.features.volcanoes) {
         for (const v of cfg.features.volcanoes) {
           const plume = makeVolcanicPlume(r, v, this.quality.tier);
           // Parent to the mesh, not the group: tidal-lock rotation is applied
           // to mesh.rotation.y, so only mesh children stay pinned to the surface.
+          mesh.add(plume.points);
+          mesh.add(plume.hotspot);
+          entry.plumes.push(plume);
+        }
+      }
+      // Geysers (V7 Enceladus): the Io plume system — including its
+      // parent-to-the-mesh fix — retinted as tall white ice jets.
+      if (cfg.geysers?.enabled && cfg.geysers.locations) {
+        const hFrac = (cfg.geysers.heightKm ?? 500) / (cfg.radiusKm || 250);
+        for (const g of cfg.geysers.locations) {
+          const plume = makeVolcanicPlume(r, g, this.quality.tier, {
+            spriteColor: 'rgba(240,250,255,1)', pointColor: 0xeef6ff,
+            hotspotSprite: 'rgba(200,230,255,1)', hotspotColor: 0xbbddff,
+            heightFrac: hFrac, spreadFrac: 0.35, opacity: 0.45, hotspotScale: 0.05,
+          });
           mesh.add(plume.points);
           mesh.add(plume.hotspot);
           entry.plumes.push(plume);
@@ -631,10 +729,14 @@ export class SceneRenderer {
     this.orbitLines = new THREE.Group();
     for (const cfg of this.system.bodies) {
       const a = cfg.semiMajorAxisKm * K;
+      // Inclined orbits (V7): same +X node-line rotation as physics.
+      const inc = ((cfg.inclinationDeg || 0) * Math.PI) / 180;
+      const cosI = Math.cos(inc), sinI = Math.sin(inc);
       const pts = [];
       for (let i = 0; i <= 180; i++) {
         const t = (i / 180) * Math.PI * 2;
-        pts.push(new THREE.Vector3(a * Math.cos(t), 0, -a * Math.sin(t)));
+        const z = -a * Math.sin(t);
+        pts.push(new THREE.Vector3(a * Math.cos(t), -z * sinI, z * cosI));
       }
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
@@ -709,6 +811,19 @@ export class SceneRenderer {
       // Tidal lock: keep the same face toward the primary.
       if (b.cfg.tidallyLocked) {
         entry.mesh.rotation.y = Math.atan2(-b.pos.z, b.pos.x) + Math.PI;
+      } else if (b.cfg.chaoticRotation) {
+        // Hyperion (V7 3d): deterministic tumble — three incommensurate
+        // sim-time frequencies, so the tumbling scales with the time
+        // multiplier, freezes on pause, and replays after date jumps.
+        const s = physics.simSeconds;
+        entry.mesh.rotation.set(
+          Math.sin(s * 1.7e-4) * 1.2 + s * 3.1e-5,
+          s * 7.7e-5 + Math.cos(s * 1.1e-4) * 0.8,
+          Math.sin(s * 0.9e-4 + 1.3) * 0.9);
+      } else if (b.cfg.rotationPeriodHours) {
+        // Non-locked moons with a measured spin (V7: Phoebe, 9.27 h).
+        entry.mesh.rotation.y =
+          (Math.PI * 2) * (physics.simSeconds / (b.cfg.rotationPeriodHours * 3600));
       }
 
       // Eclipse darkening — dramatic but smooth.
@@ -757,13 +872,31 @@ export class SceneRenderer {
       }
     }
 
-    // Ring shader uniforms (camera position in root-local space).
+    // Ring shader uniforms. Jupiter's per-band materials take root-local
+    // camera + equatorial sun; the V7 textured ring disc works in world
+    // space (userData.worldUniforms) and has no uSunDir.
     const camLocal = this.root.worldToLocal(this.camera.position.clone());
     for (const mesh of this.ringMeshes) {
       const u = mesh.material.uniforms;
-      if (u?.uCamPos) {
+      if (!u?.uCamPos) continue;
+      if (mesh.material.userData.worldUniforms) {
+        u.uCamPos.value.copy(this.camera.position);
+        if (u.uTime) u.uTime.value = physics.simSeconds % 1e6;
+      } else {
         u.uCamPos.value.copy(camLocal);
         u.uSunDir.value.copy(this.sunDir);
+      }
+    }
+
+    // Ring fly-through particles (V7): visible only when the camera sits
+    // near the ring plane and radially inside the ring span.
+    if (this.ringParticles) {
+      const cfg = this.ringParticleCfg;
+      const radial = Math.hypot(camLocal.x, camLocal.z);
+      this.ringParticles.visible = Math.abs(camLocal.y) < cfg.activation
+        && radial > cfg.inner * 0.9 && radial < cfg.outer * 1.1;
+      if (this.ringParticles.visible) {
+        this.ringParticles.material.uniforms.uTime.value = physics.simSeconds % 1e6;
       }
     }
     if (this.atmosphereMesh) {
@@ -784,9 +917,17 @@ export class SceneRenderer {
         const u = child.material?.uniforms;
         if (!u?.uCamPos) continue;
         if (child.material.userData.worldUniforms) {
-          // Limb-scatter shells: varyings come from modelMatrix (world).
+          // Shells with world-space varyings (modelMatrix): limb-scatter
+          // exospheres (uSunDir) and the V7 Titan haze (uSunW + uAltitude).
           u.uCamPos.value.copy(this.camera.position);
-          u.uSunDir.value.copy(this.sunDir).applyQuaternion(this.root.quaternion);
+          const sw = (this._tmpSw ??= new THREE.Vector3())
+            .copy(this.sunDir).applyQuaternion(this.root.quaternion);
+          if (u.uSunDir) u.uSunDir.value.copy(sw);
+          if (u.uSunW) u.uSunW.value.copy(sw);
+          if (u.uAltitude && child.material.userData.altitudeBody) {
+            u.uAltitude.value = (entry.group.getWorldPosition(this._tmpV ??= new THREE.Vector3())
+              .distanceTo(this.camera.position) - entry.radiusUnits) * KM_PER_UNIT;
+          }
         } else {
           u.uCamPos.value.copy(entry.group.worldToLocal(this.camera.position.clone()));
           u.uSunDir.value.copy(this.sunDir);
@@ -1077,8 +1218,42 @@ function makeRingMaterial(color, opacity, inner, outer, sunDirWorld, planetR) {
   });
 }
 
-/** Umbrella-shaped SO2 plume + night-glowing hotspot at a volcano site. */
-function makeVolcanicPlume(moonRadius, volcano, tier) {
+/**
+ * Textured ring-system material (V7 Saturn): Worker 2's saturn-rings.glsl
+ * on one RingGeometry disc. NORMAL blending — the B ring is dense enough to
+ * occlude what's behind it, which additive blending cannot express.
+ * uCamPos here is WORLD-space (userData.worldUniforms routes the per-frame
+ * update); uSunW follows _syncSunDirection like the Jupiter rings.
+ */
+function makeTexturedRingMaterial(inner, outer, sunDirWorld, planetR) {
+  const [, rest] = SATURN_RINGS_GLSL.split('// === VERTEX ===');
+  const [vertexShader, fragmentShader] = rest.split('// === FRAGMENT ===');
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uRingTex: { value: new THREE.Texture() },
+      uHasTex: { value: 0 },
+      uCamPos: { value: new THREE.Vector3() },
+      uSunW: { value: sunDirWorld.clone() },
+      uPlanetR: { value: planetR },
+      uInner: { value: inner },
+      uOuter: { value: outer },
+      uOpacityScale: { value: 1.0 },
+      uTime: { value: 0 },
+    },
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  mat.userData.worldUniforms = true;
+  return mat;
+}
+
+/** Umbrella-shaped particle plume + glowing hotspot at a surface vent.
+ *  Default palette is Io's volcanic orange; V7's Enceladus geysers reuse it
+ *  through `opts` (white ice, 2-radii jets, narrow spread). */
+function makeVolcanicPlume(moonRadius, volcano, tier, opts = {}) {
   const COUNT = tier === 'mobile' ? 120 : 320;
   const lat = THREE.MathUtils.degToRad(volcano.latDeg);
   const lon = THREE.MathUtils.degToRad(volcano.lonDeg);
@@ -1088,7 +1263,8 @@ function makeVolcanicPlume(moonRadius, volcano, tier) {
     -Math.cos(lat) * Math.sin(lon)
   );
   const up = base.clone();
-  const plumeHeight = moonRadius * 0.165; // ~300 km on Io
+  const plumeHeight = moonRadius * (opts.heightFrac ?? 0.165); // ~300 km on Io
+  const spreadFrac = opts.spreadFrac ?? 0.85;
 
   const pos = new Float32Array(COUNT * 3);
   const seeds = new Float32Array(COUNT);
@@ -1098,8 +1274,9 @@ function makeVolcanicPlume(moonRadius, volcano, tier) {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   // Soft circular sprite: raw points render as squares up close (bug #8).
   const mat = new THREE.PointsMaterial({
-    map: makeFlareTexture(64, 'rgba(255,225,150,1)'),
-    color: 0xffc878, size: moonRadius * 0.02, transparent: true, opacity: 0.55,
+    map: makeFlareTexture(64, opts.spriteColor ?? 'rgba(255,225,150,1)'),
+    color: opts.pointColor ?? 0xffc878, size: moonRadius * 0.02,
+    transparent: true, opacity: opts.opacity ?? 0.55,
     blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
   });
   const points = new THREE.Points(geo, mat);
@@ -1107,11 +1284,12 @@ function makeVolcanicPlume(moonRadius, volcano, tier) {
 
   // Hotspot: small additive sprite that glows on the night side (bloom feeds on it).
   const hotspot = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: makeFlareTexture(64, 'rgba(255,120,40,1)'),
-    color: 0xff7733, blending: THREE.AdditiveBlending, depthWrite: false,
+    map: makeFlareTexture(64, opts.hotspotSprite ?? 'rgba(255,120,40,1)'),
+    color: opts.hotspotColor ?? 0xff7733,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   }));
   hotspot.position.copy(base).multiplyScalar(moonRadius * 1.005);
-  hotspot.scale.setScalar(moonRadius * 0.12);
+  hotspot.scale.setScalar(moonRadius * (opts.hotspotScale ?? 0.12));
 
   // Local tangent frame for the umbrella spread.
   const tanA = new THREE.Vector3(0, 1, 0).cross(up);
@@ -1125,7 +1303,7 @@ function makeVolcanicPlume(moonRadius, volcano, tier) {
       // Each particle loops up and falls back on its own phase — umbrella arc.
       const t = (seeds[i] + elapsed * 0.07) % 1;
       const h = Math.sin(t * Math.PI) * plumeHeight;          // rise then fall
-      const spread = t * plumeHeight * 0.85;                   // widen with time
+      const spread = t * plumeHeight * spreadFrac;             // widen with time
       const ang = seeds[i] * 977.0;
       const px = Math.cos(ang) * spread, py = Math.sin(ang) * spread;
       const p = up.clone().multiplyScalar(moonRadius + h)
