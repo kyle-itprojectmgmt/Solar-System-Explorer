@@ -26,13 +26,13 @@ void main() {
   vec3 n = normalize(vWNormal);
   vec3 viewDir = normalize(uCamPos - vWPos);
 
-  // Grazing-angle fresnel: sharper than Earth (pow ~3.5) for thin limb.
-  float fresnel = pow(1.0 - abs(dot(viewDir, n)), 3.5);
+  // Grazing-angle fresnel: pow 4.5 (post-v7 hardware fix — thin pink
+  // sliver at the lit limb, not a band).
+  float fresnel = pow(1.0 - abs(dot(viewDir, n)), 4.5);
 
-  // Lit-side gating: Mars has no thick atmosphere so the transition is
-  // tighter than Earth's wide bleed. Active from ~8° into night to ~9° past terminator.
+  // Lit-side gating, tight cutoff (universal thin-atmosphere values).
   float sunDot = dot(n, normalize(uSunW));
-  float lit = smoothstep(-0.08, 0.15, sunDot);
+  float lit = smoothstep(-0.05, 0.20, sunDot);
 
   // Mars dust scattering color: deep pink-red at the bright limb,
   // fading to pale salmon toward the night side.
@@ -46,7 +46,7 @@ void main() {
 
   // Below ~3,000 km altitude, the dust haze thickens: widen the rim slightly.
   float lowAltBoost = smoothstep(3000.0, 0.0, uAltitude);
-  float rimWidth = mix(fresnel, pow(1.0 - abs(dot(viewDir, n)), 3.0), lowAltBoost * 0.3);
+  float rimWidth = mix(fresnel, pow(1.0 - abs(dot(viewDir, n)), 3.8), lowAltBoost * 0.3);
 
   // Alpha: balanced for additive blending, fainter than Earth (×0.35 scale).
   float alpha = rimWidth * lit * (1.0 + 0.3 * forwardScatter);

@@ -132,8 +132,9 @@ export default {
         ],
       },
       // Tenuous SO2 exosphere from volcanic outgassing — faint yellow-white
-      // directional limb glow, lit side only.
-      atmosphereLimb: { color: 0xffffcc, intensity: 0.35, thickness: 0.02 },
+      // sliver on the lit limb only (post-v7 hardware fix: was a 2%-radius
+      // shell at pow 3 — read as a thick halo wrapping the night side).
+      atmosphereLimb: { color: 0xf2ebbf, intensity: 0.12, thickness: 0.005, fresnelPower: 6.5 },
       surfaceFeatures: [
         { name: 'Pele Volcano',      latDeg: -18.7, lonDeg: 255.3 },
         { name: 'Loki Patera',       latDeg: 12.6,  lonDeg: 308.8 },
@@ -171,8 +172,8 @@ export default {
       detailFloor: { softKm: 300, hardKm: 150 },
       color: 0xc8d0d8,
       features: { iceCracks: true, subsurfaceGlow: true },
-      // Trace O2/O3 atmosphere — extremely thin blue-white limb glow.
-      atmosphereLimb: { color: 0xaaddff, intensity: 0.22, thickness: 0.015 },
+      // Trace O2/O3 atmosphere — barely-visible blue-white limb sliver.
+      atmosphereLimb: { color: 0xd9e6ff, intensity: 0.08, thickness: 0.004, fresnelPower: 7.0 },
       surfaceFeatures: [
         { name: 'Conamara Chaos', latDeg: 9.7,   lonDeg: 87.5 },
         { name: 'Thera Macula',   latDeg: -46.7, lonDeg: 178.9 },
@@ -210,9 +211,9 @@ export default {
       detailFloor: { softKm: 400, hardKm: 200 },
       color: 0x9a8f80,
       features: {},
-      // Thin O2 atmosphere + magnetosphere — very faint blue-green limb glow
-      // (replaces the old uniform magnetosphere halo shell).
-      atmosphereLimb: { color: 0x88ccff, intensity: 0.3, thickness: 0.02 },
+      // Thin O2 atmosphere + magnetosphere — subtle blue limb sliver,
+      // slightly stronger than Europa's.
+      atmosphereLimb: { color: 0x80b3e6, intensity: 0.15, thickness: 0.006, fresnelPower: 6.0 },
       surfaceFeatures: [
         { name: 'Galileo Regio',   latDeg: 35,   lonDeg: 133 },
         { name: 'Nicholson Regio', latDeg: -20,  lonDeg: 356 },

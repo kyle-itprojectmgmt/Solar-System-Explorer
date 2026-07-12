@@ -1086,6 +1086,34 @@ Kyle's real-hardware pass, two fixes:
   — their side; first backoff retry succeeded). Live bundle verified:
   particle strings gone, palette + terminator strings present.
 
+### v7.0.2 — Universal Thin-Atmosphere Halo Fix (2026-07-12)
+Kyle's hardware pass, all systems: thin-atmosphere halos read as thick
+rings wrapping the night side. Universal fix (Titan + Saturn EXEMPT):
+- renderer.js: makeLimbScatterMaterial gains uFresnelPow/uLit0/uLit1
+  uniforms (defaults 3.0/−0.12/0.25 preserve Jupiter's gas-giant limb);
+  atmosphereLimb shells pass fresnelPower + tight lit gate (−0.05..0.20)
+  and default thickness 0.02→0.008. makeShellAtmosphereMaterial gains
+  uHorizonGlow (config opt-in, Earth only).
+- earth-atmosphere.glsl: fresnel pow 2.8→5.0, lit gate −0.25..0.15 →
+  −0.05..0.20, v5b night-scatter term REMOVED (halo alpha had a
+  night-side floor — the ring cause; terrain nightAmbient unaffected),
+  ISS horizon arc gated by uHorizonGlow and sharpened (3.2→6.5).
+- mars-atmosphere.glsl: fresnel 3.5→4.5, lit gate −0.08..0.15 →
+  −0.05..0.20, low-alt rim pow 3.0→3.8.
+- Configs: Earth thickness 0.025→0.010 + intensity 1.2→0.5 +
+  horizonGlow; Mars 0.015→0.012; Io/Europa/Ganymede atmosphereLimb
+  thinned (0.005/0.004/0.006, intensity 0.12/0.08/0.15, fresnel
+  6.5/7.0/6.0, spec colors). Moon/Callisto/Saturn moons: none (already).
+- tests/haloshots.mjs NEW: diff-render probe (frame with vs without
+  atmosphere shells — starfield/clouds cancel; a luminance threshold
+  alone reads Milky Way pixels as halo). Analytic silhouette radius
+  (asin(R/d) projected), samples ±80° per half. Measured: night halo
+  0px on all five bodies; lit runs Earth 3px / Mars 4px / Io 2px /
+  Europa 1px / Ganymede 2px. Spec-altitude close-ups (Earth 2,919 +
+  405 km ISS line, Io 369 km) verified by screenshot.
+- Regression green: smoke 22/22, limb, moonlimb, earthtest 14/14,
+  marstest 13/13, titanprobe (shell ratio 1.10 + opaque haze intact).
+
 ---
 
 ## Known Bugs / In Progress
@@ -1150,6 +1178,7 @@ Kyle's real-hardware pass, two fixes:
 | 57 | Hyperion/Phoebe texture maps — irregular bodies with no fetchable cylindrical maps (same class as #52). Color-only + procedural cratered detail shipped; Hyperion's sponge-pit look would need a dedicated treatment. | Manual follow-up | V7_SATURN.md |
 | 58 | Saturn F ring omitted — the SSS ring strip ends at the A ring outer edge (measured alpha floor), and a procedural F ring on a separate thin annulus wasn't worth the draw call for a barely-visible feature. Revisit if a better Cassini radial profile (Björn Jónsson) is sourced. | Data choice — revisit with better source | V7_SATURN.md |
 | 59 | Telephoto zoom reveals texture resolution limits — at narrow FOV (10°) planet textures and starfield cubemap show magnification blur (same pixels covering more screen area — equivalent to digital zoom on a phone). Planet fix requires quadtree tile streaming (SpaceEngine approach, weeks of work). Starfield could be improved with 8K cubemap swap but doesn't help planets. Decision: accept as known limitation for launch. Zoom is still a major win for Earthrise and Saturn ring views. | Won't fix — known limitation | — |
+| 60 | Thin-atmosphere halos render as thick rings wrapping the night side (hardware-confirmed by Kyle: Earth at ~3,000 km, Io at ~370 km). Cause: soft fresnel pow + wide lit gate on all thin-atmosphere shells, plus Earth's v5b night-scatter alpha floor keeping the halo alive on the night limb. Fixed v7.0.2: per-body fresnelPower/thickness/intensity config, universal tight lit gate (−0.05..0.20), Earth night-scatter term removed, ISS horizon arc opt-in via horizonGlow. Titan/Saturn exempt. Guard: tests/haloshots.mjs (diff-render probe). | Resolved v7.0.2 | — |
 
 ---
 

@@ -88,10 +88,13 @@ export default {
     },
 
     // Thin CO₂ atmosphere with salmon dust scattering via custom shader.
+    // Post-v7 hardware fix: shell 0.015→0.012, fresnel pow 4.5 + tight
+    // night cutoff in the shader. Intensity stays 0.9 — the shader bakes
+    // a ×0.35 scale, so effective opacity ≈ 0.32 (already at spec).
     atmosphere: {
       limbEdge: 0xc86448,     // salmon-rust at the very limb
       limbMid: 0xe8a878,      // pale tan mid-falloff
-      thickness: 0.015,       // fraction of radius — thin feathered edge
+      thickness: 0.012,
       intensity: 0.9,
       style: 'dust',          // signature rusty scattering
     },

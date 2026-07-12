@@ -90,12 +90,18 @@ export default {
         { minKm: 0, maxKm: 400, label: '⚠️ Reentry altitude' },
       ],
     },
+    // Post-v7 hardware fix: shell 0.025→0.010 of radius, intensity
+    // 1.2→0.5, fresnel pow 5.0 in the shader — the halo read as a thick
+    // ring from ~3,000 km and wrapped the night side (the v5b night-
+    // scatter term is removed; NIGHT terrain visibility still comes from
+    // nightAmbient above). horizonGlow keeps the ISS thin-arc pass.
     atmosphere: {
       limbEdge: 0x3d7eff,     // vivid blue at the very limb (Rayleigh scattering)
       limbMid: 0xbfe3ff,      // pale cyan mid-falloff
-      thickness: 0.025,       // fraction of radius — thin feathered edge
-      intensity: 1.2,
+      thickness: 0.010,
+      intensity: 0.5,
       style: 'rayleigh',      // signature blue from nitrogen/oxygen
+      horizonGlow: true,      // Earth-only low-altitude horizon line
     },
     features: { atmosphericGlow: true, equatorialBulge: true },
     // Unified shader convention (V7 1b, surface-base.glsl). dayFadeSoft

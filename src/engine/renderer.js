@@ -488,9 +488,14 @@ export class SceneRenderer {
       if (cfg.atmosphereLimb) {
         const al = cfg.atmosphereLimb;
         const shell = new THREE.Mesh(
-          new THREE.SphereGeometry(r * (1 + (al.thickness ?? 0.02)), 48, 32),
+          new THREE.SphereGeometry(r * (1 + (al.thickness ?? 0.008)), 48, 32),
           makeLimbScatterMaterial({
             limbEdge: al.color, limbMid: al.color, intensity: al.intensity ?? 0.3,
+            // Thin-exosphere class (post-v7 hardware fix): sharp fresnel,
+            // tight night cutoff — a trace atmosphere is a sliver on the
+            // lit limb, never a ring.
+            fresnelPower: al.fresnelPower ?? 6.0,
+            lit0: -0.05, lit1: 0.20,
           })
         );
         shell.material.userData.worldUniforms = true;
@@ -999,6 +1004,8 @@ function makeShellAtmosphereMaterial(glslSource, atm) {
       uCamPos: { value: new THREE.Vector3() },
       uAltitude: { value: 1e9 },
       uIntensity: { value: atm.intensity ?? 1.0 },
+      // ISS-style low-altitude horizon arc — config opt-in (Earth only).
+      uHorizonGlow: { value: atm.horizonGlow ? 1 : 0 },
     },
     vertexShader,
     fragmentShader,
@@ -1021,6 +1028,11 @@ function makeLimbScatterMaterial(atm) {
       uEdgeColor: { value: new THREE.Color(atm.limbEdge ?? 0xc8824a) },
       uMidColor: { value: new THREE.Color(atm.limbMid ?? 0xe8d4a0) },
       uIntensity: { value: atm.intensity ?? 1.0 },
+      // Defaults preserve the gas-giant look (Jupiter). Thin-exosphere
+      // shells pass sharper values (post-v7 hardware fix).
+      uFresnelPow: { value: atm.fresnelPower ?? 3.0 },
+      uLit0: { value: atm.lit0 ?? -0.12 },
+      uLit1: { value: atm.lit1 ?? 0.25 },
       uCamPos: { value: new THREE.Vector3() },      // world space
       uSunDir: { value: new THREE.Vector3(1, 0, 0) }, // world space
     },
@@ -1037,6 +1049,9 @@ function makeLimbScatterMaterial(atm) {
       uniform vec3 uEdgeColor;
       uniform vec3 uMidColor;
       uniform float uIntensity;
+      uniform float uFresnelPow;
+      uniform float uLit0;
+      uniform float uLit1;
       uniform vec3 uCamPos;
       uniform vec3 uSunDir;
       varying vec3 vWPos;
@@ -1044,11 +1059,12 @@ function makeLimbScatterMaterial(atm) {
       void main() {
         vec3 n = normalize(vWNormal);
         vec3 viewDir = normalize(uCamPos - vWPos);
-        // Grazing-angle fresnel, pow 3 for a sharp thin atmospheric edge.
-        float f = pow(1.0 - abs(dot(viewDir, n)), 3.0);
-        // Lit side only, with slight refraction bleed past the terminator.
+        // Grazing-angle fresnel — per-body sharpness (3 = gas giant,
+        // 6-7 = trace exosphere sliver).
+        float f = pow(1.0 - abs(dot(viewDir, n)), uFresnelPow);
+        // Lit side only, cutoff per body config.
         float sunDot = dot(n, normalize(uSunDir));
-        float lit = smoothstep(-0.12, 0.25, sunDot);
+        float lit = smoothstep(uLit0, uLit1, sunDot);
         // Brightest where the atmosphere catches sunlight at the terminator.
         float term = 1.0 + 0.5 * pow(1.0 - abs(sunDot), 4.0);
         // Warm orange-tan at the limb edge -> pale yellow-white -> nothing.
