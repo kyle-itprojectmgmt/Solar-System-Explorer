@@ -142,15 +142,6 @@ against real ephemeris after any epoch or rotation config changes.
 LIVE mode syncs via Date.now() (always UTC ms) — never use getHours()
 or other local-time methods anywhere in the time pipeline.
 
-### Known UI Gotcha — #ui-root Specificity Rule (3rd occurrence in v5b)
-The CSS rule `#ui-root > * { pointer-events: auto }` uses ID
-specificity and overrides pointer-events: none on child elements.
-This has caused three separate bugs (hidden card eating clicks,
-etc). NEVER use this rule. Use class-based selectors only for
-pointer-events. When a panel must be invisible but not
-interactive, use `visibility: hidden` not `opacity: 0` —
-visibility:hidden removes from pointer event flow, opacity:0 does not.
-
 ### Per-System Lazy Loading (add before multi-system build)
 Currently all system configs (jupiter.js, saturn.js) are bundled at
 build time. Before adding Earth/Mars/Saturn, update vite.config.js
