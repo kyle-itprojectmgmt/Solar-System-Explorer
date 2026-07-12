@@ -10,17 +10,17 @@ import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
 import { KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
 
+// Surface mode removed permanently in V7 (was hidden since v4d; the
+// first-person ground experience is a future rebuild, not a revival).
 const CAMERA_MODES = [
   { id: 'cinematic', label: 'Cinematic', key: 'C', targeted: false },
   { id: 'free', label: 'Free Fly', key: 'F', targeted: false },
   { id: 'orbit', label: 'Orbit', key: 'O', targeted: true },
-  // Surface hidden until V5 (needs realistic starfield + ground rendering);
-  // the camera.js implementation stays intact.
-  { id: 'surface', label: 'Surface', key: 'S', targeted: true, hidden: true },
   { id: 'chase', label: 'Chase', key: 'H', targeted: true },
   { id: 'insertion', label: 'Orbit Insertion', key: 'I', targeted: false },
   { id: 'system', label: 'System View', key: 'G', targeted: false },
 ];
+const modeById = (id) => CAMERA_MODES.find((m) => m.id === id);
 
 export class UI {
   constructor({ system, physics, sceneRenderer, cameraCtl, audio, onScreenshot, onVoyagerPreset }) {
@@ -393,7 +393,7 @@ export class UI {
         if (this.cam.mode === 'insertion') {
           const prev = (this.cam.preModeOI && this.cam.preModeOI !== 'insertion')
             ? this.cam.preModeOI : 'free';
-          const needsTarget = ['orbit', 'chase', 'surface'].includes(prev);
+          const needsTarget = ['orbit', 'chase'].includes(prev);
           this.cam.setMode(prev,
             needsTarget ? (this.cam.lastTarget || this.system.primary.name) : null);
         }
@@ -463,7 +463,7 @@ export class UI {
 
   _buildCameraPanel(c) {
     const icons = {
-      cinematic: '🎬', free: '✈️', orbit: '🔄', surface: '🌍',
+      cinematic: '🎬', free: '✈️', orbit: '🔄',
       chase: '🏃', system: '🌌', insertion: '🛸',
     };
     const list = el('div', 'mode-list', c);
@@ -1601,8 +1601,8 @@ export class UI {
       switch (e.code) {
         case 'KeyC': this.cam.setMode('cinematic'); break;
         case 'KeyF': this.cam.setMode('free'); break;
-        case 'KeyO': this._activateMode(CAMERA_MODES[2]); break;
-        case 'KeyH': this._activateMode(CAMERA_MODES[4]); break;
+        case 'KeyO': this._activateMode(modeById('orbit')); break;
+        case 'KeyH': this._activateMode(modeById('chase')); break;
         case 'KeyI': this.cam.setMode('insertion'); break;
         case 'KeyG': this.cam.setMode('system'); break;
         case 'Space': e.preventDefault(); this.physics.togglePause(); break;
@@ -1642,7 +1642,6 @@ export class UI {
       cinematic: 'Auto-scripted cinematic pans — press any key to take control',
       free: 'Full 6DOF flight — WASD to move, mouse to look, Shift for boost',
       orbit: 'Orbit around a body — click any body to target it',
-      surface: 'Land on a moon surface — watch Jupiter rise and set',
       chase: 'Follow a moon from behind — see its surface and Jupiter ahead',
       system: 'Pull back to see the full Jupiter system with orbital paths',
       insertion: 'Insert into a physically accurate orbit — set altitude, inclination, and geosync',
@@ -1850,9 +1849,9 @@ export class UI {
     }
 
     // Named-star labels (V5 1c): the brightest stars (mag < 1.5), shown when
-    // labels are on and the camera is in System View or Surface mode.
+    // labels are on and the camera is in System View.
     const showStars = this.labelsVisible
-      && (this.cam.mode === 'system' || this.cam.mode === 'surface')
+      && this.cam.mode === 'system'
       && this.r.starLabels?.length;
     if (showStars && !this.starLabelEls) {
       this.starLabelEls = this.r.starLabels.map((s) => {

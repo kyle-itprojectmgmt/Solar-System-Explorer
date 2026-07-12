@@ -118,8 +118,7 @@ either without updating both and measuring ground-track drift:
 
   _poseInsertion(): position = (cos φ, 0, −sin φ) — phase INCREASES = prograde
   _poseOrbit():     position = (cos θ, 0, +sin θ) — theta DECREASES = prograde
-  _poseSurface():   uses +sin lon — MIRRORED vs east-positive convention
-                    (latent bug — fix when re-enabling Surface mode in V6)
+  (_poseSurface and its +sin-lon mirror bug #37 removed with Surface mode, V7)
 
 Verified by orbitdir.mjs: orbit +21.4°E, insertion 0° +36.3°E,
 retrograde -51.6°W, GeoSync 0.00°. Measure ground-track direction
@@ -236,10 +235,12 @@ Distance: 5.2 AU from Jupiter. Rendered as distant point light
 | 1 | Cinematic | C | Auto scripted pans, startup default, loops |
 | 2 | Free Fly | F | WASD + mouse, 6DOF, Shift = 5x boost |
 | 3 | Orbit | O | Click body, camera advances along orbital path |
-| 4 | Surface | S | Click moon, first-person horizon view |
-| 5 | Chase | H | Trails moon above/behind, surface visible below |
-| 6 | System View | G | Full system, orbital path lines |
-| 7 | Orbit Insertion | I | Physically accurate orbit, GeoSync preset |
+| 4 | Chase | H | Trails moon above/behind, surface visible below |
+| 5 | System View | G | Full system, orbital path lines |
+| 6 | Orbit Insertion | I | Physically accurate orbit, GeoSync preset |
+
+(Surface mode removed permanently in V7 — hidden since v4d, code deleted;
+a first-person ground experience would be a future rebuild from scratch.)
 
 ### Orbit Insertion Details
 - Parameters: parent body, altitude, inclination, geosync toggle
@@ -993,7 +994,7 @@ presets 57/57. Deployed (a76a8246), live bundle hash verified.
 | 34 | Earth night side nearly black / lakes pure black at 382 km; day-side black cloud lumps at grazing sun | Resolved v5b (per-system nightAmbient 0x8899bb×0.18, terminator bleed widened + night limb scatter, Earth normalScale 2.0→0.8 — cloud relief was the lump cause; ocean shader + colorSpace measured innocent) | — |
 | 35 | Midwest land renders olive/yellow-green — measured: that IS the source July Blue Marble palette (Wisconsin texture sample rgb(79,97,49)), pipeline faithful. For tan/brown farmland swap a September BMNG monthly variant (noted in earth.js) | Data choice — texture variant, not a bug | — |
 | 36 | Orbit direction reversed — all bodies orbited east to west (retrograde). Real cause: orbit mode +sin convention (theta must decrease for prograde) vs insertion -sin (phase increases = prograde). Fix: orbTheta += → -=, forward-tilt travel vector negated, cinematic auto-orbit flipped. Insertion untouched — GeoSync holding station proved it already prograde. Measured: orbit +21.4°E, insertion 0° +36.3°E, retrograde -51.6°W, GeoSync 0.00°. | Resolved d3d5968 | — |
-| 37 | _poseSurface uses +sin lon — mirrored vs east-positive convention. Latent until Surface mode re-enabled in V6. | Latent — fix when re-enabling Surface mode | — |
+| 37 | _poseSurface uses +sin lon — mirrored vs east-positive convention. | Resolved V7 — removed with Surface mode (code deleted, mode permanently retired) | — |
 | 38 | Earth day/night terminator wrong — sun direction never calibrated. Three compounding problems: uncalibrated placeholder direction (anti-phased seasons), epoch rotation phase not tied to UTC, coarse sidereal day (23.934h → 150° drift by 2026). Fix: true equatorial sun at epoch, rotationPhaseAtEpochDeg config knob, sidereal day 23.93446959h. Subsolar point within 3° of real sun. Night ambient reduced: 0x8899bb×0.18 → 0x445566×0.08, city gain 0.4→0.5. | Resolved 91d241d | — |
 | 39 | LIVE mode showed stale time after tab hidden — UTC pipeline was already correct (no getHours() anywhere). Real cause: requestAnimationFrame pauses when tab hidden, 60s resync counted active-tab frame time only, so stall time persisted for up to 60s after tab restored. Appeared as timezone offset equal to hidden duration. Fix: wall-clock based resync — drift >2s snaps on first frame back, Date.now()-based 60s cadence otherwise. Verified: 2-hour stall recovers within one frame. | Resolved — same commit as date picker | — |
 | 40 | Date picker had no time input — users could only set date, not time of day. Fix: native <input type="time" step="1"> row below calendar. Apply button commits date+time together as one ISO Z instant. Pre-filled with current sim HH:MM:SS UTC. Apollo 11 test: July 20 1969 + 20:17:00 → lands on epoch exactly. AM/PM display is browser locale cosmetic — value is 24h UTC. | Resolved — same commit as LIVE fix | — |
@@ -1093,7 +1094,7 @@ generative audio have no equivalent in NASA Eyes.
 | 2 | Earth + Moon System | DONE v5 — see Version History. Remaining from spec: ISS Mode (live position API), 8K/seasonal/night textures, lightning particles beyond the shader flashes. |
 | 3 | Full Solar System Orrery | Camera Mode 8 (V key). All planets in correct orbital positions. Click any to travel. Scale-adjusted so all visible. Gateway to inter-system navigation. |
 | 4 | Inter-System Navigation | System selector UI in Mission Control. Cinematic hyperjump sequence (8-12s, skippable). Runtime system switching with GPU memory management. Floating origin / scale switching between AU and km coordinate systems. |
-| 5 | Mars System | DONE v6 — see Version History. Remaining from spec: MOLA elevation normal map (GeoTIFF manual step), Phobos/Deimos texture maps (bug #52), surface landing experience with Earth as blue dot in the sky (needs Surface mode revival — latent bug #37). |
+| 5 | Mars System | DONE v6 — see Version History. Remaining from spec: MOLA elevation normal map (GeoTIFF manual step), Phobos/Deimos texture maps (bug #52). (Surface-landing experience dropped with Surface mode's V7 removal.) |
 | 6 | Historic mission trajectories | Voyager 1&2, Cassini, Juno, Galileo animated paths |
 | 7 | Time of day selector | Jump to specific simulated date/time |
 | 8 | Multiplayer shared view | URL encodes camera position + time |
@@ -1101,7 +1102,7 @@ generative audio have no equivalent in NASA Eyes.
 | 10 | Resonance visualizer | Enhanced — already implemented basic version in v4b |
 | 11 | Io volcanic event notifications | Random eruption alerts when near Io |
 | 12 | ESO photographic starfield cubemap | DONE v5 — ESO eso0932a panorama on background sphere (procedural kept as fallback). |
-| 13 | Re-enable Surface camera mode | Starfield + HYG prerequisites landed in v5; still needs constellation lines and proper ground-level rendering before re-enabling. |
+| 13 | ~~Re-enable Surface camera mode~~ | REMOVED permanently in V7 — code deleted from camera.js/ui.js. A first-person ground experience would be a from-scratch rebuild (new backlog item if ever wanted). |
 | 14 | HYG bright star catalog overlay | DONE v5 — 8,834 stars (mag < 6.5), B-V spectral colors, named-star labels. Constellation line toggle still open. |
 
 ---

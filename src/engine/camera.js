@@ -3,7 +3,7 @@
 // mouse / keyboard / touch input. System-agnostic: targets are body names
 // resolved through the renderer.
 //
-// Modes: cinematic | free | orbit | surface | chase | system
+// Modes: cinematic | free | orbit | chase | system | insertion
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three';
@@ -20,7 +20,7 @@ export class CameraController {
     this.physics = physics;
 
     this.mode = 'cinematic';
-    this.target = null;          // body name for orbit/surface/chase
+    this.target = null;          // body name for orbit/chase
     this.lastTarget = null;      // remembered across mode switches
     this.pendingMode = null;     // waiting for a click to choose target
     this.onModeChange = null;    // (mode, target) => void
@@ -41,9 +41,6 @@ export class CameraController {
     this.orbSpeedMult = 1;      // "Orbital Speed" slider, orbit mode
     this.chaseDistMult = 1;
     this.chaseHeightMult = 1.5; // "Chase Height" slider, chase mode
-
-    // Surface state
-    this.surfLat = 0; this.surfLon = 0; this.surfYaw = 0; this.surfPitch = 0.1;
 
     // Chase spring (smoothed position and look-at point)
     this.chasePos = new THREE.Vector3();
@@ -97,12 +94,6 @@ export class CameraController {
         ? this._systemViewDistance()
         : Math.max(bodyR * 4, 3);
       this.orbTheta = 0.5; this.orbPhi = 1.25;
-    }
-    if (mode === 'surface' && target) {
-      // Stand ~80° of longitude from the sub-primary point: the primary
-      // hangs huge and low on the horizon.
-      this.surfLat = 0.15; this.surfLon = Math.PI * 0.55;
-      this.surfYaw = Math.PI; this.surfPitch = 0.12;
     }
     if (mode === 'chase' && target) {
       this.chasePos.copy(this.camera.position);
@@ -350,10 +341,6 @@ export class CameraController {
         this.orbTheta -= dx * s * 1.6;
         this.orbPhi = THREE.MathUtils.clamp(this.orbPhi - dy * s * 1.6, 0.05, Math.PI - 0.05);
         break;
-      case 'surface':
-        this.surfYaw -= dx * s;
-        this.surfPitch = THREE.MathUtils.clamp(this.surfPitch + dy * s, -1.4, 1.5);
-        break;
       case 'insertion':
         this.ins.yaw -= dx * s;
         this.ins.pitch = THREE.MathUtils.clamp(this.ins.pitch - dy * s, -1.55, 0.6);
@@ -402,7 +389,6 @@ export class CameraController {
    * floor (min safe altitude) can never be crossed.
    */
   _pinch(delta) {
-    if (this.mode === 'surface') return; // standing on the ground
     // Zooming in (delta > 0) meets quadratic resistance below the target
     // body's soft detail floor and a hard stop at its hard floor (4a).
     const resist = (name, altKm) =>
@@ -545,7 +531,6 @@ export class CameraController {
 
   /** Never let the camera clip inside a body's minimum safe altitude. */
   _enforceFloors() {
-    if (this.mode === 'surface') return; // surface mode stands on the ground
     const c = new THREE.Vector3();
     for (const [name, entry] of this.r.bodyMeshes) {
       const floor = this._floorDist(name);
@@ -562,7 +547,6 @@ export class CameraController {
       case 'free': return this._poseFree(dt);
       case 'orbit': return this._poseOrbit(this.target, dt);
       case 'system': return this._poseOrbit(this.r.system.primary.name, dt);
-      case 'surface': return this._poseSurface();
       case 'chase': return this._poseChase(dt);
       case 'insertion': return this._poseInsertion(dt);
       case 'cinematic': return this._poseCinematic(dt);
@@ -638,29 +622,8 @@ export class CameraController {
     return { pos, quat };
   }
 
-  _poseSurface() {
-    const entry = this.r.bodyMeshes.get(this.target);
-    if (!entry) return this._poseFree(0);
-    const rUnits = entry.radiusUnits;
-    // Surface point in the moon mesh's local (rotating) frame.
-    const local = new THREE.Vector3(
-      Math.cos(this.surfLat) * Math.cos(this.surfLon),
-      Math.sin(this.surfLat),
-      Math.sin(this.surfLon) * Math.cos(this.surfLat)
-    ).multiplyScalar(rUnits * 1.002);
-    const pos = entry.mesh.localToWorld(local.clone());
-    const up = pos.clone().sub(entry.group.getWorldPosition(new THREE.Vector3())).normalize();
-
-    // Build horizon-relative look direction from yaw/pitch.
-    const north = Math.abs(up.y) < 0.98 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const east = north.clone().cross(up).normalize();
-    const forward0 = up.clone().cross(east).normalize();
-    const lookDir = forward0.clone()
-      .applyAxisAngle(up, this.surfYaw)
-      .applyAxisAngle(east.clone().applyAxisAngle(up, this.surfYaw), this.surfPitch);
-    const m = new THREE.Matrix4().lookAt(pos, pos.clone().add(lookDir), up);
-    return { pos, quat: new THREE.Quaternion().setFromRotationMatrix(m) };
-  }
+  // _poseSurface removed in V7: Surface mode is gone permanently (hidden
+  // since v4d; its +sin-lon mirror, bug #37, is moot with the removal).
 
   /** Body's velocity direction in world space (from physics, not geometry). */
   _bodyVelocityWorld(name, out = new THREE.Vector3()) {
