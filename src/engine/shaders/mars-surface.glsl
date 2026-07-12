@@ -31,9 +31,15 @@ float ms_vallesMarin(vec3 p, out float depth) {
 
   // Depth modulation: fbm-warped floor, stronger at center. Fixed 3 octaves —
   // dOct is a local of the injected apply block and doesn't exist at
-  // function scope.
-  float floorNoise = fbm3(p * 50.0) * 0.4;
-  depth = -0.3 * (1.0 - smoothstep(0.0, 0.035, latDist)) * (1.0 + floorNoise);
+  // function scope. Depth halved (V6.0.1 bug #53): -0.42 max relief +
+  // dark strata paint stacked to a pure-black slash at 1,291 km
+  // (measured min luminance 0) — orbiters show a dark canyon WITH
+  // internal structure, never a void.
+  // Gentle floor variation only: at ±40% the noise-modulated depth put
+  // saturated black crags along the whole spine (derivative shading
+  // clamps both ways on high-frequency height).
+  float floorNoise = fbm3(p * 50.0) * 0.15;
+  depth = -0.10 * (1.0 - smoothstep(0.0, 0.035, latDist)) * (1.0 + floorNoise);
 
   return canyonMask;
 }
@@ -71,12 +77,15 @@ float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
     // bowls only add sub-texture roughness on final approach.
     float crAct = 1.0 - smoothstep(600.0, 1500.0, uAltitude);
     if (crAct > 0.001) {
+      // DEPRESSIONS ONLY (V6.0.1 bug #51, hardware-confirmed): the rim
+      // ridge in the relief is what drew donut rings — min(c, 0) keeps
+      // the bowl and drops the rim entirely. Sparser too (35% of cells).
       float cFade = dtlFreqFade2(dUv, 300.0);
       float id1; float c = craterProfile(dUv * 300.0 + 7.3, id1);
-      c *= 0.5 * step(0.4, fract(id1 * 7.77)); // eroded + hash-thinned
-      detail = mix(detail, detail * vec3(1.05, 1.03, 1.00),
-        clamp(-c, 0.0, 1.0) * 0.10 * crAct * cFade * hl);
-      gDetailHeight += clamp(c, -1.0, 1.0) * 0.06 * crAct * cFade * hl;
+      c *= 0.5 * step(0.65, fract(id1 * 7.77)); // eroded + hash-thinned
+      float bowl = clamp(-min(c, 0.0), 0.0, 1.0);
+      detail = mix(detail, detail * 0.93, bowl * 0.5 * crAct * cFade * hl);
+      gDetailHeight += min(c, 0.0) * 0.06 * crAct * cFade * hl;
 
       // Powdery regolith grain on final approach.
       gDetailHeight += snoise(vObjPos * 900.0) * 0.03
@@ -100,10 +109,11 @@ float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
     // staged in below texture resolution like the highland field.
     float lowCrAct = 1.0 - smoothstep(600.0, 1500.0, uAltitude);
     if (lowCrAct > 0.001) {
+      // Depressions only, no rim ridge (bug #51) — and rarer still.
       float cellId;
       float crater = craterProfile(dUv * 380.0 + 3.1, cellId);
-      float sparseMask = step(0.65, fract(cellId * 12.345));
-      gDetailHeight += clamp(crater, -1.0, 1.0) * 0.05 * sparseMask
+      float sparseMask = step(0.75, fract(cellId * 12.345));
+      gDetailHeight += min(crater, 0.0) * 0.05 * sparseMask
         * dtlFreqFade2(dUv, 380.0) * lowlandMask * lowCrAct;
     }
 
@@ -167,15 +177,17 @@ float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
     if (vmMask > 0.001) {
       gDetailHeight += vmDepth * vmAltFade;
 
-      // Wall strata: banded noise along depth gradient
+      // Wall strata: banded noise along depth gradient — softened bands
+      // (the old step() bands at 0.3 weight went black, bug #53).
       float strataFreq = snoise(vObjPos * 100.0 + vec3(vmDepth * 5.0)) * 0.5 + 0.5;
-      float strataPattern = step(0.4, fract(strataFreq * 3.0)); // sharp bands
+      float strataPattern = smoothstep(0.35, 0.55, fract(strataFreq * 3.0));
 
-      // Canyon floor slightly lighter (dust-filled)
-      float floorLight = smoothstep(-0.3, -0.05, vmDepth);
-      vec3 canyonFloor = mix(detail * 1.1, detail * 0.9, floorLight);
+      // Varied dust-filled floor — internal structure, never a flat void.
+      float floorDetail = fbm3(vObjPos * 140.0) * 0.15;
+      float floorLight = smoothstep(-0.15, -0.03, vmDepth);
+      vec3 canyonFloor = mix(detail * (1.08 + floorDetail), detail * (0.92 + floorDetail), floorLight);
 
-      detail = mix(detail, mix(canyonFloor, detail * vec3(0.7, 0.5, 0.4), strataPattern), vmMask * vmAltFade * 0.3);
+      detail = mix(detail, mix(canyonFloor, detail * vec3(0.80, 0.68, 0.60), strataPattern), vmMask * vmAltFade * 0.15);
     }
   }
 }

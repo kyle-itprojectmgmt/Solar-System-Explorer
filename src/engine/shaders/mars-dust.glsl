@@ -6,9 +6,16 @@
 
 // Regional dust patch noise: slow continental-scale drifting field.
 // Thresholded so most latitudes stay CLEAR at default (uDustStorm = 0.2).
+// Domain-warped (V6.0.1 bug #54): raw simplex at low altitude aligns its
+// peaks along lattice rows — the same artifact as the Earth city-light
+// dots-in-rows; warping the coordinates first breaks the alignment.
 float ms2_dustField(vec3 p, float t, int octaves) {
   float dustT = t * 0.00002;
-  vec3 fieldPos = p * 3.0 + vec3(dustT, 0.0, -dustT * 0.7);
+  vec3 warp = vec3(
+    fbm2(p * 1.3 + vec3(1.7, 9.2, 0.0)),
+    fbm2(p * 1.3 + vec3(8.3, 2.8, 0.0)),
+    fbm2(p * 1.3 + vec3(4.1, 0.6, 7.5))) * 0.4;
+  vec3 fieldPos = (p + warp) * 3.0 + vec3(dustT, 0.0, -dustT * 0.7);
   return fbmN(fieldPos, octaves);
 }
 
@@ -101,6 +108,11 @@ vec3 ms2_dustColor = vec3(0.0);
   float lit = max(sunDot, 0.08); // minimal ambient for horizon glow
   vec3 litDust = ms2_dustColor * lit;
   float op = clamp(ms2_coverage, 0.0, 0.92) * nightFade;
+
+  // Low-altitude thinning (V6.0.1 bug #54): flying INSIDE the dust layer,
+  // the veil should read subtle — full opacity is a from-orbit look. The
+  // global-storm-from-distance appearance is unaffected (high altitude).
+  op *= mix(0.35, 1.0, smoothstep(1000.0, 5000.0, uAltitude));
 
   detail = mix(detail, litDust, op);
   gDetailHeight += op * 0.05;
