@@ -74,6 +74,12 @@ SMOKE_URL=http://localhost:5173 node tests/earthtest.mjs
 # Rayleigh shell, Apollo markers, ephemeris seasons, Moon orbit radius,
 # NAV travel rows, date jumps. Earth loads via ?system=earth.
 
+# v5b additions:
+SMOKE_URL=http://localhost:5173 node tests/v5b.mjs
+# Panel manager (one open globally, outside-click dismiss, OI close button
+# returning to the pre-insertion camera mode), panning dead-zone regression,
+# per-body radiation zones (Van Allen belts). 18 checks.
+
 # v5a additions:
 SMOKE_URL=http://localhost:5173 node tests/nightlights.mjs
 # City-light placement guard: finds a sim hour with Paris in night, aims

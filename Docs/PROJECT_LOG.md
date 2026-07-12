@@ -697,6 +697,50 @@ Per Kyle's V5a message (4 items). Version 5.1.0.
   6, ringfloor 7), zero console errors; deployed and live-verified in
   a fresh headless browser, both systems at v5.1.0.
 
+### v5b — Panel UX + Panning + Radiation Zones + Night Side (Complete — 2026-07-11, commits 804b8d0 → c1ac764 + docs)
+Per Docs/V5b_PROMPT.md + two mid-session additions. Version 5.1.1.
+
+- Item 4 first, measured (804b8d0): the "can't pan over the ocean" bug
+  had nothing to do with the ocean — an elementFromPoint grid + real
+  CDP drags showed a fixed bottom-center dead zone where the HIDDEN
+  body info card (opacity 0) swallowed pointerdown. The
+  `#ui-root > * { pointer-events: auto }` ID-specificity override
+  strikes a third time; fixed with an ID-scoped rule +
+  visibility:hidden. The prescribed cause (ocean mesh raycast) was
+  impossible: no ocean mesh exists and raycastBody() intersects only
+  the invisible picker spheres. All 9 probe points drag cleanly now.
+- Items 1–3 (2ed076b): central panel manager — ONE panel open
+  globally (9 stack panels + Orbital Insertion + body card + audio
+  flyout; tray exempt, date picker stays a self-dismissing popover).
+  Transparent dismiss overlay sits below all UI as the first
+  positioned child of #ui-root (DOM order instead of the spec's
+  z-999 — this codebase's panels aren't at z-1000+); swipe dismisses
+  on touch; the camera drag works immediately after dismissal. OI
+  panel gained a ✕; closing it by ANY route returns the camera to
+  the mode it was in before insertion (cameraCtl.preModeOI).
+- Item 5 (9a932ab): radiation warnings are config-driven
+  (radiationWarning.zones per body). Earth: Inner Van Allen
+  1,000–6,000 km, Outer 13,000–60,000 km, reentry < 400 km — clean at
+  74,000 km and at ISS altitude. Jupiter keeps its blanket zone.
+- Mid-session (695a300, measured at 382 km over Lake Michigan): night
+  side was ~black because scene ambient was 0x223344×0.06 — now
+  config-driven nightAmbient (Earth 0x8899bb×0.18 → faint terrain
+  silhouettes, dark-blue lakes; Jupiter unchanged). Terminator bleed
+  widened + faint night limb scatter in earth-atmosphere.glsl.
+  Day-side black cloud lumps at grazing sun = cloud RELIEF (on Earth
+  normalScale drives only cloud height) → 2.0→0.8. Measured innocent:
+  ocean chunk (only adds glint), texture colorSpace (already sRGB),
+  8K map (active, 8192px verified). Midwest olive-green is the July
+  Blue Marble source palette itself — September variant noted in
+  earth.js for a tan/brown look. City-light gain 0.3→0.4 vs the new
+  ambient floor (c1ac764; brightest city 62 vs floor 28).
+- Verified: tests/v5b.mjs NEW (18 checks: panel exclusivity, ✕ /
+  outside-click behavior incl. camera-mode return, drag-after-dismiss,
+  old dead zone, all five radiation zone cases) + earthtest 14/14 +
+  nightlights + Jupiter regression (smoke 22, incmeasure 6,
+  ringfloor 7). Deployed; both systems live-verified at v5.1.1, zero
+  console errors.
+
 ---
 
 ## Known Bugs / In Progress
@@ -730,10 +774,13 @@ Per Kyle's V5a message (4 items). Version 5.1.0.
 | 27 | Earth/Moon shader calibration done from headless screenshots — cloud zone coverage, city-light brightness, moon crater relief may need real-hardware tuning. v5a added the tooling: `__sse.renderer.logShaderState()` in dev builds lists live uniforms + all knob locations. | Needs review | V5_PROMPT.md |
 | 28 | Earth textures: 8K daymap WIRED in v5a (progressive diffuseHigh swap). night.jpg / clouds.jpg / specular.jpg downloaded (8K) but not yet wired into materials — lights are procedural by design (v5a Item 3). NASA CGI Moon Kit still manual (expired TLS cert at svs.gsfc.nasa.gov, URL in earth.js). | Partially resolved v5a | — |
 | 26 | Replace Ko-fi with Stripe for donations — create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Optionally keep free Ko-fi page as secondary community presence with Saturn funding goal. | Fix before launch | — |
-| 29 | Multiple panels open simultaneously — any panel can open while another is already open causing overlap and confusion. Fix: one panel open at a time globally. Opening any panel closes all others first. Applies to right-stack panels (CAM/TIME/NAV/SAVE/VIEW/HELP/ALT/INC/SPD), Orbital Insertion panel, body info cards, audio flyout. | Fix — next batch | V5b_PROMPT.md |
-| 30 | Click outside panel to close — all panels require clicking their button again to close. Standard UX: click/tap anywhere outside a panel (on the 3D scene) dismisses it. Transparent dismiss overlay pattern needed. | Fix — next batch | V5b_PROMPT.md |
-| 31 | Orbital Insertion panel has no close button and cannot be dismissed — no ✕ button, clicking outside does nothing, only way to close is switching camera mode. Must add ✕ close button and close on outside click. Closing switches camera back to previous mode (Orbit or Free Fly). | Fix — next batch | V5b_PROMPT.md |
-| 32 | Camera panning inconsistent on Earth — dragging to look around only responds when clicking on space or land, not reliably on ocean areas. Likely a raycasting or pointer event issue with the ocean shader mesh. | Fix — next batch | V5b_PROMPT.md |
+| 29 | Multiple panels open simultaneously — overlap and confusion | Resolved v5b (central panel manager — one panel globally, stack + OI + body card + audio flyout) | V5b_PROMPT.md |
+| 30 | Click outside panel to close | Resolved v5b (transparent dismiss overlay below all UI; swipe dismisses on touch; drag works immediately after) | V5b_PROMPT.md |
+| 31 | Orbital Insertion panel has no close button / cannot be dismissed | Resolved v5b (✕ button; any dismissal returns camera to the pre-insertion mode) | V5b_PROMPT.md |
+| 32 | Camera panning inconsistent on Earth ("ocean areas") — measured real cause: the HIDDEN body info card (opacity 0) swallowed pointerdown in a fixed bottom-center region via the `#ui-root > *` pointer-events ID-specificity override (3rd occurrence); there is no ocean mesh and picking never sees overlay meshes | Resolved v5b (visibility:hidden + ID-specificity rule) | V5b_PROMPT.md |
+| 33 | Radiation warning showed "Extreme radiation environment" at 74,000 km over Earth (Jupiter logic hardcoded) | Resolved v5b (config-driven radiationWarning.zones — Earth Van Allen belts + reentry band; Jupiter blanket zone kept) | V5b_PROMPT.md |
+| 34 | Earth night side nearly black / lakes pure black at 382 km; day-side black cloud lumps at grazing sun | Resolved v5b (per-system nightAmbient 0x8899bb×0.18, terminator bleed widened + night limb scatter, Earth normalScale 2.0→0.8 — cloud relief was the lump cause; ocean shader + colorSpace measured innocent) | — |
+| 35 | Midwest land renders olive/yellow-green — measured: that IS the source July Blue Marble palette (Wisconsin texture sample rgb(79,97,49)), pipeline faithful. For tan/brown farmland swap a September BMNG monthly variant (noted in earth.js) | Data choice — texture variant, not a bug | — |
 
 ---
 
