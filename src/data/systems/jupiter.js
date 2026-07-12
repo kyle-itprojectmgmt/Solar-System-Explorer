@@ -57,6 +57,14 @@ export default {
       intensity: 1.0,
     },
     features: { greatRedSpot: true, atmosphericGlow: true, equatorialBulge: true },
+    // Unified shader convention (V7 1b, surface-base.glsl): terminator and
+    // grazing-sun fade bands. The gasGiant style currently has no local
+    // day fade (Phong lighting darkens the clouds) — these calibrate any
+    // future sun-relative detail layers.
+    shaderParams: {
+      dayFadeSoft0: -0.12, dayFadeSoft1: 0.10, // gas giant, no hard surface
+      grazeFade0: 0.15, grazeFade1: 0.50,
+    },
     detail: {
       style: 'gasGiant',
       activationKm: 50000,

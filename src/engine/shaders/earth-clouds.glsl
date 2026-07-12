@@ -150,7 +150,9 @@ float ec_polar   = smoothstep(0.88, 0.96, ec_ay);
 // terminator they still catch the last light.
 {
   float sunDot = dot(vObjPos, uSunObj);
-  float nightFade = smoothstep(-0.3, 0.1, sunDot);
+  // V7 1b: thresholds come from earth.js shaderParams (dayFadeSoft0/1 =
+  // -0.30/0.10, wide — the atmosphere scatters light past the terminator).
+  float nightFade = sse_dayFade(sunDot, uDayFade0, uDayFade1);
   float lit = max(sunDot, 0.06);
   vec3 cloudCol = mix(vec3(0.973, 0.973, 1.0), vec3(0.80, 0.82, 0.86), ec_grey) * lit;
   float op = clamp(ec_cloud, 0.0, 0.92) * nightFade;

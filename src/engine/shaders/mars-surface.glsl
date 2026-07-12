@@ -52,7 +52,9 @@ float ms_vallesMarin(vec3 p, out float depth) {
 // height and color deltas fade out through the terminator (sharper blend
 // than Earth: no atmosphere to scatter light past it). The dust chunk is
 // deliberately EXEMPT (a dust veil is visible against the night sky).
-float ms_dayFade = smoothstep(-0.08, 0.15, dot(vObjPos, uSunObj));
+// V7 1b: thresholds come from mars.js shaderParams (dayFadeSoft0/1 =
+// -0.08/0.15) via the unified uDayFade uniforms — same values, same output.
+float ms_dayFade = sse_dayFade(dot(vObjPos, uSunObj), uDayFade0, uDayFade1);
 // High-frequency layers (crater bowls, regolith grain) fade with SUN
 // ELEVATION: at grazing angles their perturbed normals ignite as isolated
 // bloom-boosted orange sparkle dots across the whole twilight zone
@@ -60,7 +62,7 @@ float ms_dayFade = smoothstep(-0.08, 0.15, dot(vObjPos, uSunObj));
 // sunDot 0.7 the same layers read as clean granular texture). Macro
 // relief (canyon, Olympus) keeps the wider ms_dayFade for long
 // terminator shadows.
-float ms_grazeFade = smoothstep(0.2, 0.55, dot(vObjPos, uSunObj));
+float ms_grazeFade = sse_grazeFade(dot(vObjPos, uSunObj), uGrazeFade0, uGrazeFade1);
 float ms_height0 = gDetailHeight;
 vec3 ms_color0 = detail;
 

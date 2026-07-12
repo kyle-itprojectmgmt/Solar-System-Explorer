@@ -18,6 +18,7 @@
 
 import * as THREE from 'three';
 import SIMPLEX_GLSL from './glsl/simplex.glsl?raw';
+import SURFACE_BASE_GLSL from './glsl/surface-base.glsl?raw';
 import TERRA_CLOUDS from './shaders/earth-clouds.glsl?raw';
 import TERRA_LIGHTS from './shaders/earth-lights.glsl?raw';
 import TERRA_AURORA from './shaders/earth-aurora.glsl?raw';
@@ -41,7 +42,7 @@ const OCTAVES_MOON =
  * Wire a detail style into a MeshPhongMaterial. Returns the uniform handles
  * the renderer updates per frame ({ uTime, uAltitude, uDetailBlend, ... }).
  */
-export function applyDetailShader(material, style, params = {}, quality = {}) {
+export function applyDetailShader(material, style, params = {}, quality = {}, shaderParams = {}) {
   const def = DETAIL_STYLES[style];
   if (!def) return null;
 
@@ -55,6 +56,13 @@ export function applyDetailShader(material, style, params = {}, quality = {}) {
     // body because vObjPos does. The renderer updates these per frame.
     uSunObj: { value: new THREE.Vector3(1, 0, 0) },
     uCamObj: { value: new THREE.Vector3(0, 0, 1) },
+    // Unified fade convention (V7 1b) — per-body terminator / grazing-sun
+    // bands from body.shaderParams; see glsl/surface-base.glsl. Defaults
+    // are the Mars-calibrated bands (the v6.0.2 night-fade values).
+    uDayFade0: { value: shaderParams.dayFadeSoft0 ?? -0.08 },
+    uDayFade1: { value: shaderParams.dayFadeSoft1 ?? 0.15 },
+    uGrazeFade0: { value: shaderParams.grazeFade0 ?? 0.20 },
+    uGrazeFade1: { value: shaderParams.grazeFade1 ?? 0.55 },
     ...(def.uniforms ? def.uniforms(params) : {}),
   };
 
@@ -76,9 +84,14 @@ export function applyDetailShader(material, style, params = {}, quality = {}) {
         uniform float uNormalScale;
         uniform vec3 uSunObj;
         uniform vec3 uCamObj;
+        uniform float uDayFade0;
+        uniform float uDayFade1;
+        uniform float uGrazeFade0;
+        uniform float uGrazeFade1;
         ${def.decls || ''}
         ${quality.tier === 'mobile' ? '#define DETAIL_QUALITY_LOW' : ''}
         ${SIMPLEX_GLSL}
+        ${SURFACE_BASE_GLSL}
         ${def.fns || ''}`)
       .replace('#include <map_fragment>', `#include <map_fragment>
         vec3 gDetailEmissive = vec3(0.0);

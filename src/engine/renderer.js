@@ -322,7 +322,7 @@ export class SceneRenderer {
     this.root.add(this.primaryMesh);
     this.pickables.push(this._makePicker(p.name, this.primaryMesh, rEq));
 
-    if (p.detail) this._registerDetail(p.name, this.primaryMesh, mat, p.detail, rEq, p.normalScale);
+    if (p.detail) this._registerDetail(p.name, this.primaryMesh, mat, p.detail, rEq, p.normalScale, p.shaderParams);
 
     // Progressive high-res swap (outside the loading manager on purpose —
     // the app starts on the low-res map and upgrades silently).
@@ -529,7 +529,7 @@ export class SceneRenderer {
         }
       }
 
-      if (cfg.detail) this._registerDetail(cfg.name, group, mat, cfg.detail, r, cfg.normalScale);
+      if (cfg.detail) this._registerDetail(cfg.name, group, mat, cfg.detail, r, cfg.normalScale, cfg.shaderParams);
 
       this.root.add(group);
       this.bodyMeshes.set(cfg.name, entry);
@@ -537,8 +537,10 @@ export class SceneRenderer {
     }
   }
 
-  _registerDetail(name, anchor, material, detail, radiusUnits, normalScale) {
-    const uniforms = applyDetailShader(material, detail.style, detail.params, this.quality);
+  _registerDetail(name, anchor, material, detail, radiusUnits, normalScale, shaderParams) {
+    // shaderParams (V7 1b): per-body terminator/graze fade bands for the
+    // unified surface convention — see glsl/surface-base.glsl.
+    const uniforms = applyDetailShader(material, detail.style, detail.params, this.quality, shaderParams);
     if (!uniforms) return;
     if (normalScale != null) uniforms.uNormalScale.value = normalScale;
     this.detailEntries.push({ name, anchor, uniforms, detail, radiusUnits, blend: 0 });

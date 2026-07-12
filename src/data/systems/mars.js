@@ -98,6 +98,14 @@ export default {
 
     features: { atmosphericGlow: true, equatorialBulge: true },
 
+    // Unified shader convention (V7 1b, surface-base.glsl). These are the
+    // v6.0.2 night-fade values (bug #55) verbatim: sharp terminator (thin
+    // atmosphere) + high-frequency graze fade for the sparkle-prone layers.
+    shaderParams: {
+      dayFadeSoft0: -0.08, dayFadeSoft1: 0.15,
+      grazeFade0: 0.20, grazeFade1: 0.55,
+    },
+
     // Ares detail shader: procedural relief for dust-eroded terrain.
     // Activation is deliberately HIGH (Earth-like) because the style also
     // carries the dust-storm veil — a 2018-style global storm is visible

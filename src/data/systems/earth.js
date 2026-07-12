@@ -98,6 +98,13 @@ export default {
       style: 'rayleigh',      // signature blue from nitrogen/oxygen
     },
     features: { atmosphericGlow: true, equatorialBulge: true },
+    // Unified shader convention (V7 1b, surface-base.glsl). dayFadeSoft
+    // matches the cloud night fade shipped in V5.1.2 (bug #48) exactly —
+    // wide band, the atmosphere scatters light past the terminator.
+    shaderParams: {
+      dayFadeSoft0: -0.30, dayFadeSoft1: 0.10,
+      grazeFade0: 0.10, grazeFade1: 0.45,
+    },
     detail: {
       style: 'terra',
       activationKm: 50000,

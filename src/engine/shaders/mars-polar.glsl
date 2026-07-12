@@ -51,7 +51,7 @@ float mp_swissCheese(vec3 p) {
 
 // Night fade (V6.0.2): caps must not glow in the dark — same per-chunk
 // delta fade as the surface chunk (the dust chunk stays exempt).
-float mp_dayFade = smoothstep(-0.08, 0.15, dot(vObjPos, uSunObj));
+float mp_dayFade = sse_dayFade(dot(vObjPos, uSunObj), uDayFade0, uDayFade1); // V7 1b: mars.js shaderParams
 float mp_height0 = gDetailHeight;
 vec3 mp_color0 = detail;
 
