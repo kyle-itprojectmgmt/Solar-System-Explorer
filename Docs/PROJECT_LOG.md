@@ -779,6 +779,58 @@ Per Docs/V5b_PROMPT.md + two mid-session additions. Version 5.1.1.
   ringfloor 7). Deployed; both systems live-verified at v5.1.1, zero
   console errors.
 
+### v5c — Earth Cloud Polish + Preset Scoping (Complete — 2026-07-12, commits 52c1026 → 6f9541c + docs)
+Per Docs/V5c_PROMPT.md. Version 5.1.3 (5.1.2 was never bumped in
+package.json — bcac126 shipped as 5.1.1; both steps landed here).
+
+- Item 1 (52c1026, bug #41): hurricane spiral rose. Measured first at the
+  terminator (probe places the NW-Pacific storm at sunDot 0.084): the
+  pure sin(ang_spiral*3.5) rendered as machined concentric rings under
+  relief shading. ec_spiral now bends arm phase with fbm3 (±1.2 rad),
+  de-centers rings with radial snoise, and fades band contrast outward;
+  the coherent eyewall is kept (real hurricanes have one). Day-side
+  3.5-cycle spiral amplitude outside the eyewall: 13.1 → 4.1 (organic).
+  tests/hurricane.mjs gates on it and screenshots both sun angles.
+  NOTE for tuning: the prompt's prescribed snippet assumed a 2D-uv
+  hurricane function; the real one works on 3D sphere positions — the
+  fix was adapted, not pasted.
+- Item 2 (c5f8b46, bug #42): LAYER 5 cloud puff was ±0.18 ADDITIVE over
+  every cloud pixel below 8,000 km (wall-to-wall confetti); now it's
+  subtractive edge erosion (domain-warped snoise, edge mask
+  1-|cov-0.5|*2.5) — dense decks solid, edges ragged. Ocean glint:
+  fixed pow(400) made a ~450 km undithered disc at 2,113 km (normal
+  rotation and view rotation nearly cancel there, so the lobe decays
+  very slowly across the surface); sharpness now altitude-scaled
+  mix(6000 close → 150 far) + screen-space rim dither + capped core.
+  Measured footprint 450 km → 157 km glitter core; looks like real
+  ISS-photo sun glitter at 700 km. tests/glint.mjs gates the footprint.
+- Item 3 (6f9541c, bug #49): curated presets scoped per system. The
+  prompt assumed config-side curatedPresets arrays — reality: the list
+  is hardcoded in ui.js._buildPresetsPanel, so entries got a `system`
+  tag matched against system.slug (Moon Alignment scoped jupiter too —
+  it's the Galilean resonance). The prompt's expected Earth presets
+  didn't exist and were BUILT: 🛰️ ISS Orbit View (navPreset uv path),
+  🌍 Earthrise (jumps to the nearest full-Earth lunar phase within one
+  month — at the July epoch Earth-from-Moon is a black disc, measured —
+  then a 40 s sweep lifts Earth over the limb from startTheta = Earth
+  bearing + 156°), 🌃 City Lights at Night (aims at whichever of six
+  major cities is deepest in darkness right now — never touches the
+  clock), 🌌 Aurora from Orbit (dark magnetic pole via sun sign).
+  Helpers _bodyFrameNormal/_flyToLatLon (uv = [0.5+lon/360, 0.5+lat/180]
+  matches flyToFeature's SphereGeometry mapping). tests/presets.mjs:
+  28 checks — scoping both directions + camera behavior per preset.
+- Verified: hurricane + glint metric gates green, presets 28/28,
+  earthtest 14/14, nightlights, v5b 18, livedefault, Jupiter regression
+  (smoke 22, incmeasure 6, ringfloor 7) — all against the dev server
+  (window.__sse is DEV-only; production builds can't run the suites).
+  Production build checked separately: both systems load at v5.1.3 with
+  zero console errors + v5c feature strings in the served bundle.
+  GOTCHA hit again: the dev server bakes __APP_VERSION__ at startup —
+  restart it after a package.json version bump or the loading-screen
+  version checks fail against stale 5.1.1.
+- Deployed (dde94afd) and live-verified with cache-bust: both systems
+  v5.1.3, zero console errors, v5c strings present in the live bundle.
+
 ---
 
 ## Known Bugs / In Progress
@@ -824,15 +876,16 @@ Per Docs/V5b_PROMPT.md + two mid-session additions. Version 5.1.1.
 | 38 | Earth day/night terminator wrong — sun direction never calibrated. Three compounding problems: uncalibrated placeholder direction (anti-phased seasons), epoch rotation phase not tied to UTC, coarse sidereal day (23.934h → 150° drift by 2026). Fix: true equatorial sun at epoch, rotationPhaseAtEpochDeg config knob, sidereal day 23.93446959h. Subsolar point within 3° of real sun. Night ambient reduced: 0x8899bb×0.18 → 0x445566×0.08, city gain 0.4→0.5. | Resolved 91d241d | — |
 | 39 | LIVE mode showed stale time after tab hidden — UTC pipeline was already correct (no getHours() anywhere). Real cause: requestAnimationFrame pauses when tab hidden, 60s resync counted active-tab frame time only, so stall time persisted for up to 60s after tab restored. Appeared as timezone offset equal to hidden duration. Fix: wall-clock based resync — drift >2s snaps on first frame back, Date.now()-based 60s cadence otherwise. Verified: 2-hour stall recovers within one frame. | Resolved — same commit as date picker | — |
 | 40 | Date picker had no time input — users could only set date, not time of day. Fix: native <input type="time" step="1"> row below calendar. Apply button commits date+time together as one ISO Z instant. Pre-filled with current sim HH:MM:SS UTC. Apollo 11 test: July 20 1969 + 20:17:00 → lands on epoch exactly. AM/PM display is browser locale cosmetic — value is 24h UTC. | Resolved — same commit as LIVE fix | — |
-| 41 | Hurricane vortex stripes — ec_hurricane uses pure sin(ang_spiral*3.5) with no noise modulation. At terminator, cloud-relief height shading makes machined spiral-rose pattern visible. | Needs fix — next batch | — |
-| 42 | Cloud confetti below ~2,000 km — LAYER 5 puff term speckles everything at close range. Sun glint at 2,000 km renders as undithered white blob. | Needs fix — next batch | — |
+| 41 | Hurricane vortex stripes — ec_hurricane used pure sin(ang_spiral*3.5); terminator relief shading exposed a machined spiral rose. Fixed: fbm arm-phase modulation + radial de-centering + outward contrast fade; eyewall coherence kept. Day-side spiral harmonic 13.1 → 4.1 (tests/hurricane.mjs). | Resolved v5c (52c1026) | V5c_PROMPT.md |
+| 42 | Cloud confetti below ~2,000 km + sun glint blob. Fixed: LAYER 5 puff converted additive → domain-warped edge erosion (decks solid, edges ragged); glint sharpness altitude-scaled 6000→150 with rim dither + capped core, footprint 450 km → 157 km at 2,113 km (tests/glint.mjs). | Resolved v5c (c5f8b46) | V5c_PROMPT.md |
 | 43 | City light dots-in-rows at 2,113 km (real cause: snoise(vObjPos×250) peaks align along simplex lattice — NOT HYG stars. HYG already had depthTest, depthWrite:false, renderOrder:-1; disc pixel count unchanged when toggled). Fix: domain-warp speckle + per-dot brightness variation → irregular clusters. depthTest:true made explicit as regression lock. | Resolved bcac126 | — |
 | 44 | LIVE off by default, hidden in TIME panel (real finding: 🔴 button was already in HUD; only default needed flipping). Both systems now open at current UTC on fresh load. LIVE defaults off under navigator.webdriver to avoid fighting headless suite time jumps. | Resolved bcac126 | — |
 | 45 | Voyager preset latently broken — used bare simSeconds=0 write, never moved n-body moons (documented gotcha, masked until LIVE defaulted to 0). Now exits LIVE and does proper jumpToSimSeconds. | Resolved bcac126 | — |
 | 46 | Apollo 11 preset missing from Earth SAVE panel — added as Earth-only curated preset, now the only way back to the 1969 epoch. | Resolved bcac126 | — |
 | 47 | City lights too dim at night — gain 0.5→0.7, three dominant gaussians 1.00→1.20, region clamp 1.15→1.35. nightlights guard: city 87 vs dark 14. | Resolved bcac126 | — |
 | 48 | Cloud streaking on night side — smoothstep(-0.3, 0.1, sunDot) night fade. Deep night renders no cloud layer (eliminates relief-shading streaks). Terminator clouds still catch last light. | Resolved bcac126 | — |
-| 49 | Jupiter/Earth curated SAVE presets (Io Volcano Flyby, GRS Close Pass, Triple Moon Shadow) appear on Earth system too — pre-existing, out of scope for bcac126. Fix in next batch. | Next batch | — |
+| 49 | Jupiter curated SAVE presets appeared on Earth. Fixed: per-system scope tags in ui.js + filter on system.slug; four NEW Earth presets built (ISS Orbit View, Earthrise, City Lights at Night, Aurora from Orbit — the prompt assumed they existed; they didn't). tests/presets.mjs 28 checks. | Resolved v5c (6f9541c) | V5c_PROMPT.md |
+| 50 | Aurora curtains render as rings of DOTS at 4,500 km (snoise curtain sampling turns pointillist) — pre-existing v5 worker-shader quality, surfaced by the new Aurora from Orbit preset. Related: Earth seen from the Moon in Earthrise reads small and veiled (true angular size + Rayleigh shell at extreme minification) — physical, but a tele-FOV shot or shader distance fade could polish both. | Needs review (with #27) | — |
 
 ---
 
