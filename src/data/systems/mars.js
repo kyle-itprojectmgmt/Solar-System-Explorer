@@ -39,12 +39,18 @@ export default {
     //   so solar declination = asin(sin 25.19° · sin 97°) ≈ +25.0°.
     //   Landing was 16:13 local mean solar time at 49.97°W: the sun sat
     //   ~4.22 h past local noon → subsolar longitude ≈ 111.5°W.
-    //   With rotationPhaseAtEpochDeg = 0 the equatorial-frame azimuth IS
-    //   the body longitude: dir = (cosδ·cosλ, sinδ, −cosδ·sinλ), λ = −111.5°.
+    // PIPELINE GOTCHA (measured): sunDirectionAt() FLATTENS this vector's
+    // declination and rebuilds it from the tilt — the seasonal phase lives
+    // in the ecliptic longitude λ0, not in the y component. So this vector
+    // must be the model's own equatorial form
+    //   (cos λ0·cos tilt, −cos λ0·sin tilt, −sin λ0)
+    // with λ0 = −173.2° chosen so declination = +25.0° AND decreasing
+    // (post-solstice). The epoch longitude offset is carried by
+    // rotationPhaseAtEpochDeg below.
     // NOTE the ephemeris is a circular-orbit model; Mars e = 0.093 means
     // the subsolar longitude can lead/lag by up to ~10° across the year.
     // Fine for lighting; refine when the ephemeris gains eccentricity.
-    direction: [-0.3322, 0.4226, 0.8432],
+    direction: [-0.8986, 0.4226, 0.1184],
   },
 
   primary: {
@@ -57,14 +63,17 @@ export default {
     // True sidereal day (24h 37m 22.66s). The SOLAR day (sol) is 24.6597 h —
     // do not confuse them; the terminator calibration needs sidereal.
     rotationPeriodHours: 24.6229,
-    // All epoch-longitude calibration is carried in star.direction above.
-    rotationPhaseAtEpochDeg: 0,
+    // frame azimuth of the epoch sun (−172.5°) minus the Viking subsolar
+    // longitude (−111.5°) — measured convention: frame_lon = body_lon + phase.
+    rotationPhaseAtEpochDeg: -61.0,
     orbitalPeriodDays: 686.98,
     axialTiltDeg: 25.19,
     surfaceGravity: 3.72,          // m/s²
     surfaceTempRange: [-125, 20],  // °C
 
-    textures: { diffuse: 'diffuse.jpg' },
+    // 2K base loads fast; desktop silently upgrades to the 8K SSS map
+    // (same progressive diffuseHigh path Earth uses).
+    textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
 
     // Worker 3 completes: atmosphere (style 'dust'), detail (style 'ares'),
     // dust storm layer config, detailFloor, radiationWarning, navPresets,
