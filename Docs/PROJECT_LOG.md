@@ -1031,8 +1031,12 @@ multiplying the whole height field; reversed-arg smoothstep (GLSL UB).
 - 7 Saturn curated presets (ui.js tagged list); Through the Rings uses
   orbit mode as the documented ring-floor exemption.
 - Suites: saturntest.mjs NEW (23), saturncal (8), security (28);
-  presets extended (Viking). Full regression green. Deployed and
-  live-verified with cache-bust.
+  presets extended (Viking). Full regression green (16 suites).
+- Deployed (1c24c6b9) and live-verified with cache-bust: all FOUR
+  systems at v7.0.0, zero console errors, zero CSP violations, v7
+  feature strings in the served bundles. Security suite 28/28 against
+  the live URL. **Mozilla Observatory: A+ (score 130, 10/10 tests,
+  scanned 2026-07-12)** — exceeds the launch target.
 
 ---
 
