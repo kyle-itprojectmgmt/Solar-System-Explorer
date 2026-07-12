@@ -49,6 +49,12 @@ float mp_swissCheese(vec3 p) {
 // Northern summer: uSunObj.y ≈ +0.42
 // Southern summer: uSunObj.y ≈ -0.42
 
+// Night fade (V6.0.2): caps must not glow in the dark — same per-chunk
+// delta fade as the surface chunk (the dust chunk stays exempt).
+float mp_dayFade = smoothstep(-0.08, 0.15, dot(vObjPos, uSunObj));
+float mp_height0 = gDetailHeight;
+vec3 mp_color0 = detail;
+
 float mp_capMask = 0.0;
 vec3 mp_capColor = vec3(0.94);
 
@@ -132,10 +138,13 @@ vec3 mp_capColor = vec3(0.94);
   }
 }
 
-// APPLY: blend the cap into the surface
+// APPLY: blend the cap into the surface, then fade the whole chunk's
+// contribution into darkness.
 {
   if (mp_capMask > 0.001) {
     detail = mix(detail, mp_capColor, mp_capMask * 0.92);
     gDetailHeight += mp_capMask * 0.08;
   }
+  gDetailHeight = mp_height0 + (gDetailHeight - mp_height0) * mp_dayFade;
+  detail = mix(mp_color0, detail, mp_dayFade);
 }

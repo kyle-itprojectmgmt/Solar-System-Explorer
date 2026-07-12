@@ -46,6 +46,24 @@ float ms_vallesMarin(vec3 p, out float depth) {
 
 // === APPLY ===
 
+// Night fade (V6.0.2, hardware-confirmed at 736 km): relief-perturbed
+// normals can tilt far enough to catch sun from BELOW the local horizon —
+// glowing crater dots on the pitch-dark night side. All of this chunk's
+// height and color deltas fade out through the terminator (sharper blend
+// than Earth: no atmosphere to scatter light past it). The dust chunk is
+// deliberately EXEMPT (a dust veil is visible against the night sky).
+float ms_dayFade = smoothstep(-0.08, 0.15, dot(vObjPos, uSunObj));
+// High-frequency layers (crater bowls, regolith grain) fade with SUN
+// ELEVATION: at grazing angles their perturbed normals ignite as isolated
+// bloom-boosted orange sparkle dots across the whole twilight zone
+// (measured — sun-light-off and uNormalScale-0 both kill them; at
+// sunDot 0.7 the same layers read as clean granular texture). Macro
+// relief (canyon, Olympus) keeps the wider ms_dayFade for long
+// terminator shadows.
+float ms_grazeFade = smoothstep(0.2, 0.55, dot(vObjPos, uSunObj));
+float ms_height0 = gDetailHeight;
+vec3 ms_color0 = detail;
+
 float ms_polar = smoothstep(0.94, 0.88, abs(vObjPos.y)); // fade above ±70°
 
 // Mars dichotomy: darker in the south (volcanic/highland), lighter in the north (dusty).
@@ -85,11 +103,11 @@ float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
       c *= 0.5 * step(0.65, fract(id1 * 7.77)); // eroded + hash-thinned
       float bowl = clamp(-min(c, 0.0), 0.0, 1.0);
       detail = mix(detail, detail * 0.93, bowl * 0.5 * crAct * cFade * hl);
-      gDetailHeight += min(c, 0.0) * 0.06 * crAct * cFade * hl;
+      gDetailHeight += min(c, 0.0) * 0.06 * crAct * cFade * hl * ms_grazeFade;
 
       // Powdery regolith grain on final approach.
-      gDetailHeight += snoise(vObjPos * 900.0) * 0.03
-        * dtlFreqFade(vObjPos, 900.0) * crAct * hl;
+      gDetailHeight += snoise(vObjPos * 900.0) * 0.022
+        * dtlFreqFade(vObjPos, 900.0) * crAct * hl * ms_grazeFade;
     }
 
     // Wind ripples: long east-west streaks = LOW frequency along the
@@ -114,7 +132,7 @@ float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
       float crater = craterProfile(dUv * 380.0 + 3.1, cellId);
       float sparseMask = step(0.75, fract(cellId * 12.345));
       gDetailHeight += min(crater, 0.0) * 0.05 * sparseMask
-        * dtlFreqFade2(dUv, 380.0) * lowlandMask * lowCrAct;
+        * dtlFreqFade2(dUv, 380.0) * lowlandMask * lowCrAct * ms_grazeFade;
     }
 
     // East-west wind streaks: very elongated, faint.
@@ -220,5 +238,11 @@ float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
 // Apply polar fade to all layers
 detail = mix(dBase, detail, ms_polar);
 
+// Night fade: everything this chunk added — height AND color — vanishes
+// into darkness (see ms_dayFade above). Craters emerge through the
+// terminator and are invisible in deep night.
+gDetailHeight = ms_height0 + (gDetailHeight - ms_height0) * ms_dayFade;
+detail = mix(ms_color0, detail, ms_dayFade);
+
 // Mars surface: no city lights or emissive effects on the night side.
-// gDetailEmissive stays at vec3(0.0) — relief shading works automatically.
+// gDetailEmissive stays at vec3(0.0).
