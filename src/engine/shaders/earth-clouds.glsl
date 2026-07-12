@@ -7,11 +7,20 @@
 // Injected into the 'terra' detail style; the style provides the preamble
 // (dBase/detail) and the final mix. Extra uniforms: uSunObj.
 
-float ec_spiral(vec2 pos, float rate, float rot) {
+// Spiral bands, fbm-broken (V5c bug #41): the pure sin(ang_spiral * 3.5)
+// read as a machined spiral rose once terminator relief shading picked it
+// up. Angle noise bends the arms out of register, radial noise de-centers
+// the rings, and band contrast fades outward so the outer bands soften
+// into the surrounding cloud field. d = angular distance / 0.055 (0..1.6).
+float ec_spiral(vec2 pos, float rate, float rot, float d, float t) {
   float r = length(pos);
   float ang = atan(pos.y, pos.x);
+  float angNoise = fbm3(vec3(pos * 1.5, 7.3 + t * 1.5)) * 1.2;
+  float radNoise = snoise(vec3(r * 2.4, ang * 1.5, 3.1 + t)) * 0.35;
   float ang_spiral = ang - rate / max(r, 0.01) + rot;
-  return sin(ang_spiral * 3.5) * 0.5 + 0.5;
+  float s = sin(ang_spiral * 3.5 + angNoise) * 0.5 + 0.5 + radNoise;
+  float contrast = mix(0.30, 1.0, smoothstep(1.1, 0.25, d));
+  return clamp(mix(0.5, s, contrast), 0.0, 1.0);
 }
 
 // Zonal flow: rotate object-space position about the spin axis by a
@@ -39,7 +48,7 @@ float ec_hurricane(vec3 p, float latDeg, float lonDeg, float sunY, float t) {
   vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), hc));
   vec3 e2 = cross(hc, e1);
   vec2 rel = vec2(dot(p - hc, e1), dot(p - hc, e2)) * hemi; // CCW north, CW south
-  float spiral = ec_spiral(rel * 40.0, 2.0 / (d + 0.35), t * 8.0);
+  float spiral = ec_spiral(rel * 40.0, 2.0 / (d + 0.35), t * 8.0, d, t);
   float eye = smoothstep(0.06, 0.16, d);                 // clear eye at the center
   return spiral * eye * (1.0 - smoothstep(0.75, 1.5, d)) * season;
 }
