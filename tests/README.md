@@ -80,6 +80,15 @@ SMOKE_URL=http://localhost:5173 node tests/v5b.mjs
 # returning to the pre-insertion camera mode), panning dead-zone regression,
 # per-body radiation zones (Van Allen belts). 18 checks.
 
+# orbit-direction hotfix guard:
+SMOKE_URL=http://localhost:5173 node tests/orbitdir.mjs
+# Measures GEOGRAPHIC longitude drift under the camera (east-positive, via
+# the pixel-verified nightlights toLocal convention) — never raw angle signs.
+# Orbit mode + insertion 0° must drift EAST (prograde), insertion −51.6°
+# WEST (retrograde), GeoSync stationary. NOTE: the two position formulas use
+# OPPOSITE conventions: insertion (cos φ, −sin φ) → phase INCREASES for
+# prograde; orbit mode (cos θ, +sin θ) → orbTheta DECREASES for prograde.
+
 # v5a additions:
 SMOKE_URL=http://localhost:5173 node tests/nightlights.mjs
 # City-light placement guard: finds a sim hour with Paris in night, aims

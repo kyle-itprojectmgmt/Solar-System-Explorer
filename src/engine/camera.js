@@ -605,7 +605,10 @@ export class CameraController {
     // seconds so high multipliers sweep dramatically instead of strobing.
     if (this.mode === 'orbit') {
       const adv = (Math.PI * 2 / 60) * this.orbSpeedMult * this._simDelta;
-      this.orbTheta += Math.min(adv, (Math.PI * 2 / 5) * dt);
+      // Decreasing theta = prograde (west-to-east) in this position formula's
+      // +sin(z) convention — measured via sub-camera longitude drift
+      // (tests/orbitdir.mjs); insertion phase uses the opposite convention.
+      this.orbTheta -= Math.min(adv, (Math.PI * 2 / 5) * dt);
     }
 
     const center = this.r.bodyWorldPos(name, this._v);
@@ -624,7 +627,7 @@ export class CameraController {
       if (altKm < 500) {
         const t = 1 - Math.max(0, altKm) / 500;
         const nadir = center.clone().sub(pos).normalize();
-        const travel = new THREE.Vector3(-Math.sin(this.orbTheta), 0, Math.cos(this.orbTheta));
+        const travel = new THREE.Vector3(Math.sin(this.orbTheta), 0, -Math.cos(this.orbTheta)); // d(pos)/dt with theta decreasing
         const axis = nadir.cross(travel); // rotating about n×t tips the view from nadir toward travel
         if (axis.lengthSq() > 1e-9) {
           quat.premultiply(new THREE.Quaternion().setFromAxisAngle(
@@ -896,7 +899,7 @@ export class CameraController {
     const cur = seq[this.cineIndex % seq.length];
     const center = this.r.bodyWorldPos(cur.target, this._v).clone();
     const bodyR = this.r.bodyRadius(cur.target);
-    const theta = (cur.startTheta || 0) + this.cineTime * (cur.orbitRate || 0.03);
+    const theta = (cur.startTheta || 0) - this.cineTime * (cur.orbitRate || 0.03); // decreasing = prograde drift
     const dist = bodyR * cur.dist;
     const pos = new THREE.Vector3(
       center.x + dist * Math.cos(theta),
