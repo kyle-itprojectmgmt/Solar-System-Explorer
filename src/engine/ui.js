@@ -1997,14 +1997,38 @@ function fmtDur(s) {
   return `${(s / 86400).toFixed(1)}d`;
 }
 
-function spotifyEmbedUrl(url) {
+// Validate a user-pasted URL before any embed parsing: http(s) only (rejects
+// javascript:/data: injection) and the hostname must belong to the service.
+// The embed src is then REBUILT from matched groups — never the raw input.
+function sanitizeEmbedUrl(input, allowedDomains) {
+  const raw = input.trim();
+  try {
+    // Users routinely paste without a scheme; default to https for parsing.
+    const url = new URL(raw.includes('://') ? raw : `https://${raw}`);
+    if (!['https:', 'http:'].includes(url.protocol)) return null;
+    const ok = allowedDomains.some(
+      (d) => url.hostname === d || url.hostname.endsWith(`.${d}`),
+    );
+    return ok ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function spotifyEmbedUrl(raw) {
+  const url = sanitizeEmbedUrl(raw, ['spotify.com']);
+  if (!url) return null;
   const m = url.match(/open\.spotify\.com\/(playlist|album|track)\/([A-Za-z0-9]+)/);
   return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}?theme=0` : null;
 }
 
-function youtubeEmbedUrl(url) {
+function youtubeEmbedUrl(raw) {
+  // youtu.be short links are accepted input; embeds always come from the
+  // privacy-enhanced nocookie domain (the only YouTube host in the CSP).
+  const url = sanitizeEmbedUrl(raw, ['youtube.com', 'youtube-nocookie.com', 'youtu.be']);
+  if (!url) return null;
   const list = url.match(/[?&]list=([\w-]+)/);
-  if (list) return `https://www.youtube.com/embed/videoseries?list=${list[1]}`;
-  const vid = url.match(/(?:v=|youtu\.be\/)([\w-]{6,})/);
-  return vid ? `https://www.youtube.com/embed/${vid[1]}` : null;
+  if (list) return `https://www.youtube-nocookie.com/embed/videoseries?list=${list[1]}`;
+  const vid = url.match(/(?:v=|youtu\.be\/|\/embed\/)([\w-]{6,})/);
+  return vid ? `https://www.youtube-nocookie.com/embed/${vid[1]}` : null;
 }

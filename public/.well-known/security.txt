@@ -1,0 +1,4 @@
+Contact: mailto:kyle@itprojectmgmt.com
+Expires: 2027-07-12T00:00:00Z
+Preferred-Languages: en
+Canonical: https://solar-system-explorer.kyle-d06.workers.dev/.well-known/security.txt
