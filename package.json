@@ -1,6 +1,6 @@
 {
   "name": "solar-system-explorer",
-  "version": "6.0.0",
+  "version": "6.0.1",
   "description": "A photorealistic, first-person 3D explorer of the solar system. Jupiter system first.",
   "type": "module",
   "scripts": {

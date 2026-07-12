@@ -109,7 +109,6 @@ Standing instructions in .claude/instructions.md (auto-read by Claude Code).
 
 ### Procedural Detail Shaders
 Shared GLSL Simplex noise library in `/src/engine/glsl/simplex.glsl`.
-Altitude-based blend: `uDetailBlend = smoothstep(farDist, nearDist, uAltitude)`
 All shaders disabled above activation altitude — zero GPU cost when far.
 Uniforms: `uTime`, `uAltitude`, `uDetailBlend` passed every frame.
 
@@ -136,11 +135,26 @@ panel must be invisible but not interactive.
 ### Sun / Rotation Calibration — Per System
 star.direction must be the true equatorial sun direction at the system
 epoch. rotationPhaseAtEpochDeg must be calibrated to UTC. Use
-full-precision sidereal day: 23.93446959h for Earth. Coarse values
-accumulate large longitude errors over decades. Verify subsolar point
-against real ephemeris after any epoch or rotation config changes.
-LIVE mode syncs via Date.now() (always UTC ms) — never use getHours()
-or other local-time methods anywhere in the time pipeline.
+full-precision sidereal day: 23.93446959h for Earth, 24.6229h for
+Mars. Coarse values accumulate large longitude errors over decades.
+Verify subsolar point against real ephemeris after any epoch or
+rotation config changes. LIVE mode syncs via Date.now() (always UTC ms)
+— never use getHours() or other local-time methods anywhere in the
+time pipeline.
+
+### Insertion Preset Order — CRITICAL (v6 discovery)
+Insertion presets must call setMode('insertion') FIRST then
+setInsertion({...}) — entry re-derives altitude from current camera
+distance and clobbers preset values if setInsertion() runs first.
+Measured: 45,614 km instead of 15,000 when order was wrong.
+
+### Procedural Crater Lesson (v6 Mars)
+The base 8K texture already carries orbit-scale basins. Every strong
+procedural crater layer renders as stamped donut rings (xz-projection
+lattice, dUv Callisto pattern — all produce rings). Rule: if it looks
+like a stamp sheet the answer is LESS, not different paint.
+Working pattern: sub-texture roughness only below 1,500 km,
+hash-thinned, relief-led with no rim paint.
 
 ### Per-System Lazy Loading (add before multi-system build)
 Currently all system configs (jupiter.js, saturn.js) are bundled at
@@ -904,6 +918,23 @@ at function scope.
   systems load at v6.0.0 with zero console errors, v6 feature strings
   in the served bundle.
 
+### v6.0.1 — Mars Hardware-Review Fixes (Complete — 2026-07-12, commit 4d37d74 + docs)
+Kyle's real-hardware pass at 1,291 km confirmed three visual bugs; all
+measured headless before and after (mars-surface.glsl + mars-dust.glsl
+only). Bug #51 crater donuts: the rings were the RELIEF rim ridge (the
+prescribed "rim paint" was already gone in v6) — craters are now
+min(c, 0) depressions only, hash-thinned to 35%/25% of cells; the
+terrain texture dominates. Bug #53 Valles Marineris black slash
+(measured min luminance 0): noise-modulated -0.42 relief + step strata
+paint stacked — now depth -0.10, ±15% floor noise, softened strata,
+varied dust floor (canyon min lum 23, mean 66 vs terrain 63-82,
+internal structure visible). Bug #54 dust lattice caterpillar rows:
+field coordinates domain-warped (the Earth city-light #43 fix class) +
+veil thinned to 35% below 1,000 km — the 100% storm from global
+distance remains a featureless orange sphere (verified). marstest
+13/13, marscal 6/6. Deployed (eeadb787), live index confirmed serving
+the new bundle.
+
 ---
 
 ## Known Bugs / In Progress
@@ -959,7 +990,9 @@ at function scope.
 | 48 | Cloud streaking on night side — smoothstep(-0.3, 0.1, sunDot) night fade. Deep night renders no cloud layer (eliminates relief-shading streaks). Terminator clouds still catch last light. | Resolved bcac126 | — |
 | 49 | Jupiter curated SAVE presets appeared on Earth. Fixed: per-system scope tags in ui.js + filter on system.slug; four NEW Earth presets built (ISS Orbit View, Earthrise, City Lights at Night, Aurora from Orbit — the prompt assumed they existed; they didn't). tests/presets.mjs 28 checks. | Resolved v5c (6f9541c) | V5c_PROMPT.md |
 | 50 | Aurora curtains render as rings of DOTS at 4,500 km (snoise curtain sampling turns pointillist) — pre-existing v5 worker-shader quality, surfaced by the new Aurora from Orbit preset. Related: Earth seen from the Moon in Earthrise reads small and veiled (true angular size + Rayleigh shell at extreme minification) — physical, but a tele-FOV shot or shader distance fade could polish both. | Needs review (with #27) | — |
-| 51 | Mars procedural craters still read slightly ring-like where present below 1,500 km (whisper amplitude, hash-thinned — calibrated headless; craterProfile's rim shape is the limiting factor). Joins the #9/#27 real-hardware eyeball pass. Knobs: crater block weights in mars-surface.glsl. | Needs review (with #9/#27) | V6_MARS.md |
+| 51 | Mars crater donuts at 1,291 km (hardware-confirmed by Kyle). Real cause: the RELIEF rim ridge, not rim paint (paint was already removed in v6) — craterProfile's positive rim drew rings via derivative shading. Fixed: min(c, 0) depressions only + hash-thinned to 35%/25% of cells; texture dominates, craters read as sparse subtle dark pits. | Resolved v6.0.1 (4d37d74) | — |
+| 53 | Valles Marineris rendered near-black at low altitude (measured min luminance 0 at 1,291 km). Cause: -0.42 noise-modulated relief + step-banded strata paint stacking. Fixed: depth -0.10 with ±15% floor noise, softened strata, varied dust-filled floor — canyon min lum 23, mean 66 vs terrain 63-82, internal structure visible. | Resolved v6.0.1 (4d37d74) | — |
+| 54 | Dust caterpillar/lattice rows at low altitude + veil too heavy inside the layer. Fixed: dust field coordinates domain-warped (same fix class as Earth city-light dots #43); veil thinned to 35% below 1,000 km, full by 5,000 km. 100% storm from global distance still a featureless orange sphere (verified). | Resolved v6.0.1 (4d37d74) | — |
 | 52 | Phobos/Deimos cylindrical texture maps — no directly fetchable public URLs (Albers references David Seal / Phil Stooke pages without files). Color-only ellipsoids + cratered detail shipped. Manual fetch + wiring when sourced; URLs noted in mars.js. | Manual follow-up | V6_MARS.md |
 
 ---
@@ -977,6 +1010,10 @@ at function scope.
 | 7 | Sun — basic corona visuals | Sun sits in the Bodies panel (v4c) with a Solar Observatory stub toast. Remaining: subtle corona glow shader, slow sunspot texture, occasional flare particles. Full Solar Observatory mode = V6+. |
 | 8 | System-wide labels | Toggle exists in the Display panel (v4c stub) — implement with the Solar System Orrery view. |
 | 9 | Velocity vectors | Toggle exists in the Display panel (v4c stub) — draw per-moon velocity arrows in System View. |
+| 10 | Steve Albers attribution — confirm before launch | Check renderer.js and config files for any runtime fetches from stevealbers.net (grep -r "stevealbers" src/). If textures downloaded locally, add Steve Albers credit to legal/credits page. His Galilean moon maps are non-commercial use by permission — attribution required. Compiled from NASA/JPL + Björn Jónsson data. |
+| 11 | Google Analytics (cookieless) — add after launch | Add GA4 with anonymized IP and no cookies (consent-free mode). GA4 supports cookieless measurement via gtag config: { anonymize_ip: true, cookie_flags: 'SameSite=None;Secure', storage: 'none' }. Page views, session counts, country breakdown, device type — no PII or cookies — compatible with Privacy Policy. Add to CSP connect-src: www.google-analytics.com. Implement after public launch once privacy policy confirmed. |
+| 12 | Zoom / Telephoto View (FOV control) | Add FOV slider to VIEW panel (75° normal → 5° extreme telephoto). Scroll-wheel changes FOV when holding Alt (altitude when not). Quick-toggle 🔭 button in bottom tray switching between 75° and 8°. Update Earthrise preset to auto-set FOV to 8° on entry. Full Earthrise fix requires: (1) correct lunar orbital position with Earth rising above lunar horizon, (2) full/gibbous Earth phase not new moon, (3) narrow FOV 8-10° so Earth fills frame, (4) lunar surface visible in foreground. Without zoom the 1.9° angular diameter of Earth from Moon is underwhelming — telephoto compression is what makes Apollo 8 iconic. Estimated effort: 3-4 hours. |
+| 13 | Ko-fi → Stripe for donations | Create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Fix before public launch. |
 
 Completed in v4c (removed from backlog): ghost time display, date
 picker + LIVE toggle, icon-stack Mission Control redesign (Camera /
