@@ -1114,6 +1114,32 @@ rings wrapping the night side. Universal fix (Titan + Saturn EXEMPT):
 - Regression green: smoke 22/22, limb, moonlimb, earthtest 14/14,
   marstest 13/13, titanprobe (shell ratio 1.10 + opaque haze intact).
 
+### v7.0.3 — Custom Domain app.solarexplorer.co (2026-07-12)
+Primary URL is now https://app.solarexplorer.co (zone solarexplorer.co;
+landing page at the apex is separate and unchanged). Changes:
+- wrangler.toml: routes for app.solarexplorer.co/* + `workers_dev = true`
+  — GOTCHA: adding a route silently DISABLES the workers.dev URL
+  (measured: 404 after first deploy); the explicit flag keeps the legacy
+  alias live.
+- src/config.js: new APP_URL constant (canonical public URL).
+- ui.js _sharePreset: share links use APP_URL in production (canonical
+  even when visited via workers.dev), location.origin in dev so
+  localhost testing still works.
+- README live-demo link, security.txt Canonical updated. CSP untouched
+  (fully origin-relative). Docs/ prompt files + version history keep
+  the old URL as historical record.
+- Verified live: both URLs 200; headless probe drove the real SAVE →
+  🔗 flow on app.solarexplorer.co with a stubbed clipboard — copied
+  link is https://app.solarexplorer.co/?view=… ✓; stack.mjs share/
+  preset checks green (its 4 failures are pre-v7 staleness: 9 stack
+  buttons vs expected 6, Saturn now a built system — suite needs a
+  refresh, logged as bug #61).
+- NEW FINDING (bug #62): Cloudflare zone auto-injects Web Analytics
+  (static.cloudflareinsights.com/beacon.min.js) on the custom domain;
+  our CSP blocks it (console error, no functional impact). Decision
+  needed: disable RUM injection in the dashboard (privacy-policy
+  aligned) or allow it in CSP script-src/connect-src.
+
 ---
 
 ## Known Bugs / In Progress
@@ -1178,7 +1204,11 @@ rings wrapping the night side. Universal fix (Titan + Saturn EXEMPT):
 | 57 | Hyperion/Phoebe texture maps — irregular bodies with no fetchable cylindrical maps (same class as #52). Color-only + procedural cratered detail shipped; Hyperion's sponge-pit look would need a dedicated treatment. | Manual follow-up | V7_SATURN.md |
 | 58 | Saturn F ring omitted — the SSS ring strip ends at the A ring outer edge (measured alpha floor), and a procedural F ring on a separate thin annulus wasn't worth the draw call for a barely-visible feature. Revisit if a better Cassini radial profile (Björn Jónsson) is sourced. | Data choice — revisit with better source | V7_SATURN.md |
 | 59 | Telephoto zoom reveals texture resolution limits — at narrow FOV (10°) planet textures and starfield cubemap show magnification blur (same pixels covering more screen area — equivalent to digital zoom on a phone). Planet fix requires quadtree tile streaming (SpaceEngine approach, weeks of work). Starfield could be improved with 8K cubemap swap but doesn't help planets. Decision: accept as known limitation for launch. Zoom is still a major win for Earthrise and Saturn ring views. | Won't fix — known limitation | — |
+| 61 | Saturn ring particles removed — snow-globe appearance on real hardware. Geometry ring disc retained (looks excellent). | Resolved v7.0.1 | — |
+| 62 | Saturn cloud bands too flat/drab on real hardware — insufficient contrast between zones and belts. Fixed: per-latitude color palette (cream zones, brown belts, blue-grey polar), band contrast increased from 4% to 11-13%, terminator widened via shaderParams. | Resolved v7.0.1 | — |
 | 60 | Thin-atmosphere halos render as thick rings wrapping the night side (hardware-confirmed by Kyle: Earth at ~3,000 km, Io at ~370 km). Cause: soft fresnel pow + wide lit gate on all thin-atmosphere shells, plus Earth's v5b night-scatter alpha floor keeping the halo alive on the night limb. Fixed v7.0.2: per-body fresnelPower/thickness/intensity config, universal tight lit gate (−0.05..0.20), Earth night-scatter term removed, ISS horizon arc opt-in via horizonGlow. Titan/Saturn exempt. Guard: tests/haloshots.mjs (diff-render probe). | Resolved v7.0.2 | — |
+| 61 | tests/stack.mjs stale since v7 — 4 checks assert the pre-v7 world (6 stack buttons vs 9 with ALT/INC/SPD, "camera panel + 7 modes", Saturn "Coming Soon" toast though Saturn is built, Tab cycle count). Share/preset/?view= checks still green and meaningful. Refresh the assertions. | Needs fix (test-only) | — |
+| 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard (matches the no-analytics Privacy Policy stance) or allow the host in CSP script-src + connect-src. workers.dev is unaffected. | Needs decision | — |
 
 ---
 
@@ -1199,6 +1229,9 @@ rings wrapping the night side. Universal fix (Titan + Saturn EXEMPT):
 | 11 | Google Analytics (cookieless) — add after launch | Add GA4 with anonymized IP and no cookies (consent-free mode). GA4 supports cookieless measurement via gtag config: { anonymize_ip: true, cookie_flags: 'SameSite=None;Secure', storage: 'none' }. Page views, session counts, country breakdown, device type — no PII or cookies — compatible with Privacy Policy. Add to CSP connect-src: www.google-analytics.com. Implement after public launch once privacy policy confirmed. |
 | 12 | ~~Zoom / Telephoto View (FOV control)~~ | DONE v7 (3c): OPTICS section in VIEW panel (log slider 5–90°), 🔭 tray toggle 48°↔10° (normal is the renderer's 48° — 75° would oval-stretch spheres, v2 lesson), sse-fov persisted, Earthrise preset auto-telephoto, Through-the-Rings at 25°. NOT built: Alt+scroll-wheel FOV (slider + toggle cover the use cases; add on request). |
 | 13 | Ko-fi → Stripe for donations | Create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Fix before public launch. |
+| 14 | Custom domain URL update — app.solarexplorer.co | Update src/config.js APP_URL to https://app.solarexplorer.co. Update wrangler.toml routes. Grep and replace all hardcoded solar-system-explorer.kyle-d06.workers.dev URLs in codebase. Verify share URL generator uses new domain. Landing page (solarexplorer.co) also needs its Launch Explorer links updated to app.solarexplorer.co — coordinate with landing page chat. |
+| 15 | instructions.md location wrong | .claude/instructions.md says PROJECT_LOG.md is at repo root but it actually lives in Docs/. Update instructions.md path reference. Also update any other path references that may be wrong. |
+| 16 | Callisto + Jupiter horizon curated preset | The Callisto/Jupiter telephoto shot (Callisto surface in foreground, Jupiter above horizon, Milky Way background) is one of the best views in the simulator. Add as a curated preset in jupiter.js. Position: low orbit over Callisto, Alt+drag tilted to show Jupiter above the horizon, telephoto FOV ~10°. |
 
 Completed in v4c (removed from backlog): ghost time display, date
 picker + LIVE toggle, icon-stack Mission Control redesign (Camera /

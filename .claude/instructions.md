@@ -198,7 +198,7 @@ Orchestrator merges worker branches sequentially:
 
 ## Living Document
 
-- Location: PROJECT_LOG.md (repo root)
+- Location: Docs/PROJECT_LOG.md (in Docs/ folder — NOT repo root)
 - Read at the START of every session before touching any code
 - Update at the END of every session:
   - Add completed items to Version History with commit hash
@@ -338,6 +338,25 @@ code is not bundled. Never remove manualChunks.
 git show HEAD --name-only must show .js files, not just .md files.
 If only docs appear in commits, source was never staged. See git
 discipline section above for recovery steps.
+
+**ShaderMaterial + Logarithmic Depth Buffer (v7 Titan orange donut):**
+Raw THREE.ShaderMaterial silently loses depth testing under the log
+depth buffer. Symptom: mesh renders as flat billboard in front of
+everything. Fix: set material.extensions = { logDepthBuf: true } and
+material.defines = { USE_LOGDEPTHBUF: '' } on every raw ShaderMaterial.
+OR use onBeforeCompile injection into MeshStandardMaterial — inherits
+log-depth automatically. Check this FIRST when any new shader renders
+incorrectly at depth. Applies to: atmosphere spheres, ring discs,
+particle materials, any BackSide mesh.
+
+**Security headers — use public/_headers not wrangler.toml:**
+The wrangler.toml [[headers]] block is NOT valid for Workers Static
+Assets. Use public/_headers file instead. Format:
+  /*
+    Content-Security-Policy: ...
+    X-Frame-Options: SAMEORIGIN
+Verify via DevTools Network → response headers after deploy.
+Current Observatory score: A+ (130) — maintain this.
 
 **Production serving wrong version:**
 Browser cache can serve stale JS even after deploy. Always verify

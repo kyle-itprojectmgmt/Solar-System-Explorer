@@ -2,7 +2,7 @@
 
 A photorealistic, first-person 3D explorer of the solar system — **four systems** live: Jupiter, Earth + Moon, Mars, and Saturn. Opens LIVE at the current UTC instant with physically calibrated sun geometry; historic-mission presets (Voyager 1979, Apollo 11, Viking 1) jump back to the epochs. Built with Three.js + Vite, deployed as a Cloudflare Worker.
 
-**Live demo:** https://solar-system-explorer.kyle-d06.workers.dev
+**Live demo:** https://app.solarexplorer.co
 
 ## Features
 

@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
-import { KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
+import { APP_URL, KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
 
 // Surface mode removed permanently in V7 (was hidden since v4d; the
 // first-person ground experience is a future rebuild, not a revival).
@@ -1041,7 +1041,11 @@ export class UI {
 
   _sharePreset(p) {
     const encoded = btoa(encodeURIComponent(JSON.stringify(p)));
-    const url = `${location.origin}${location.pathname}?view=${encoded}`;
+    // Canonical domain in production (links stay right even when the app is
+    // opened via the legacy workers.dev host); current origin in dev so
+    // localhost share links remain testable.
+    const base = import.meta.env.DEV ? location.origin : APP_URL;
+    const url = `${base}${location.pathname}?view=${encoded}`;
     navigator.clipboard?.writeText(url).then(
       () => this.notify('Link copied! Share this view with anyone.'),
       () => this.notify('Could not copy — check clipboard permissions'),

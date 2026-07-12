@@ -8,6 +8,10 @@ export const TEXTURE_BASE_URL = import.meta.env.DEV
   ? '/textures'
   : '/textures'; // e.g. 'https://pub-XXXX.r2.dev/textures' once R2 is set up
 
+// Canonical public URL — share links always point here, even when the app
+// is visited via the legacy workers.dev host.
+export const APP_URL = 'https://app.solarexplorer.co';
+
 // Systems with a complete config in /src/data/systems/<name>.js.
 // Append new systems here as their configs land.
 export const AVAILABLE_SYSTEMS = ['jupiter', 'earth', 'mars', 'saturn'];

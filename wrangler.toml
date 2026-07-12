@@ -1,6 +1,13 @@
 name = "solar-system-explorer"
 compatibility_date = "2026-01-01"
 
+# Custom domain (primary URL). The workers.dev URL remains as a legacy alias —
+# adding a route disables it by default, so it must be re-enabled explicitly.
+workers_dev = true
+routes = [
+  { pattern = "app.solarexplorer.co/*", zone_name = "solarexplorer.co" }
+]
+
 [assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
