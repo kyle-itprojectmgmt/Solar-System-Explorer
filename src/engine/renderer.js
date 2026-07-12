@@ -535,11 +535,17 @@ export class SceneRenderer {
       // parent-to-the-mesh fix — retinted as tall white ice jets.
       if (cfg.geysers?.enabled && cfg.geysers.locations) {
         const hFrac = (cfg.geysers.heightKm ?? 500) / (cfg.radiusKm || 250);
+        // Plume tint is config-overridable (V8): Enceladus keeps the white
+        // ice defaults; Triton's nitrogen geysers entrain dark dust.
+        const gt = cfg.geysers.tint || {};
         for (const g of cfg.geysers.locations) {
           const plume = makeVolcanicPlume(r, g, this.quality.tier, {
-            spriteColor: 'rgba(240,250,255,1)', pointColor: 0xeef6ff,
-            hotspotSprite: 'rgba(200,230,255,1)', hotspotColor: 0xbbddff,
-            heightFrac: hFrac, spreadFrac: 0.35, opacity: 0.45, hotspotScale: 0.05,
+            spriteColor: gt.spriteColor ?? 'rgba(240,250,255,1)',
+            pointColor: gt.pointColor ?? 0xeef6ff,
+            hotspotSprite: gt.hotspotSprite ?? 'rgba(200,230,255,1)',
+            hotspotColor: gt.hotspotColor ?? 0xbbddff,
+            heightFrac: hFrac, spreadFrac: gt.spreadFrac ?? 0.35,
+            opacity: gt.opacity ?? 0.45, hotspotScale: 0.05,
           });
           mesh.add(plume.points);
           mesh.add(plume.hotspot);

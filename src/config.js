@@ -14,7 +14,10 @@ export const APP_URL = 'https://app.solarexplorer.co';
 
 // Systems with a complete config in /src/data/systems/<name>.js.
 // Append new systems here as their configs land.
-export const AVAILABLE_SYSTEMS = ['jupiter', 'earth', 'mars', 'saturn'];
+export const AVAILABLE_SYSTEMS = [
+  'jupiter', 'earth', 'mars', 'saturn',
+  'mercury', 'venus', 'uranus', 'neptune',
+];
 
 // Active system: ?system= URL parameter, validated against the list.
 const requested = new URLSearchParams(window.location.search).get('system');
@@ -51,8 +54,8 @@ export const SOLAR_SYSTEM = [
   { name: 'Mars', moons: ['Phobos', 'Deimos'] },
   { name: 'Jupiter', moons: [] }, // active system — moons injected from config
   { name: 'Saturn', moons: ['Titan', 'Enceladus', 'Rhea', 'Iapetus'] },
-  { name: 'Uranus', moons: ['Titania', 'Miranda'] },
-  { name: 'Neptune', moons: ['Triton'] },
+  { name: 'Uranus', moons: ['Miranda', 'Ariel', 'Umbriel', 'Titania', 'Oberon'] },
+  { name: 'Neptune', moons: ['Triton', 'Proteus'] },
   { name: 'Pluto', moons: ['Charon'] },
 ];
 
