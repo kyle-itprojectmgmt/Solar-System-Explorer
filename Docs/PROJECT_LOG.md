@@ -155,6 +155,32 @@ like a stamp sheet the answer is LESS, not different paint.
 Working pattern: sub-texture roughness only below 1,500 km,
 hash-thinned, relief-led with no rim paint.
 
+### ShaderMaterial + Logarithmic Depth Buffer — CRITICAL (v7 discovery)
+Raw THREE.ShaderMaterial silently loses depth testing when the scene
+uses a logarithmic depth buffer. Symptom: the mesh renders as a flat
+billboard or donut in front of everything (Titan appeared as an orange
+donut until this was found). Fix: always set on raw ShaderMaterials:
+  material.extensions = { logDepthBuf: true };
+  material.defines = { USE_LOGDEPTHBUF: '' };
+OR use onBeforeCompile injection into MeshStandardMaterial instead of
+raw ShaderMaterial — it inherits log-depth support automatically.
+This applies to ALL custom shader overlays: atmosphere spheres, ring
+discs, particle materials, any BackSide mesh. Check first when a new
+shader renders incorrectly at depth.
+
+### Security Headers — Cloudflare Workers (v7 discovery)
+The wrangler.toml [[headers]] block is NOT valid for Workers Static
+Assets. Use public/_headers file instead (Cloudflare Pages/Workers
+static assets convention). Format:
+  /*
+    Content-Security-Policy: default-src 'self'; ...
+    X-Frame-Options: SAMEORIGIN
+    X-Content-Type-Options: nosniff
+    ...
+Verify headers are active via browser DevTools → Network →
+response headers, or run Mozilla Observatory after deploy.
+Current Observatory score: A+ (130, 10/10 tests) — maintain this.
+
 ### Per-System Lazy Loading (add before multi-system build)
 Currently all system configs (jupiter.js, saturn.js) are bundled at
 build time. Before adding Earth/Mars/Saturn, update vite.config.js
@@ -1101,6 +1127,7 @@ multiplying the whole height field; reversed-arg smoothstep (GLSL UB).
 | 56 | Saturn-system shader calibration done from headless screenshots — ring brightness/scatter balance, kronos band strength, hexagon subtlety, Enceladus stripe contrast, Iapetus ridge seam may need real-hardware tuning (joins the #9/#27 eyeball-pass class). Knobs: uOpacityScale + litFace in saturn-rings.glsl, band mix factors in saturn-clouds.glsl, en_stripe/ia_ridge amplitudes. | Needs review | V7_SATURN.md |
 | 57 | Hyperion/Phoebe texture maps — irregular bodies with no fetchable cylindrical maps (same class as #52). Color-only + procedural cratered detail shipped; Hyperion's sponge-pit look would need a dedicated treatment. | Manual follow-up | V7_SATURN.md |
 | 58 | Saturn F ring omitted — the SSS ring strip ends at the A ring outer edge (measured alpha floor), and a procedural F ring on a separate thin annulus wasn't worth the draw call for a barely-visible feature. Revisit if a better Cassini radial profile (Björn Jónsson) is sourced. | Data choice — revisit with better source | V7_SATURN.md |
+| 59 | Telephoto zoom reveals texture resolution limits — at narrow FOV (10°) planet textures and starfield cubemap show magnification blur (same pixels covering more screen area — equivalent to digital zoom on a phone). Planet fix requires quadtree tile streaming (SpaceEngine approach, weeks of work). Starfield could be improved with 8K cubemap swap but doesn't help planets. Decision: accept as known limitation for launch. Zoom is still a major win for Earthrise and Saturn ring views. | Won't fix — known limitation | — |
 
 ---
 

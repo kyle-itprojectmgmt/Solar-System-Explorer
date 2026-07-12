@@ -178,10 +178,9 @@ export default {
     texture: 'saturn/rings.png',
     innerKm: 69075,
     outerKm: 140715,
-    // Fly-through particle layer (Worker 2's point shader): activates
-    // when the camera is within activationKm of the ring plane and
-    // radially inside the span.
-    particles: { count: 24000, activationKm: 5000 },
+    // (Fly-through particle layer removed post-v7: read as white blob
+    // snowflakes on real hardware, not ice — the textured disc alone
+    // carries the ring-plane experience.)
   },
 
   // Worker 4 fills: all 9 moons (Titan, Enceladus, Iapetus, Mimas, Tethys,

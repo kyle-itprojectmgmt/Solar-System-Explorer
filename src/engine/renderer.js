@@ -18,7 +18,6 @@ import MARS_ATMOSPHERE_GLSL from './shaders/mars-atmosphere.glsl?raw';
 import SATURN_ATMOSPHERE_GLSL from './shaders/saturn-atmosphere.glsl?raw';
 import TITAN_GLSL from './shaders/titan.glsl?raw';
 import SATURN_RINGS_GLSL from './shaders/saturn-rings.glsl?raw';
-import RING_PARTICLES_GLSL from './shaders/saturn-ring-particles.glsl?raw';
 
 const K = 1 / KM_PER_UNIT; // km -> scene units
 
@@ -400,7 +399,6 @@ export class SceneRenderer {
       mesh.renderOrder = 1; // after the planet, no depth writes
       this.root.add(mesh);
       this.ringMeshes.push(mesh);
-      if (rs.particles) this._buildRingParticles(rs, inner, outer);
     }
     for (const ring of this.system.rings || []) {
       const inner = ring.innerKm * K, outer = ring.outerKm * K;
@@ -426,47 +424,6 @@ export class SceneRenderer {
       this.root.add(mesh);
       this.ringMeshes.push(mesh);
     }
-  }
-
-  /** Ring fly-through particles (V7): ice chunks the camera passes when it
-   *  dips near the ring plane. Density weighted by band opacity (B densest);
-   *  vertical spread exaggerated (~±25 km) so the layer reads in scene
-   *  scale — the real rings are thinner than a pixel. Visibility gated per
-   *  frame in update(). */
-  _buildRingParticles(rs, inner, outer) {
-    const count = this.quality.tier === 'mobile' ? 6000 : (rs.particles.count ?? 24000);
-    const pos = new Float32Array(count * 3);
-    const seeds = new Float32Array(count);
-    const rand = mulberry32(60268);
-    // Acceptance weight vs normalized radius — mirrors the shader's bands.
-    const bandWeight = (t) => (t < 0.076 ? 0.05 : t < 0.32 ? 0.3 : t < 0.677 ? 1.0
-      : t < 0.741 ? 0.04 : t < 0.945 ? 0.7 : 0.05);
-    for (let i = 0; i < count; i++) {
-      let t;
-      do { t = rand(); } while (rand() > bandWeight(t));
-      const r = inner + (outer - inner) * t;
-      const ang = rand() * Math.PI * 2;
-      pos[i * 3] = r * Math.cos(ang);
-      pos[i * 3 + 1] = (rand() + rand() + rand() - 1.5) * 0.017; // ±~25 km
-      pos[i * 3 + 2] = r * Math.sin(ang);
-      seeds[i] = rand();
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
-    const [, rest] = RING_PARTICLES_GLSL.split('// === VERTEX ===');
-    const [vertexShader, fragmentShader] = rest.split('// === FRAGMENT ===');
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uPointScale: { value: 220 } },
-      vertexShader, fragmentShader,
-      transparent: true, depthWrite: false,
-    });
-    this.ringParticles = new THREE.Points(geo, mat);
-    this.ringParticles.frustumCulled = false;
-    this.ringParticles.visible = false;
-    this.ringParticles.renderOrder = 2;
-    this.ringParticleCfg = { inner, outer, activation: (rs.particles.activationKm ?? 5000) * K };
-    this.root.add(this.ringParticles);
   }
 
   // -- Moons -----------------------------------------------------------------------
@@ -895,17 +852,6 @@ export class SceneRenderer {
       }
     }
 
-    // Ring fly-through particles (V7): visible only when the camera sits
-    // near the ring plane and radially inside the ring span.
-    if (this.ringParticles) {
-      const cfg = this.ringParticleCfg;
-      const radial = Math.hypot(camLocal.x, camLocal.z);
-      this.ringParticles.visible = Math.abs(camLocal.y) < cfg.activation
-        && radial > cfg.inner * 0.9 && radial < cfg.outer * 1.1;
-      if (this.ringParticles.visible) {
-        this.ringParticles.material.uniforms.uTime.value = physics.simSeconds % 1e6;
-      }
-    }
     if (this.atmosphereMesh) {
       // Limb/Rayleigh shaders work in world space (varyings from modelMatrix).
       const u = this.atmosphereMesh.material.uniforms;

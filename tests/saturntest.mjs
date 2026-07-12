@@ -138,26 +138,24 @@ check('Cassini Division darker than B and A rings (pixel probe)',
   division.b > division.division * 1.8 && division.a > division.division * 1.2,
   JSON.stringify(division));
 
-// -- Group 5: ring fly-through particles gate on plane proximity ---------------
-const particles = await page.evaluate(() => {
+// -- Group 5: ring plane fly-in — disc only, no particle overlay ----------------
+// (Particle system removed post-v7 — white blob snowflakes on hardware.)
+const ringPlane = await page.evaluate(() => {
   const { renderer, physics, THREE } = window.__sse;
-  const out = {};
-  // The ring plane is the ROOT frame's y = 0 (the root carries the 26.73°
-  // axial tilt) — probe positions must be authored there, not in world.
-  const place = (x, y, z) => {
-    renderer.camera.position.copy(
-      renderer.root.localToWorld(new THREE.Vector3(x, y, z)));
-    renderer.update(physics, 0.016, 1);
-    return renderer.ringParticles.visible;
+  // Inside the ring plane at low altitude (root frame carries the tilt).
+  renderer.camera.position.copy(
+    renderer.root.localToWorld(new THREE.Vector3(110, 1.0, 0)));
+  renderer.camera.lookAt(renderer.root.localToWorld(new THREE.Vector3(130, 0, 0)));
+  renderer.update(physics, 0.016, 1);
+  return {
+    noParticles: !renderer.ringParticles,
+    noPointsInRoot: !renderer.root.children.some(
+      (c) => c.isPoints && c.geometry?.attributes?.aSeed),
+    discVisible: renderer.ringMeshes[0]?.visible === true,
   };
-  out.farVisible = place(110, 40, 0);       // 40,000 km above the plane
-  out.inPlaneVisible = place(110, 1.0, 0);  // 1,000 km off the plane, in-span
-  out.outsideVisible = place(200, 1.0, 0);  // in-plane but past the rings
-  return out;
 });
-check('ring particles: hidden far above plane', particles.farVisible === false);
-check('ring particles: visible inside the ring plane', particles.inPlaneVisible === true);
-check('ring particles: hidden outside the ring span', particles.outsideVisible === false);
+check('ring particle system fully removed', ringPlane.noParticles && ringPlane.noPointsInRoot);
+check('ring disc still renders in the ring plane', ringPlane.discVisible);
 
 // -- Group 6: FOV / telephoto ---------------------------------------------------
 const fov = await page.evaluate(() => {
