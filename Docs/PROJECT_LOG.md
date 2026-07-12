@@ -822,6 +822,88 @@ package.json — bcac126 shipped as 5.1.1; both steps landed here).
 - Deployed (dde94afd) and live-verified with cache-bust: both systems
   v5.1.3, zero console errors, v5c strings present in the live bundle.
 
+### v6 — Mars System, Parallel Worker Build (Complete — 2026-07-12, commits 5267c43 → see final + docs)
+Per Docs/V6_MARS.md. Version 6.0.0. Third system — NAV now travels
+Jupiter ⇄ Earth ⇄ Mars.
+
+**Phase 1 — shared infrastructure (orchestrator):**
+- Epoch: Viking 1 touchdown 1976-07-20T11:53:06Z (house pattern:
+  historic-mission epochs). Prompt-vs-reality: ephemeris.js has NO
+  ELEMENTS table and no sunDirectionFrom() — it's config-driven
+  (star.direction at epoch + orbitalPeriodDays), so 1c needed zero
+  engine code, only calibrated config values.
+- Calibration gotcha (measured): sunDirectionAt() FLATTENS the epoch
+  vector's declination and rebuilds it from tilt — the seasonal phase
+  lives in the ecliptic longitude λ0. Mars: λ0 = −173.2° (declination
+  +25.0° decreasing, Ls ≈ 97°), rotationPhaseAtEpochDeg −61.0 puts the
+  subsolar point at 111.5°W (Viking landed 16:13 LMST @ 49.97°W).
+  tests/marscal.mjs: epoch geometry exact, sol-vs-sidereal residual
+  0.5°, quarter/half-year declination phasing. 6/6.
+- Textures: 8K SSS Mars daymap (CC BY 4.0, Referer header) + local 2K
+  GDI+ downscale as base; diffuseHigh progressive swap. MOLA normal
+  skipped (GeoTIFF manual step, backlog pattern). Phobos/Deimos have NO
+  directly-fetchable cylindrical maps (Albers references Seal/Stooke
+  without files) — color-only ellipsoids + procedural detail (Metis
+  house pattern); manual fetch noted in mars.js.
+- 'mars' in AVAILABLE_SYSTEMS — NAV travel row was automatic (v5 1d
+  infrastructure), loadingFacts in config.
+
+**Phase 2 — 3 parallel Haiku workers, exclusive file ownership:**
+W1 mars-surface.glsl + mars-atmosphere.glsl, W2 mars-dust.glsl +
+mars-polar.glsl, W3 mars.js completion (~40k tokens each). The v5
+lesson held — every worker shipped real bugs the orchestrator review
+caught BEFORE commit: Olympus const vector double-converted degrees +
+GLSL-const-with-builtins; Valles longitude test compared 265..330E
+against atan2's −180..180 (canyon never rendered); scarp "ring"
+degenerated to a filled disc; dtlFreqFade fed pre-scaled positions
+(exact v5 repeat); dust-devil fbm sampled a ±0.08 domain (constant);
+polar projection normalized onto the unit circle (spiral troughs and
+swiss-cheese pits lost their radial coordinate); south collar mask
+multiplied to zero; `patch` is a GLSL reserved word; dOct referenced
+at function scope.
+
+**Phase 3 — integration + measured visual calibration:**
+- ares detail style (chunk order surface → polar → dust so a global
+  storm veils the caps) with uDustStorm style uniform; atm.style 'dust'
+  through a shared shell-material path; untextured detail bodies get a
+  1px white map (vMapUv only compiles when a map exists — Phobos/
+  Deimos are the first color-only detail bodies).
+- Craters: FOUR visual iterations, each measured by screenshot. The 8K
+  texture already carries orbit-scale basins; every strong procedural
+  crater layer rendered as stamped donut rings (xz-projection lattice
+  columns → dUv Callisto pattern → still donuts → subdued → whisper).
+  Final: sub-texture roughness only below 1,500 km, hash-thinned,
+  relief-led with no rim paint. If it looks like a stamp sheet, the
+  answer is LESS, not different paint.
+- Dust storms: detail activation raised to 50,000 km so a 100% storm
+  reads from global view (2018-storm featureless orange sphere —
+  verified) — the veil is the one layer that must not gate at low
+  altitude only. VIEW panel gets a data-driven Conditions slider (any
+  primary with detail.params.dustIntensity; localStorage
+  sse-dust-<slug>).
+- Olympus Mons at real proportions (0.09 rad shield, 80 km caldera,
+  smooth basal scarp annulus, craters suppressed on the young shield);
+  Valles Marineris renders as a genuine 4,000 km canyon slash; north
+  cap at its (correct) northern-summer minimum with ragged edges.
+- Insertion presets must setMode FIRST then setInsertion — entry
+  re-derives altitude from current camera distance and clobbers preset
+  values (measured 45,614 km instead of 15,000).
+- Phobos physics verified prograde AND outrunning the spin (3.55×) —
+  test gotcha: +Y rotation means the surface's atan2(z,x) DECREASES;
+  compare moon motion against the surface, not mesh.rotation.y's sign.
+- 5 Mars curated presets (Olympus flyover, Valles, Global View, Chase
+  Phobos, North Polar Cap) in the ui.js tagged list.
+- Suites: tests/marstest.mjs NEW (13 — orbits, prograde, ares compile,
+  storm uniform, ellipsoids, dust slider), marscal.mjs NEW (6),
+  presets.mjs extended to 57 checks across three systems.
+- Verified: full 13-suite regression green against the dev server
+  (smoke, earthtest, marstest, marscal, suncal, nightlights, presets,
+  v5b, livedefault, hurricane, glint, incmeasure, ringfloor). Build
+  produces the system-mars lazy chunk. Deployed (b7a42224) and
+  live-verified with cache-bust in a fresh headless browser: all THREE
+  systems load at v6.0.0 with zero console errors, v6 feature strings
+  in the served bundle.
+
 ---
 
 ## Known Bugs / In Progress
@@ -877,6 +959,8 @@ package.json — bcac126 shipped as 5.1.1; both steps landed here).
 | 48 | Cloud streaking on night side — smoothstep(-0.3, 0.1, sunDot) night fade. Deep night renders no cloud layer (eliminates relief-shading streaks). Terminator clouds still catch last light. | Resolved bcac126 | — |
 | 49 | Jupiter curated SAVE presets appeared on Earth. Fixed: per-system scope tags in ui.js + filter on system.slug; four NEW Earth presets built (ISS Orbit View, Earthrise, City Lights at Night, Aurora from Orbit — the prompt assumed they existed; they didn't). tests/presets.mjs 28 checks. | Resolved v5c (6f9541c) | V5c_PROMPT.md |
 | 50 | Aurora curtains render as rings of DOTS at 4,500 km (snoise curtain sampling turns pointillist) — pre-existing v5 worker-shader quality, surfaced by the new Aurora from Orbit preset. Related: Earth seen from the Moon in Earthrise reads small and veiled (true angular size + Rayleigh shell at extreme minification) — physical, but a tele-FOV shot or shader distance fade could polish both. | Needs review (with #27) | — |
+| 51 | Mars procedural craters still read slightly ring-like where present below 1,500 km (whisper amplitude, hash-thinned — calibrated headless; craterProfile's rim shape is the limiting factor). Joins the #9/#27 real-hardware eyeball pass. Knobs: crater block weights in mars-surface.glsl. | Needs review (with #9/#27) | V6_MARS.md |
+| 52 | Phobos/Deimos cylindrical texture maps — no directly fetchable public URLs (Albers references David Seal / Phil Stooke pages without files). Color-only ellipsoids + cratered detail shipped. Manual fetch + wiring when sourced; URLs noted in mars.js. | Manual follow-up | V6_MARS.md |
 
 ---
 
@@ -915,7 +999,8 @@ brand icons, tooltips.
 ### Priority Order
 ```
 V5  — Earth + Moon — DONE (city lights, auroras, Apollo sites; ISS mode → V5.1)
-V6  — Mars (solid surface, Olympus Mons, Valles Marineris, landing)
+V6  — Mars — DONE (Olympus Mons, Valles Marineris, dust storms, polar caps,
+      Phobos + Deimos; surface landing experience → V6.1+)
 V7  — Saturn + Rings + Titan + Enceladus + Iapetus
 V8  — Outer solar system (Uranus, Neptune, Triton, Pluto)
 ```
@@ -953,7 +1038,7 @@ generative audio have no equivalent in NASA Eyes.
 | 2 | Earth + Moon System | DONE v5 — see Version History. Remaining from spec: ISS Mode (live position API), 8K/seasonal/night textures, lightning particles beyond the shader flashes. |
 | 3 | Full Solar System Orrery | Camera Mode 8 (V key). All planets in correct orbital positions. Click any to travel. Scale-adjusted so all visible. Gateway to inter-system navigation. |
 | 4 | Inter-System Navigation | System selector UI in Mission Control. Cinematic hyperjump sequence (8-12s, skippable). Runtime system switching with GPU memory management. Floating origin / scale switching between AU and km coordinate systems. |
-| 5 | Mars System | Best solid-surface planet for landing experience. MOLA elevation data, Olympus Mons (3x Everest height), Valles Marineris (length of USA), polar ice caps, dust storms, Phobos and Deimos moons. Surface landing with Earth as blue dot in sky. |
+| 5 | Mars System | DONE v6 — see Version History. Remaining from spec: MOLA elevation normal map (GeoTIFF manual step), Phobos/Deimos texture maps (bug #52), surface landing experience with Earth as blue dot in the sky (needs Surface mode revival — latent bug #37). |
 | 6 | Historic mission trajectories | Voyager 1&2, Cassini, Juno, Galileo animated paths |
 | 7 | Time of day selector | Jump to specific simulated date/time |
 | 8 | Multiplayer shared view | URL encodes camera position + time |
