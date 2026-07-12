@@ -113,6 +113,44 @@ Altitude-based blend: `uDetailBlend = smoothstep(farDist, nearDist, uAltitude)`
 All shaders disabled above activation altitude — zero GPU cost when far.
 Uniforms: `uTime`, `uAltitude`, `uDetailBlend` passed every frame.
 
+### Camera Pose Angle Conventions — CRITICAL
+Two pose functions use OPPOSITE angle conventions — never change
+either without updating both and measuring ground-track drift:
+
+  _poseInsertion(): position = (cos φ, 0, −sin φ) — phase INCREASES = prograde
+  _poseOrbit():     position = (cos θ, 0, +sin θ) — theta DECREASES = prograde
+  _poseSurface():   uses +sin lon — MIRRORED vs east-positive convention
+                    (latent bug — fix when re-enabling Surface mode in V6)
+
+Verified by orbitdir.mjs: orbit +21.4°E, insertion 0° +36.3°E,
+retrograde -51.6°W, GeoSync 0.00°. Measure ground-track direction
+before and after any orbital mechanics change.
+
+### Known UI Gotcha — #ui-root Specificity Rule (3rd occurrence v5b)
+`#ui-root > * { pointer-events: auto }` uses ID specificity and
+overrides pointer-events:none on child elements. Has caused three
+separate pointer-event bugs. NEVER use this rule. Use class-based
+selectors only. Use `visibility: hidden` not `opacity: 0` when a
+panel must be invisible but not interactive.
+
+### Sun / Rotation Calibration — Per System
+star.direction must be the true equatorial sun direction at the system
+epoch. rotationPhaseAtEpochDeg must be calibrated to UTC. Use
+full-precision sidereal day: 23.93446959h for Earth. Coarse values
+accumulate large longitude errors over decades. Verify subsolar point
+against real ephemeris after any epoch or rotation config changes.
+LIVE mode syncs via Date.now() (always UTC ms) — never use getHours()
+or other local-time methods anywhere in the time pipeline.
+
+### Known UI Gotcha — #ui-root Specificity Rule (3rd occurrence in v5b)
+The CSS rule `#ui-root > * { pointer-events: auto }` uses ID
+specificity and overrides pointer-events: none on child elements.
+This has caused three separate bugs (hidden card eating clicks,
+etc). NEVER use this rule. Use class-based selectors only for
+pointer-events. When a panel must be invisible but not
+interactive, use `visibility: hidden` not `opacity: 0` —
+visibility:hidden removes from pointer event flow, opacity:0 does not.
+
 ### Per-System Lazy Loading (add before multi-system build)
 Currently all system configs (jupiter.js, saturn.js) are bundled at
 build time. Before adding Earth/Mars/Saturn, update vite.config.js
@@ -781,6 +819,20 @@ Per Docs/V5b_PROMPT.md + two mid-session additions. Version 5.1.1.
 | 33 | Radiation warning showed "Extreme radiation environment" at 74,000 km over Earth (Jupiter logic hardcoded) | Resolved v5b (config-driven radiationWarning.zones — Earth Van Allen belts + reentry band; Jupiter blanket zone kept) | V5b_PROMPT.md |
 | 34 | Earth night side nearly black / lakes pure black at 382 km; day-side black cloud lumps at grazing sun | Resolved v5b (per-system nightAmbient 0x8899bb×0.18, terminator bleed widened + night limb scatter, Earth normalScale 2.0→0.8 — cloud relief was the lump cause; ocean shader + colorSpace measured innocent) | — |
 | 35 | Midwest land renders olive/yellow-green — measured: that IS the source July Blue Marble palette (Wisconsin texture sample rgb(79,97,49)), pipeline faithful. For tan/brown farmland swap a September BMNG monthly variant (noted in earth.js) | Data choice — texture variant, not a bug | — |
+| 36 | Orbit direction reversed — all bodies orbited east to west (retrograde). Real cause: orbit mode +sin convention (theta must decrease for prograde) vs insertion -sin (phase increases = prograde). Fix: orbTheta += → -=, forward-tilt travel vector negated, cinematic auto-orbit flipped. Insertion untouched — GeoSync holding station proved it already prograde. Measured: orbit +21.4°E, insertion 0° +36.3°E, retrograde -51.6°W, GeoSync 0.00°. | Resolved d3d5968 | — |
+| 37 | _poseSurface uses +sin lon — mirrored vs east-positive convention. Latent until Surface mode re-enabled in V6. | Latent — fix when re-enabling Surface mode | — |
+| 38 | Earth day/night terminator wrong — sun direction never calibrated. Three compounding problems: uncalibrated placeholder direction (anti-phased seasons), epoch rotation phase not tied to UTC, coarse sidereal day (23.934h → 150° drift by 2026). Fix: true equatorial sun at epoch, rotationPhaseAtEpochDeg config knob, sidereal day 23.93446959h. Subsolar point within 3° of real sun. Night ambient reduced: 0x8899bb×0.18 → 0x445566×0.08, city gain 0.4→0.5. | Resolved 91d241d | — |
+| 39 | LIVE mode showed stale time after tab hidden — UTC pipeline was already correct (no getHours() anywhere). Real cause: requestAnimationFrame pauses when tab hidden, 60s resync counted active-tab frame time only, so stall time persisted for up to 60s after tab restored. Appeared as timezone offset equal to hidden duration. Fix: wall-clock based resync — drift >2s snaps on first frame back, Date.now()-based 60s cadence otherwise. Verified: 2-hour stall recovers within one frame. | Resolved — same commit as date picker | — |
+| 40 | Date picker had no time input — users could only set date, not time of day. Fix: native <input type="time" step="1"> row below calendar. Apply button commits date+time together as one ISO Z instant. Pre-filled with current sim HH:MM:SS UTC. Apollo 11 test: July 20 1969 + 20:17:00 → lands on epoch exactly. AM/PM display is browser locale cosmetic — value is 24h UTC. | Resolved — same commit as LIVE fix | — |
+| 41 | Hurricane vortex stripes — ec_hurricane uses pure sin(ang_spiral*3.5) with no noise modulation. At terminator, cloud-relief height shading makes machined spiral-rose pattern visible. | Needs fix — next batch | — |
+| 42 | Cloud confetti below ~2,000 km — LAYER 5 puff term speckles everything at close range. Sun glint at 2,000 km renders as undithered white blob. | Needs fix — next batch | — |
+| 43 | City light dots-in-rows at 2,113 km (real cause: snoise(vObjPos×250) peaks align along simplex lattice — NOT HYG stars. HYG already had depthTest, depthWrite:false, renderOrder:-1; disc pixel count unchanged when toggled). Fix: domain-warp speckle + per-dot brightness variation → irregular clusters. depthTest:true made explicit as regression lock. | Resolved bcac126 | — |
+| 44 | LIVE off by default, hidden in TIME panel (real finding: 🔴 button was already in HUD; only default needed flipping). Both systems now open at current UTC on fresh load. LIVE defaults off under navigator.webdriver to avoid fighting headless suite time jumps. | Resolved bcac126 | — |
+| 45 | Voyager preset latently broken — used bare simSeconds=0 write, never moved n-body moons (documented gotcha, masked until LIVE defaulted to 0). Now exits LIVE and does proper jumpToSimSeconds. | Resolved bcac126 | — |
+| 46 | Apollo 11 preset missing from Earth SAVE panel — added as Earth-only curated preset, now the only way back to the 1969 epoch. | Resolved bcac126 | — |
+| 47 | City lights too dim at night — gain 0.5→0.7, three dominant gaussians 1.00→1.20, region clamp 1.15→1.35. nightlights guard: city 87 vs dark 14. | Resolved bcac126 | — |
+| 48 | Cloud streaking on night side — smoothstep(-0.3, 0.1, sunDot) night fade. Deep night renders no cloud layer (eliminates relief-shading streaks). Terminator clouds still catch last light. | Resolved bcac126 | — |
+| 49 | Jupiter/Earth curated SAVE presets (Io Volcano Flyby, GRS Close Pass, Triple Moon Shadow) appear on Earth system too — pre-existing, out of scope for bcac126. Fix in next batch. | Next batch | — |
 
 ---
 
@@ -823,6 +875,24 @@ V6  — Mars (solid surface, Olympus Mons, Valles Marineris, landing)
 V7  — Saturn + Rings + Titan + Enceladus + Iapetus
 V8  — Outer solar system (Uranus, Neptune, Triton, Pluto)
 ```
+
+### Build Order Decision — Mars Before Saturn
+Mars chosen before Saturn for three reasons:
+1. Mars is a solid surface planet — tests surface rendering techniques
+   needed for Saturn's moons (Titan, Enceladus) on a simpler system
+2. Token cost: Saturn (rings + Titan + 5 major moons) is ~2.5-3x Mars
+3. Story arc: Jupiter → Earth → Mars → Saturn matches exploration history
+   and gives two separate viral launch moments instead of one long build
+
+Saturn ring system is the most complex single feature in the simulator.
+Build it last when all foundations are solid.
+
+### Earth Texture Notes
+July Blue Marble (current): Wisconsin rgb(79,97,49) — olive-green farmland.
+This is photographically accurate for July. For tan/brown farmland look,
+swap September BMNG monthly variant (URL noted in earth.js).
+NASA CGI Moon Kit: still blocked by expired TLS cert at svs.gsfc.nasa.gov.
+Retry when NASA fixes. URL documented in earth.js.
 
 ### Competitive Context
 NASA Eyes on the Solar System (eyes.nasa.gov) is the closest
