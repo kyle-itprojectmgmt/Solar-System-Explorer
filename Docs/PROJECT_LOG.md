@@ -935,6 +935,23 @@ distance remains a featureless orange sphere (verified). marstest
 13/13, marscal 6/6. Deployed (eeadb787), live index confirmed serving
 the new bundle.
 
+### v6.0.2 — Mars Night-Side Detail Fade (Complete — 2026-07-12, commit c3efcf2 + docs)
+Kyle's second hardware pass: glowing orange crater blobs on the pitch
+NIGHT side at 736 km (bug #55). The forensic toggles (sun light off /
+ambient off / uNormalScale=0 / dust killed) pinned it: relief-perturbed
+normals catch sun from below the local horizon and bloom turns those
+fragments into glow dots — dust was innocent. Fix is two-tier in
+mars-surface.glsl (+ same construct in mars-polar.glsl): each chunk's
+height AND color deltas fade through the terminator via a captured-
+baseline rescale (the fade must be per-chunk — a global uDetailBlend
+fade would also kill the dust veil, which is deliberately exempt: dust
+stays faintly visible against the night sky), and the high-frequency
+layers additionally fade with sun elevation because tall sub-pixel
+bumps sparkle under ANY grazing light, not just past the terminator.
+Measured: deep night 2,285 bright px → 0, terminator dark half
+1,469 → 0, day side byte-identical. marstest 13/13, marscal 6/6,
+presets 57/57. Deployed (a76a8246), live bundle hash verified.
+
 ---
 
 ## Known Bugs / In Progress
@@ -993,6 +1010,7 @@ the new bundle.
 | 51 | Mars crater donuts at 1,291 km (hardware-confirmed by Kyle). Real cause: the RELIEF rim ridge, not rim paint (paint was already removed in v6) — craterProfile's positive rim drew rings via derivative shading. Fixed: min(c, 0) depressions only + hash-thinned to 35%/25% of cells; texture dominates, craters read as sparse subtle dark pits. | Resolved v6.0.1 (4d37d74) | — |
 | 53 | Valles Marineris rendered near-black at low altitude (measured min luminance 0 at 1,291 km). Cause: -0.42 noise-modulated relief + step-banded strata paint stacking. Fixed: depth -0.10 with ±15% floor noise, softened strata, varied dust-filled floor — canyon min lum 23, mean 66 vs terrain 63-82, internal structure visible. | Resolved v6.0.1 (4d37d74) | — |
 | 54 | Dust caterpillar/lattice rows at low altitude + veil too heavy inside the layer. Fixed: dust field coordinates domain-warped (same fix class as Earth city-light dots #43); veil thinned to 35% below 1,000 km, full by 5,000 km. 100% storm from global distance still a featureless orange sphere (verified). | Resolved v6.0.1 (4d37d74) | — |
+| 55 | Mars craters visible as glowing orange blobs on the NIGHT side at 736 km (hardware-confirmed). Forensics: dots died with sun light off and uNormalScale=0, NOT with dust killed — relief-perturbed normals caught sun from below the local horizon, bloom amplified the lit fragments. Fixed v6.0.2: per-chunk night fade (surface + polar height/color deltas × smoothstep(-0.08, 0.15, sunDot)) + high-frequency layers (crater bowls, regolith grain) additionally fade with sun elevation (0.2..0.55) — they sparkled as isolated glints under ANY grazing light. Dust exempt per spec. Deep night 2,285 bright px → 0; terminator dark half 1,469 → 0; day unchanged. Residual: mid-morning (sunDot ~0.35) grain reads as soft lit-bump flecks — matter of taste, knob is ms_grazeFade + grain amplitude in mars-surface.glsl (joins #9/#27 eyeball pass). | Resolved v6.0.2 (c3efcf2) | — |
 | 52 | Phobos/Deimos cylindrical texture maps — no directly fetchable public URLs (Albers references David Seal / Phil Stooke pages without files). Color-only ellipsoids + cratered detail shipped. Manual fetch + wiring when sourced; URLs noted in mars.js. | Manual follow-up | V6_MARS.md |
 
 ---
