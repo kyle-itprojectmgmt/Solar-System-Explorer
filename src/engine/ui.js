@@ -5,6 +5,7 @@
 // brand system (Montserrat / Lato, #0077CC / #66B2FF).
 // ---------------------------------------------------------------------------
 
+import * as THREE from 'three';
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
 import { KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
@@ -641,38 +642,34 @@ export class UI {
 
   _buildPresetsPanel(c) {
     el('h3', 'side-heading', c).textContent = 'CURATED';
+    // Curated presets are scoped per system (V5c bug #49): Jupiter's flybys
+    // made no sense on Earth and vice versa. `system` matches the config
+    // slug; an entry without one would show everywhere. User-saved presets
+    // below are never filtered.
     const curated = [
-      ['🌋 Io Volcano Flyby', () => {
+      { label: '🌋 Io Volcano Flyby', system: 'jupiter', fn: () => {
         this.cam.playSequence([
           { target: 'Io', dist: 4, height: 1.0, orbitRate: 0.07, duration: 10, startTheta: 1.0 },
           { target: 'Io', dist: 1.6, height: 0.35, orbitRate: 0.1, duration: 12, startTheta: 2.6 },
           { target: 'Io', dist: 6, height: 1.4, orbitRate: 0.05, duration: 10, startTheta: 4.2, lookAt: this.system.primary.name },
         ]);
         this.notify('Io volcano flyby — watch for plumes on the limb');
-      }],
-      ['🌑 Triple Moon Shadow', () => {
+      } },
+      { label: '🌑 Triple Moon Shadow', system: 'jupiter', fn: () => {
         this.cam.setMode('orbit', this.system.primary.name);
         this.cam.setAltitudeDirect(80000);
         this.physics.setTimeIndex(4);
         this.notify('1,000× — watch for moon shadows crossing Jupiter');
-      }],
-      ['🔴 GRS Close Pass', () => {
+      } },
+      { label: '🔴 GRS Close Pass', system: 'jupiter', fn: () => {
         const preset = this.system.primary.navPresets?.[0];
         if (preset) {
           this.cam.flyToFeature(this.system.primary.name, preset);
           this.notify(preset.message || 'Navigating to the Great Red Spot…');
         }
-      }],
-      ['🛸 Voyager 1979', () => this.onVoyagerPreset?.()],
-      // Earth's epoch moment (V5.1.2: LIVE-by-default means the sim no
-      // longer OPENS at the epoch — this is now the way back to it).
-      ...(this.system.slug === 'earth' ? [['🌙 Apollo 11 — 1969', () => {
-        this.setLive(false);
-        this.physics.jumpToSimSeconds(0);
-        this.physics.setTimeIndex(1);
-        this.notify('Apollo 11 lunar landing — July 20, 1969');
-      }]] : []),
-      ['💫 Moon Alignment', () => {
+      } },
+      { label: '🛸 Voyager 1979', system: 'jupiter', fn: () => this.onVoyagerPreset?.() },
+      { label: '💫 Moon Alignment', system: 'jupiter', fn: () => {
         this.cam.setMode('system');
         if (!this.resonanceToggle.checked) {
           this.resonanceToggle.checked = true;
@@ -680,14 +677,88 @@ export class UI {
         }
         this.physics.setTimeIndex(5);
         this.notify('10,000× — resonance lines pulse when moons align');
-      }],
+      } },
+      { label: '🛰️ ISS Orbit View', system: 'earth', fn: () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Descending to ISS altitude — 408 km');
+        }
+      } },
+      { label: '🌍 Earthrise', system: 'earth', fn: () => {
+        // Earth-from-Moon is only lit when the Moon sits sunward of Earth —
+        // at the wrong lunar phase the classic shot is a black disc
+        // (measured at the July 1969 epoch). Jump to the nearest
+        // mostly-full Earth within one lunar month, then start the sweep
+        // just behind the limb so Earth climbs over the lunar horizon.
+        this.setLive(false);
+        const v = new THREE.Vector3(), w = new THREE.Vector3();
+        const sunW = () => this.r.sunDir.clone().applyQuaternion(this.r.root.quaternion).normalize();
+        const earthFullness = () => v.copy(this.r.bodyWorldPos('Moon', v))
+          .sub(this.r.bodyWorldPos('Earth', w)).normalize().dot(sunW());
+        const s0 = this.physics.simSeconds;
+        let bestS = s0, bestD = -2;
+        for (let i = 0; i < 30; i++) {
+          const s = s0 + i * 86400;
+          this.physics.jumpToSimSeconds(s);
+          this.r.update(this.physics, 0.016, 1);
+          const d = earthFullness();
+          if (d > bestD) { bestD = d; bestS = s; }
+        }
+        this.physics.jumpToSimSeconds(bestS);
+        this.physics.setTimeIndex(1);
+        this.r.update(this.physics, 0.016, 1);
+        // Earth's bearing from the Moon in the orbit plane: the camera
+        // starts 156 deg around — Earth grazing the limb — and the prograde
+        // drift (theta decreases) lifts it clear over ~40 s.
+        const e = v.copy(this.r.bodyWorldPos('Earth', v)).sub(this.r.bodyWorldPos('Moon', w));
+        const phiE = Math.atan2(e.z, e.x);
+        this.cam.playSequence([
+          { target: 'Moon', dist: 2.2, height: 0.3, orbitRate: 0.025, duration: 40, startTheta: phiE + 2.72, lookAt: 'Earth' },
+        ]);
+        this.notify('Earthrise — Earth climbs over the lunar horizon');
+      } },
+      // Earth's epoch moment (V5.1.2: LIVE-by-default means the sim no
+      // longer OPENS at the epoch — this is now the way back to it).
+      { label: '🌙 Apollo 11 — 1969', system: 'earth', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('Apollo 11 lunar landing — July 20, 1969');
+      } },
+      { label: '🌃 City Lights at Night', system: 'earth', fn: () => {
+        // Aim at whichever major city is deepest in darkness right now —
+        // there is always one; the user's clock is never touched.
+        const cities = [
+          ['New York', 40.7, -74.0], ['London', 51.5, -0.1],
+          ['Tokyo', 35.7, 139.7], ['Cairo', 30.1, 31.3],
+          ['Moscow', 55.8, 37.6], ['São Paulo', -23.6, -46.6],
+        ];
+        const sunW = this.r.sunDir.clone().applyQuaternion(this.r.root.quaternion).normalize();
+        let best = null;
+        for (const [name, lat, lon] of cities) {
+          const n = this._bodyFrameNormal(lat, lon);
+          if (n && (!best || n.dot(sunW) < best.dot)) best = { name, lat, lon, dot: n.dot(sunW) };
+        }
+        if (!best) return;
+        this._flyToLatLon(best.lat, best.lon, 12000, `City lights — ${best.name} after dark`);
+      } },
+      { label: '🌌 Aurora from Orbit', system: 'earth', fn: () => {
+        // Magnetic poles carry the auroral ovals (earth-aurora.glsl); the
+        // curtains are brightest on the night side, so visit the dark one.
+        const sunW = this.r.sunDir.clone().applyQuaternion(this.r.root.quaternion).normalize();
+        const north = this._bodyFrameNormal(82, -111);
+        const dark = north && north.dot(sunW) > 0 ? [-74, 127] : [82, -111];
+        this._flyToLatLon(dark[0], dark[1], 4500, 'Auroral oval — curtains shimmer above 1,000 km');
+      } },
     ];
     this.voyagerBtn = null;
-    for (const [label, fn] of curated) {
+    for (const p of curated) {
+      if (p.system && p.system !== this.system.slug) continue;
       const b = el('button', 'preset-row', c);
-      b.textContent = label;
-      b.onclick = fn;
-      if (label.includes('Voyager')) this.voyagerBtn = b;
+      b.textContent = p.label;
+      b.onclick = p.fn;
+      if (p.label.includes('Voyager')) this.voyagerBtn = b;
     }
 
     el('h3', 'side-heading', c).textContent = 'MY PRESETS';
@@ -728,6 +799,27 @@ export class UI {
       e.stopPropagation();
     });
     this._renderPresetList();
+  }
+
+  /** World-space surface normal of a body-frame lat/lon on the primary.
+   *  Body-frame coordinates, not rotation-phase guesses — the mesh world
+   *  quaternion carries rotation + axial tilt. */
+  _bodyFrameNormal(latDeg, lonDeg) {
+    const entry = this.r.bodyMeshes.get(this.system.primary.name);
+    if (!entry) return null;
+    const la = latDeg * Math.PI / 180, lo = lonDeg * Math.PI / 180;
+    const v = new THREE.Vector3(
+      Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo));
+    entry.mesh.updateWorldMatrix(true, false);
+    return v.applyQuaternion(entry.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  }
+
+  /** Tweened orbit-camera navigation to a body-frame lat/lon via
+   *  flyToFeature's uv path (SphereGeometry mapping: az = pi + lon). */
+  _flyToLatLon(latDeg, lonDeg, altitudeKm, message) {
+    const uv = [0.5 + lonDeg / 360, 0.5 + latDeg / 180];
+    this.cam.flyToFeature(this.system.primary.name, { uv, altitudeKm, message });
+    if (message) this.notify(message);
   }
 
   _loadPresets() {
