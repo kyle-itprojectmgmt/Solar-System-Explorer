@@ -80,6 +80,15 @@ SMOKE_URL=http://localhost:5173 node tests/v5b.mjs
 # returning to the pre-insertion camera mode), panning dead-zone regression,
 # per-body radiation zones (Van Allen belts). 18 checks.
 
+# sun-calibration hotfix guard:
+SMOKE_URL=http://localhost:5173 node tests/suncal.mjs
+# Subsolar point (geographic lat/lon) vs the real sun at 4 UTC dates
+# (epoch, live-bug instant, solstice, equinox); ±3° lat / ±4° lon — the
+# circular-orbit model has no equation of time. Requires the calibrated
+# earth.js star.direction + rotationPhaseAtEpochDeg + full-precision
+# sidereal day (23.93446959 h — 23.934 drifts ~150° of longitude over
+# the 57 years between the 1969 epoch and today).
+
 # orbit-direction hotfix guard:
 SMOKE_URL=http://localhost:5173 node tests/orbitdir.mjs
 # Measures GEOGRAPHIC longitude drift under the camera (east-positive, via

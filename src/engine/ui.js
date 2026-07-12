@@ -1054,7 +1054,7 @@ export class UI {
     const period = cfg.periodDays ?? cfg.orbitalPeriodDays;
     if (period) add('Orbital period', period < 1 ? `${(period * 24).toFixed(1)} hours` : `${period.toLocaleString()} days`);
     if (cfg.tidallyLocked) add('Rotation', `${(cfg.periodDays * 24).toFixed(1)} hours (tidally locked)`);
-    else if (cfg.rotationPeriodHours) add('Rotation', `${cfg.rotationPeriodHours} hours`);
+    else if (cfg.rotationPeriodHours) add('Rotation', `${parseFloat(cfg.rotationPeriodHours.toFixed(3))} hours`);
     if (cfg.discoveredYear) add('Discovered', `${cfg.discoveredYear} — ${cfg.discoveredBy || ''}`);
 
     // Notable features (fall back to legacy facts for bodies without them).

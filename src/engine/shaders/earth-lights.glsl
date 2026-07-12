@@ -82,9 +82,9 @@ if (uDetailBlend > 0.001) {
     vec3 lightCool = vec3(0.910, 0.941, 1.0);   // #E8F0FF
     vec3 lightColor = mix(lightWarm, lightCool, clusterIntensity * 0.5);
 
-    // 0.4 (was 0.3): the V5b night ambient lifts terrain to ~10% — lights
-    // need the extra gain to pop against a dark-but-not-black surface.
-    gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.4;
+    // 0.5: paired with nightAmbient 0x445566 × 0.08 (terrain ~3-5%
+    // silhouettes) — lights must dominate the night side.
+    gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.5;
 
     // RARE LIGHTNING: subtle blue-white flashes in storm regions.
     float stormMask = smoothstep(0.4, 0.7, fbmN(vObjPos * 12.0, 3));

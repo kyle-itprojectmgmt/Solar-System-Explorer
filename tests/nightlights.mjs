@@ -35,15 +35,21 @@ const pts = await page.evaluate(() => {
     mesh.localToWorld(toLocal(lat, lon).multiplyScalar(r)).sub(center()).normalize();
   const sunW = renderer.sunDir.clone().applyQuaternion(renderer.root.quaternion).normalize();
 
-  // Find a sim hour where Paris sits well inside the night hemisphere.
+  // Darkest sim hour for Paris. NOTE: a fixed "deep night" threshold is a
+  // trap — with correctly phased seasons (sun-direction hotfix), the July
+  // epoch never takes 49°N below sun-dot ≈ -0.5 (midsummer twilight).
   physics.setTimeIndex(0);
-  let chosen = -1;
+  let chosen = 0, best = 1;
   for (let h = 0; h < 24; h += 1) {
     physics.jumpToSimSeconds(h * 3600);
     renderer.update(physics, 0.016, 1);
     mesh.updateWorldMatrix(true, false);
-    if (worldNormal(48.9, 2.3).dot(sunW) < -0.55) { chosen = h; break; }
+    const dot = worldNormal(48.9, 2.3).dot(sunW);
+    if (dot < best) { best = dot; chosen = h; }
   }
+  physics.jumpToSimSeconds(chosen * 3600);
+  renderer.update(physics, 0.016, 1);
+  mesh.updateWorldMatrix(true, false);
 
   // Aim the orbit camera down Paris's normal.
   const N = worldNormal(48.9, 2.3);

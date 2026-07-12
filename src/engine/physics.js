@@ -40,7 +40,11 @@ export class PhysicsEngine {
     this.timeIndex = 1;               // index into TIME_STEPS (1x)
     this.pausedIndex = 1;             // restore point for pause toggle
     this.primaryMass = system.primary.massKg;
-    this.primaryRotation = 0;         // radians
+    // Rotation angle at the epoch (radians) — calibrates geographic
+    // longitude against real UTC (see earth.js rotationPhaseAtEpochDeg).
+    this.rotationPhase0 = (((system.primary.rotationPhaseAtEpochDeg || 0)
+      * Math.PI / 180) % TWO_PI + TWO_PI) % TWO_PI;
+    this.primaryRotation = this.rotationPhase0; // radians
     this.rotationRate = TWO_PI / (system.primary.rotationPeriodHours * 3600);
 
     // Sun direction (unit vector, primary equatorial frame).
@@ -103,7 +107,7 @@ export class PhysicsEngine {
   jumpToSimSeconds(s) {
     this.simSeconds = s;
     const TWO_PI = Math.PI * 2;
-    this.primaryRotation = ((this.rotationRate * s) % TWO_PI + TWO_PI) % TWO_PI;
+    this.primaryRotation = ((this.rotationPhase0 + this.rotationRate * s) % TWO_PI + TWO_PI) % TWO_PI;
     for (const b of this.bodies) {
       const ang = b.phase + TWO_PI * (s / b.period);
       const v = TWO_PI * b.a / b.period;

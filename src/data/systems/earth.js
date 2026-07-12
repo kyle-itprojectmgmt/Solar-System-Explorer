@@ -27,18 +27,24 @@ export default {
   // Simulation epoch: Apollo 11 lunar landing — humanity's greatest reach.
   epoch: '1969-07-20T20:17:00Z',
 
-  // Night-side fill (V5b): terrain stays faintly visible (~5-10%) — real
-  // earthglow/scatter keeps the surface from pure black at ISS altitude.
-  nightAmbient: { color: 0x8899bb, intensity: 0.18 },
+  // Night-side fill: terrain reads as faint silhouettes (~3-5%), dark
+  // enough that city lights are the dominant night-side light source.
+  // (V5b's 0x8899bb × 0.18 overcorrected to ~10%+ twilight.)
+  nightAmbient: { color: 0x445566, intensity: 0.08 },
 
   star: {
     name: 'Sun',
     distanceAU: 1.0,          // distance from primary
     color: 0xfff5e8,
     intensity: 2.8,
-    // Fixed direction the sunlight arrives from, in the primary's
-    // equatorial frame (unit-ish vector, engine normalizes).
-    direction: [1, 0.05, 0.25],
+    // Sun direction at the EPOCH in Earth's equatorial frame — calibrated
+    // to the real sky (tests/suncal.mjs): 1969-07-20 20:17 UTC, solar
+    // declination +20.4° (mid-July), ecliptic longitude 29.3 days past the
+    // June solstice. The ephemeris rotates this with the orbital period, so
+    // getting the epoch value right phases the seasons for ALL dates. (The
+    // pre-hotfix [1, 0.05, 0.25] was an uncalibrated aesthetic pick — it
+    // put the July sun at declination +2.8° and anti-phased the seasons.)
+    direction: [-0.8037, 0.3484, 0.4823],
   },
 
   primary: {
@@ -48,7 +54,14 @@ export default {
     radiusKm: 6371,           // equatorial mean radius
     polarRadiusKm: 6357,      // oblate — rendered as ellipsoid
     massKg: 5.972e24,
-    rotationPeriodHours: 23.934,
+    // True sidereal day. Full precision matters: 23.934 loses 1.7 s/day,
+    // which is ~150° of longitude drift between the 1969 epoch and today —
+    // the UTC↔terminator calibration below only holds with this value.
+    rotationPeriodHours: 23.93446959,
+    // Rotation angle at the epoch, calibrated (tests/suncal.mjs) so that
+    // geographic longitude matches real UTC: subsolar point at the epoch
+    // (1969-07-20 20:17 UTC) = 124.25°W (mean sun).
+    rotationPhaseAtEpochDeg: -24.8,
     orbitalPeriodDays: 365.256, // around the Sun
     surfaceGravity: 9.81,       // m/s² at sea level
     surfaceTempRange: [-88, 58], // °C, coldest to hottest recorded
