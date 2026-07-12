@@ -84,7 +84,13 @@ export class UI {
     this.delayEl = el('span', 'ghost-delay', line2);
 
     this._buildDatePicker();
-    this.setLive(localStorage.getItem('sse-live-mode') === '1', true);
+    // LIVE defaults ON (V5.1.2): every system opens at the current real UTC
+    // instant; historical epochs are reached via the SAVE-panel presets.
+    // Automated browsers (navigator.webdriver — the headless suites) default
+    // OFF so time-manipulating tests aren't fought by the LIVE drift-snap;
+    // an explicit localStorage value always wins.
+    const storedLive = localStorage.getItem('sse-live-mode');
+    this.setLive(storedLive === null ? !navigator.webdriver : storedLive === '1', true);
 
     const tr = el('div', 'hud-topright panel', this.hud);
     this.modeEl = el('div', 'hud-mode', tr);
@@ -658,6 +664,14 @@ export class UI {
         }
       }],
       ['🛸 Voyager 1979', () => this.onVoyagerPreset?.()],
+      // Earth's epoch moment (V5.1.2: LIVE-by-default means the sim no
+      // longer OPENS at the epoch — this is now the way back to it).
+      ...(this.system.slug === 'earth' ? [['🌙 Apollo 11 — 1969', () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('Apollo 11 lunar landing — July 20, 1969');
+      }]] : []),
       ['💫 Moon Alignment', () => {
         this.cam.setMode('system');
         if (!this.resonanceToggle.checked) {

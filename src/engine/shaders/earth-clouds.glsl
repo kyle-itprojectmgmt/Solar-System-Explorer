@@ -130,13 +130,19 @@ float ec_polar   = smoothstep(0.88, 0.96, ec_ay);
   }
 }
 
-// Clouds catch sunlight; on the night side they read as dim grey.
+// Clouds catch sunlight; they FADE OUT into deep night (V5.1.2) — unlit
+// clouds aren't visible in reality, and killing the layer in darkness also
+// removes the relief-shading streaks the dark ambient exposed. Near the
+// terminator they still catch the last light.
 {
-  float lit = max(dot(vObjPos, uSunObj), 0.06);
+  float sunDot = dot(vObjPos, uSunObj);
+  float nightFade = smoothstep(-0.3, 0.1, sunDot);
+  float lit = max(sunDot, 0.06);
   vec3 cloudCol = mix(vec3(0.973, 0.973, 1.0), vec3(0.80, 0.82, 0.86), ec_grey) * lit;
-  float op = clamp(ec_cloud, 0.0, 0.92);
+  float op = clamp(ec_cloud, 0.0, 0.92) * nightFade;
   detail = mix(detail, cloudCol, op);
   // Height kept subtle: at low altitude + grazing sun the relief shading
   // turned cloud decks into big black lumps (V5b, measured at 382 km).
+  // nightFade zeroes it in darkness with op.
   gDetailHeight += op * 0.10;
 }

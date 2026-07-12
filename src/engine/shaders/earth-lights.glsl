@@ -18,10 +18,10 @@ float el_pop(vec3 p, float latDeg, float lonDeg, float radDeg, float w) {
 // Sum of the major population centers, Black Marble calibrated.
 float el_population(vec3 p) {
   float pop = 0.0;
-  // Dominant three
-  pop += el_pop(p,  40.5,  -74.5,  9.0, 1.00);  // US East Coast (BosWash)
-  pop += el_pop(p,  48.5,    6.0, 11.0, 1.00);  // Western Europe
-  pop += el_pop(p,  35.8,  137.8,  5.5, 1.00);  // Japan
+  // Dominant three (+20% V5.1.2 — must read clearly over the dark ambient)
+  pop += el_pop(p,  40.5,  -74.5,  9.0, 1.20);  // US East Coast (BosWash)
+  pop += el_pop(p,  48.5,    6.0, 11.0, 1.20);  // Western Europe
+  pop += el_pop(p,  35.8,  137.8,  5.5, 1.20);  // Japan
   // Secondary
   pop += el_pop(p,  52.5,   -1.5,  4.0, 0.80);  // UK
   pop += el_pop(p,  41.8,  -87.7,  7.0, 0.70);  // US Midwest / Great Lakes
@@ -55,7 +55,7 @@ if (uDetailBlend > 0.001) {
 
     // REGION LAYER — the hardcoded density map. Dominates at all altitudes;
     // everything below only shapes light within it.
-    float region = clamp(el_population(vObjPos), 0.0, 1.15);
+    float region = clamp(el_population(vObjPos), 0.0, 1.35); // ceiling above the boosted peaks
 
     // MID-FREQUENCY CLUSTERS: worley cells give metro-area structure.
     vec2 clusterUv = dUv * 80.0;
@@ -64,8 +64,17 @@ if (uDetailBlend > 0.001) {
 
     // HIGH-FREQUENCY SPECKLE: individual cities (fades out at distance,
     // leaving the region glow — exactly how Black Marble reads from high up).
-    float citySpeckle = snoise(vObjPos * 250.0);
-    float cityMask = dtlAAstep(0.55, 0.95, citySpeckle) * dtlFreqFade(vObjPos, 250.0);
+    // Domain-warped (V5.1.2): raw simplex peaks align along the noise
+    // lattice and read as uniform DOTS IN ROWS from ~2,000 km — reported
+    // as "stars rendering on the surface" (measured: identical dot field
+    // with the star Points hidden). The warp breaks the row alignment and
+    // a second noise varies each dot's brightness so they read as cities.
+    vec3 spWarp = vec3(
+      snoise(vObjPos * 37.0), snoise(vObjPos * 37.0 + 11.3),
+      snoise(vObjPos * 37.0 - 5.9)) * 0.012;
+    float citySpeckle = snoise((vObjPos + spWarp) * 250.0);
+    float cityMask = dtlAAstep(0.55, 0.95, citySpeckle) * dtlFreqFade(vObjPos, 250.0)
+                   * (0.35 + 0.65 * (snoise(vObjPos * 91.0 + 3.1) * 0.5 + 0.5));
 
     // FAINT RURAL BACKGROUND: sparse dim glow on other land, so continents
     // aren't pitch black — but far below any region.
@@ -82,9 +91,9 @@ if (uDetailBlend > 0.001) {
     vec3 lightCool = vec3(0.910, 0.941, 1.0);   // #E8F0FF
     vec3 lightColor = mix(lightWarm, lightCool, clusterIntensity * 0.5);
 
-    // 0.5: paired with nightAmbient 0x445566 × 0.08 (terrain ~3-5%
-    // silhouettes) — lights must dominate the night side.
-    gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.5;
+    // 0.7: paired with nightAmbient 0x445566 × 0.08 (terrain ~3-5%
+    // silhouettes) — lights must clearly dominate the night side.
+    gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.7;
 
     // RARE LIGHTNING: subtle blue-white flashes in storm regions.
     float stormMask = smoothstep(0.4, 0.7, fbmN(vObjPos * 12.0, 3));

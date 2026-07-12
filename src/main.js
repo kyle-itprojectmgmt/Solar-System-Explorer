@@ -101,7 +101,10 @@ async function boot() {
   // Voyager 1 flyby preset: reset the clock to the epoch, radio audio,
   // scripted approach sequence.
   function voyagerPreset() {
-    physics.simSeconds = 0;
+    // Leave LIVE first or its drift-snap reverts the jump next frame; a
+    // full jump (not a bare simSeconds write) so the n-body moons move too.
+    ui.setLive(false);
+    physics.jumpToSimSeconds(0);
     physics.setTimeIndex(1);
     audio.setMode('voyager');
     ui.notify('Voyager 1 flyby — March 5, 1979');

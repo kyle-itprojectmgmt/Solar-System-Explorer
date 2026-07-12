@@ -232,10 +232,11 @@ export class SceneRenderer {
           vertexColors: true,
           transparent: true,
           depthWrite: false,
+          depthTest: true, // explicit: stars must never draw over a planet
         });
         mat.toneMapped = false;
         const points = new THREE.Points(geo, mat);
-        points.renderOrder = -1;
+        points.renderOrder = -1; // drawn first; opaque bodies overdraw them
         this.scene.add(points);
         for (const [idx, name] of data.names) {
           this.starLabels.push({

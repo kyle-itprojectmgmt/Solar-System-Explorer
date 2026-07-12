@@ -82,6 +82,19 @@ SMOKE_URL=http://localhost:5173 node tests/v5b.mjs
 # returning to the pre-insertion camera mode), panning dead-zone regression,
 # per-body radiation zones (Van Allen belts). 18 checks.
 
+# LIVE-by-default guard (V5.1.2):
+SMOKE_URL=http://localhost:5173 node tests/livedefault.mjs
+# Fresh REAL-USER load (navigator.webdriver spoofed off, isolated browser
+# context per system) opens Jupiter AND Earth in LIVE at the current UTC;
+# Voyager/Apollo 11 SAVE presets jump to their epochs and exit LIVE (and
+# survive the drift-snap); HYG stars visible in the sky at 50,000 km and
+# never on the planet disc (changed-pixel diff on star-layer toggle).
+# NOTE: under automation (navigator.webdriver) LIVE defaults OFF so the
+# suites' time jumps and pauses aren't fought by the LIVE drift-snap — an
+# explicit localStorage 'sse-live-mode' always wins. The "stars on the
+# surface" report was the city-light speckle grid (simplex-lattice dot
+# rows), fixed by domain-warping the speckle in earth-lights.glsl.
+
 # sun-calibration hotfix guard:
 SMOKE_URL=http://localhost:5173 node tests/suncal.mjs
 # Subsolar point (geographic lat/lon) vs the real sun at 4 UTC dates
