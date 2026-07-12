@@ -75,13 +75,153 @@ export default {
     // (same progressive diffuseHigh path Earth uses).
     textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
 
-    // Worker 3 completes: atmosphere (style 'dust'), detail (style 'ares'),
-    // dust storm layer config, detailFloor, radiationWarning, navPresets,
-    // surfaceFeatures, notableFeatures, moreInfo, facts.
+    // Detail floor: zoom resistance and hard-stop altitudes for procedural relief.
+    normalScale: 2.0,
+    detailFloor: { softKm: 400, hardKm: 100 },
+    minInsertionAltKm: 200,
+
+    // Mars has no magnetosphere — warn only on reentry/direct impact.
+    radiationWarning: {
+      zones: [
+        { minKm: 0, maxKm: 300, label: '⚠️ Reentry altitude' },
+      ],
+    },
+
+    // Thin CO₂ atmosphere with salmon dust scattering via custom shader.
+    atmosphere: {
+      limbEdge: 0xc86448,     // salmon-rust at the very limb
+      limbMid: 0xe8a878,      // pale tan mid-falloff
+      thickness: 0.015,       // fraction of radius — thin feathered edge
+      intensity: 0.9,
+      style: 'dust',          // signature rusty scattering
+    },
+
+    features: { atmosphericGlow: true, equatorialBulge: true },
+
+    // Ares detail shader: procedural relief for dust-eroded terrain.
+    detail: {
+      style: 'ares',
+      activationKm: 20000,
+      fullKm: 400,
+      params: { dustIntensity: 0.2 },
+    },
+
+    // UI navigation shortcuts to texture-anchored surface features.
+    navPresets: [
+      {
+        label: '🌋 Olympus Mons',
+        altitudeKm: 2000,
+        uv: [0.1283, 0.6036],
+        message: 'Descending to Olympus Mons — 21 km above the plains',
+      },
+      {
+        label: '🏔️ Valles Marineris',
+        altitudeKm: 1500,
+        uv: [0.3333, 0.4333],
+        message: 'Soaring over Valles Marineris — 4,000 km of canyon',
+      },
+    ],
+
+    // Surface feature landmarks visible from orbit (east-positive longitude).
+    surfaceFeatures: [
+      { name: 'Olympus Mons',   latDeg: 18.65,  lonDeg: -133.8 },
+      { name: 'Valles Marineris', latDeg: -12.0, lonDeg: -60.0 },
+      { name: 'Hellas Basin',   latDeg: -42.4,  lonDeg: 70.5 },
+      { name: 'Jezero Crater',  latDeg: 18.4,   lonDeg: 77.7 },
+      { name: 'Gale Crater',    latDeg: -5.4,   lonDeg: 137.8 },
+      { name: 'Syrtis Major',   latDeg: 8.4,    lonDeg: 69.5 },
+      { name: 'Tharsis Plateau', latDeg: 2.0,   lonDeg: -113.0 },
+      { name: 'Argyre Basin',   latDeg: -49.7,  lonDeg: -44.0 },
+      { name: 'Elysium Mons',   latDeg: 25.0,   lonDeg: 147.2 },
+      { name: 'Utopia Planitia', latDeg: 46.7,  lonDeg: 117.5 },
+    ],
+
+    notableFeatures: [
+      'Olympus Mons — the largest volcano in the solar system, 21 km above the plains',
+      'Valles Marineris — a 4,000 km canyon system dwarfing Earth\'s Grand Canyon',
+      'Planet-engulfing dust storms visible from Earth when they occur',
+      'Ancient river valleys and deltas hint at a warmer, wetter past',
+      'Two tiny captured-asteroid moons, Phobos and Deimos',
+    ],
+
+    moreInfo: {
+      atmosphere: 'CO₂ 95%, nitrogen 2.8%, argon 2% — 0.6% of Earth\'s pressure',
+      day: 'A sol is 24 h 37 m — Mars time is the closest to Earth\'s of any planet',
+      missions: 'Perseverance and Curiosity rovers active; Viking 1 landed July 20, 1976',
+      water: 'Polar caps hold enough water ice to flood the planet 35 m deep',
+    },
+
+    facts: [
+      'Mars is named after the Roman god of war for its blood-red color',
+      'Dust storms on Mars can last months and encircle the entire planet',
+      'A Martian year is 687 Earth days — missions endure long mission cycles',
+    ],
   },
 
-  // Worker 3 adds Phobos and Deimos (kepler, radii ellipsoids like Amalthea).
-  bodies: [],
+  // Phobos and Deimos — two tiny captured-asteroid moons (Kepler orbits).
+  // Neither has public cylindrical maps (JPL/Stooke maps exist but require
+  // manual fetch). Rendered as ellipsoids via radii with procedural detail.
+  bodies: [
+    {
+      name: 'Phobos', slug: 'phobos',
+      radiusKm: 11.1,           // mean
+      radii: { x: 13.5, y: 11.0, z: 9.0 }, // real irregular: ~27 × 22 × 18 km
+      massKg: 1.0659e16,
+      semiMajorAxisKm: 9376, periodDays: 0.31891, phaseDeg: 0,
+      physics: 'kepler', tidallyLocked: true,
+      color: 0x4a423c,          // one of the darkest objects in the solar system
+      normalScale: 2.0,
+      detailFloor: { softKm: 20, hardKm: 5 },
+      geometrySegments: 64,
+      type: 'Irregular Moon',
+      discoveredYear: 1877,
+      discoveredBy: 'Asaph Hall',
+      surfaceGravity: 0.0057,   // m/s²
+      surfaceTempRange: [-40, -4], // °C
+      orbitalDistanceKm: { min: 9234, max: 9518 },
+      // Detail shader: cratered style (matches Callisto pattern).
+      detail: { style: 'cratered', activationKm: 2000, fullKm: 20 },
+      notableFeatures: [
+        'Orbits faster than Mars rotates — rises in the west, sets in the east',
+        'Doomed: tidal decay will crash or shred it within ~50 million years',
+        'Stickney crater spans nearly half its width',
+        'One of the darkest objects in the solar system',
+      ],
+      facts: [
+        'Phobos orbits Mars in just 7.5 hours — faster than Mars spins',
+        'Its tidal forces gradually slowing it into the planet over ~50 million years',
+      ],
+    },
+    {
+      name: 'Deimos', slug: 'deimos',
+      radiusKm: 6.2,            // mean
+      radii: { x: 7.5, y: 6.0, z: 5.5 }, // real irregular: ~15 × 12 × 11 km
+      massKg: 1.4762e15,
+      semiMajorAxisKm: 23463, periodDays: 1.26244, phaseDeg: 180,
+      physics: 'kepler', tidallyLocked: true,
+      color: 0x5a5248,          // slightly lighter, dust-blanketed
+      normalScale: 1.5,
+      detailFloor: { softKm: 10, hardKm: 3 },
+      geometrySegments: 64,
+      type: 'Irregular Moon',
+      discoveredYear: 1877,
+      discoveredBy: 'Asaph Hall',
+      surfaceGravity: 0.003,    // m/s²
+      surfaceTempRange: [-40, -4], // °C
+      orbitalDistanceKm: { min: 23456, max: 23471 },
+      // Detail shader: cratered style (matches Callisto pattern).
+      detail: { style: 'cratered', activationKm: 2000, fullKm: 20 },
+      notableFeatures: [
+        'Only 15 km across — escape velocity is a brisk walking pace',
+        'Smoother than Phobos — blanketed in thick regolith dust',
+        'From Mars it looks like a bright star, barely a disc',
+      ],
+      facts: [
+        'Deimos is so small that you could almost jump off it',
+        'Its low gravity means loose dust stays on the surface despite impacts',
+      ],
+    },
+  ],
 
   loadingFacts: [
     'Olympus Mons is three times the height of Mount Everest',
