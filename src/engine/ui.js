@@ -1089,7 +1089,8 @@ export class UI {
     // stretch spheres into ovals, v2 lesson) — NOT the common 75°.
     // Telephoto compression is what makes Earthrise read like Apollo 8.
     const optics = section(c, 'Optics');
-    const fovReadout = el('div', 'alt-readout', optics);
+    // Own class — .alt-readout is how tests find the ALTITUDE slider.
+    const fovReadout = el('div', 'fov-readout', optics);
     this.fovSlider = el('input', 'slider', optics);
     // Logarithmic: slider is linear in log(fov), 5°..90°.
     Object.assign(this.fovSlider, { type: 'range', min: 0, max: 1, step: 0.001 });

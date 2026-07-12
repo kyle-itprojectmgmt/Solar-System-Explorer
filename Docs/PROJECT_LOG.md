@@ -337,6 +337,8 @@ rotate with the surface. Same fix required as volcanic plumes (Bug #4).**
 | Europa | USGS via Steve Albers | Public Domain |
 | Ganymede | USGS via Steve Albers | Public Domain |
 | Callisto | Björn Jónsson | Public Domain |
+| Saturn + ring strip | Solar System Scope | CC BY 4.0 |
+| Titan, Enceladus, Iapetus, Mimas, Tethys, Dione, Rhea | Steve Albers SOS (Cassini data) | Non-commercial by permission — attribution required (see backlog #10) |
 
 Full credits in README.md.
 
@@ -953,6 +955,85 @@ Measured: deep night 2,285 bright px → 0, terminator dark half
 1,469 → 0, day side byte-identical. marstest 13/13, marscal 6/6,
 presets 57/57. Deployed (a76a8246), live bundle hash verified.
 
+### v7 — Saturn System + Security + Shader Convention (Complete — 2026-07-12, commits 4755b51 → 57bd971 + docs)
+Per Docs/V7_SATURN.md. Version 7.0.0. Fourth system — NAV travels
+Jupiter ⇄ Earth ⇄ Mars ⇄ Saturn. Surface mode removed permanently.
+
+**Phase 1 — security + conventions + infrastructure (orchestrator):**
+- 1a Security: public/_headers (Workers Static Assets — the prompt's
+  wrangler.toml [[headers]] is not valid for Workers; verified against
+  CF docs and live wrangler dev): CSP (script/style/img/connect/frame
+  locked down; youtube-nocookie for embeds), XFO, XCTO, Referrer-Policy,
+  Permissions-Policy, COOP, CORP. security.txt (RFC 9116 mailto:).
+  ui.js sanitizeEmbedUrl (protocol + hostname validation before the
+  embed regexes; youtu.be kept). npm audit: 0 vulnerabilities.
+  tests/security.mjs (28 checks vs wrangler-served prod build).
+- 1b Shader convention: glsl/surface-base.glsl (sse_dayFade/
+  sse_grazeFade/sse_detailBlend) injected into every detail style;
+  per-body config shaderParams → uDayFade0/1 + uGrazeFade0/1 uniforms.
+  Mars/Earth night-fade constants moved to config VERBATIM (zero visual
+  change; bug #55/#48 behavior preserved); Jupiter's params inert today
+  (gasGiant has no local day fade — Phong handles its terminator).
+- 1c Surface mode DELETED (code + UI; bug #37 moot). 1d LIVE-by-default
+  verified (v5.1.2 already shipped it); Viking 1 — 1976 preset built
+  (Mars had no route back to its epoch; Apollo-11 pattern).
+- 1e Textures: SSS Saturn (4096×2048 — SSS's max for Saturn) + 2K GDI+
+  base + 8192×500 RGBA Cassini ring strip; Steve Albers cylindrical
+  maps for Titan/Enceladus/Iapetus/Mimas/Tethys/Dione/Rhea (4K–8K).
+  Hyperion/Phoebe: no fetchable maps — color-only + procedural.
+- 1f Ephemeris: λ0 anchored to the 2025-03-23 ring-plane crossing —
+  LIVE is the default view, so TODAY'S ring tilt wins the circular-
+  model error budget (2026 δ ≈ −7.1° vs real −7.5°, rings nearly
+  edge-on; costs ~2° at the 2004 Cassini SOI epoch, documented).
+  tests/saturncal.mjs is pure node (ephemeris.js is dependency-free).
+
+**Phase 2 — 4 parallel Haiku workers, exclusive file ownership:**
+W1 saturn-clouds/saturn-atmosphere, W2 saturn-rings/ring-particles,
+W3 titan/enceladus/iapetus, W4 saturn.js config. The house rule held a
+third time — every worker shipped real bugs caught in review BEFORE
+commit: Cassini Division fallback ramped to 0.90 opacity across the
+gap; Encke gap in A-ring-relative coords vs full-span position;
+Enceladus tiger-stripe mask INVERTED (stripes everywhere EXCEPT the
+pole); iapetus undeclared variable (compile failure) + ridge gate
+multiplying the whole height field; reversed-arg smoothstep (GLSL UB).
+
+**Phase 3 — integration + measured calibration:**
+- Rings: ONE textured disc, span calibrated by MEASURING the SSS
+  strip's alpha profile (Cassini dip t≈0.71, B onset t≈0.32 →
+  69,075–140,715 km; F ring below the strip's floor, omitted). NORMAL
+  blending (B ring occludes — additive can't). Saturn shadow preserved.
+  24k fly-through particles (band-weighted radii, ±25 km), visible when
+  the camera is within 5,000 km of the plane and inside the span.
+- Ring shadow on clouds: analytical sun-ray/ring-plane crossing in the
+  kronos chunk — applied to diffuseColor AFTER the detail mix (a real
+  shadow doesn't scale with uDetailBlend; measured 63%→7% dilution
+  before the fix), activation 400,000 km so it reads from NAV entry.
+  Probe: band 2.2× darker than mirror latitude at 2017 northern summer.
+- Titan: opaque haze shell needed TWO discoveries — FrontSide (a
+  BackSide shell's disc fill is always depth-occluded by the moon) and
+  three.js log-depth chunks (raw ShaderMaterials don't write log depth;
+  the shell lost every depth test → rim donut). Now a Voyager-style
+  opaque orange ball, surface ghosting through below 1,000 km.
+- Physics: orbital inclination for Kepler orbits (+X node line);
+  >90° = retrograde emerges naturally (Phoebe 175.2° verified
+  orbiting opposite to all other moons); kepler velocities kept live
+  (chase-mode tangents were equator-only before). Orbit lines inclined.
+- Hyperion: deterministic sim-time tumble (3 incommensurate freqs —
+  scales with time multiplier, freezes on pause, replays after jumps).
+  Phoebe: 9.27 h spin for non-locked moons.
+- Enceladus geysers: Io plume system parameterized (white ice, 2-radii
+  jets, mesh-parented). Tiger stripes: 4 thin meandering parallel
+  troughs (the ridged-noise first cut painted an angular maze).
+- FOV/telephoto (backlog #12): OPTICS log slider 5–90°, 🔭 tray toggle
+  48°↔10° (NORMAL is the renderer's 48°, not the prompt's assumed 75° —
+  wide FOVs oval-stretch spheres, v2 lesson), sse-fov persisted,
+  Earthrise auto-telephoto, Through-the-Rings preset at 25°.
+- 7 Saturn curated presets (ui.js tagged list); Through the Rings uses
+  orbit mode as the documented ring-floor exemption.
+- Suites: saturntest.mjs NEW (23), saturncal (8), security (28);
+  presets extended (Viking). Full regression green. Deployed and
+  live-verified with cache-bust.
+
 ---
 
 ## Known Bugs / In Progress
@@ -1013,6 +1094,9 @@ presets 57/57. Deployed (a76a8246), live bundle hash verified.
 | 54 | Dust caterpillar/lattice rows at low altitude + veil too heavy inside the layer. Fixed: dust field coordinates domain-warped (same fix class as Earth city-light dots #43); veil thinned to 35% below 1,000 km, full by 5,000 km. 100% storm from global distance still a featureless orange sphere (verified). | Resolved v6.0.1 (4d37d74) | — |
 | 55 | Mars craters visible as glowing orange blobs on the NIGHT side at 736 km (hardware-confirmed). Forensics: dots died with sun light off and uNormalScale=0, NOT with dust killed — relief-perturbed normals caught sun from below the local horizon, bloom amplified the lit fragments. Fixed v6.0.2: per-chunk night fade (surface + polar height/color deltas × smoothstep(-0.08, 0.15, sunDot)) + high-frequency layers (crater bowls, regolith grain) additionally fade with sun elevation (0.2..0.55) — they sparkled as isolated glints under ANY grazing light. Dust exempt per spec. Deep night 2,285 bright px → 0; terminator dark half 1,469 → 0; day unchanged. Residual: mid-morning (sunDot ~0.35) grain reads as soft lit-bump flecks — matter of taste, knob is ms_grazeFade + grain amplitude in mars-surface.glsl (joins #9/#27 eyeball pass). | Resolved v6.0.2 (c3efcf2) | — |
 | 52 | Phobos/Deimos cylindrical texture maps — no directly fetchable public URLs (Albers references David Seal / Phil Stooke pages without files). Color-only ellipsoids + cratered detail shipped. Manual fetch + wiring when sourced; URLs noted in mars.js. | Manual follow-up | V6_MARS.md |
+| 56 | Saturn-system shader calibration done from headless screenshots — ring brightness/scatter balance, kronos band strength, hexagon subtlety, Enceladus stripe contrast, Iapetus ridge seam may need real-hardware tuning (joins the #9/#27 eyeball-pass class). Knobs: uOpacityScale + litFace in saturn-rings.glsl, band mix factors in saturn-clouds.glsl, en_stripe/ia_ridge amplitudes. | Needs review | V7_SATURN.md |
+| 57 | Hyperion/Phoebe texture maps — irregular bodies with no fetchable cylindrical maps (same class as #52). Color-only + procedural cratered detail shipped; Hyperion's sponge-pit look would need a dedicated treatment. | Manual follow-up | V7_SATURN.md |
+| 58 | Saturn F ring omitted — the SSS ring strip ends at the A ring outer edge (measured alpha floor), and a procedural F ring on a separate thin annulus wasn't worth the draw call for a barely-visible feature. Revisit if a better Cassini radial profile (Björn Jónsson) is sourced. | Data choice — revisit with better source | V7_SATURN.md |
 
 ---
 
@@ -1024,14 +1108,14 @@ presets 57/57. Deployed (a76a8246), live bundle hash verified.
 | 2 | WebGPU renderer upgrade | When postprocessing library adds WebGPU support |
 | 3 | Moon 8K texture upgrades | Jupiter already at SSS's max (8K). Galilean moon candidates need GeoTIFF conversion: Björn Jónsson (bjj.is/3d/planetary-maps), USGS Astrogeology. Priority: Europa, Io, Ganymede, Callisto. URLs noted in renderer.js. |
 | 4 | Release preparation — supporting pages | Add About page (project story, AI-built in 48hrs narrative, tech stack, author bio linking to ITprojectMGMT.com and LinkedIn), Contact page (kyle@itprojectmgmt.com), Legal/Disclaimer page (NASA texture credits and CC BY 4.0 attribution, Solar System Scope CC BY 4.0, Björn Jónsson public domain credits, no warranty disclaimer, not affiliated with NASA or any space agency), Privacy Policy (no tracking, no user data collected, localStorage only for user preferences, no cookies, no analytics). All pages accessible from a minimal persistent footer. Style matches brand. Mobile-friendly. |
-| 5 | Release preparation — security hardening | Before any public promotion or LinkedIn post: (1) Content Security Policy headers via Cloudflare Worker — restrict script-src to self, block inline scripts and eval; (2) Add /.well-known/security.txt with contact info; (3) Subresource Integrity (SRI) on Google Fonts CDN links; (4) Security response headers: X-Frame-Options SAMEORIGIN, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy restricting unused browser APIs; (5) Audit all source code for exposed secrets, API keys, or tokens before public release; (6) Review localStorage usage — confirm no sensitive data stored; (7) Rate limiting on ISS position API endpoint when built; (8) HTTPS-only already enforced by Cloudflare. Run Mozilla Observatory scan and target A+ rating before launch. |
+| 5 | ~~Release preparation — security hardening~~ | DONE v7 (1a): CSP + XFO + XCTO + Referrer-Policy + Permissions-Policy + COOP + CORP via public/_headers (Workers Static Assets); security.txt; embed URL sanitization; npm audit clean; no secrets in source (audited); localStorage holds prefs only. NOT done: SRI on Google Fonts (their CSS is dynamically generated per-UA — SRI hashes won't hold; CSP style-src/font-src pinning covers the risk); ISS API rate limiting (feature not built). Observatory scan on the live URL logged below. |
 | 6 | Sharpness calibration eyeball pass | Bug #9 — review relief/crater/speckle strength on real hardware; knobs: normalScale in jupiter.js, gDetailHeight weights in detailShaders.js |
 | 7 | Sun — basic corona visuals | Sun sits in the Bodies panel (v4c) with a Solar Observatory stub toast. Remaining: subtle corona glow shader, slow sunspot texture, occasional flare particles. Full Solar Observatory mode = V6+. |
 | 8 | System-wide labels | Toggle exists in the Display panel (v4c stub) — implement with the Solar System Orrery view. |
 | 9 | Velocity vectors | Toggle exists in the Display panel (v4c stub) — draw per-moon velocity arrows in System View. |
 | 10 | Steve Albers attribution — confirm before launch | Check renderer.js and config files for any runtime fetches from stevealbers.net (grep -r "stevealbers" src/). If textures downloaded locally, add Steve Albers credit to legal/credits page. His Galilean moon maps are non-commercial use by permission — attribution required. Compiled from NASA/JPL + Björn Jónsson data. |
 | 11 | Google Analytics (cookieless) — add after launch | Add GA4 with anonymized IP and no cookies (consent-free mode). GA4 supports cookieless measurement via gtag config: { anonymize_ip: true, cookie_flags: 'SameSite=None;Secure', storage: 'none' }. Page views, session counts, country breakdown, device type — no PII or cookies — compatible with Privacy Policy. Add to CSP connect-src: www.google-analytics.com. Implement after public launch once privacy policy confirmed. |
-| 12 | Zoom / Telephoto View (FOV control) | Add FOV slider to VIEW panel (75° normal → 5° extreme telephoto). Scroll-wheel changes FOV when holding Alt (altitude when not). Quick-toggle 🔭 button in bottom tray switching between 75° and 8°. Update Earthrise preset to auto-set FOV to 8° on entry. Full Earthrise fix requires: (1) correct lunar orbital position with Earth rising above lunar horizon, (2) full/gibbous Earth phase not new moon, (3) narrow FOV 8-10° so Earth fills frame, (4) lunar surface visible in foreground. Without zoom the 1.9° angular diameter of Earth from Moon is underwhelming — telephoto compression is what makes Apollo 8 iconic. Estimated effort: 3-4 hours. |
+| 12 | ~~Zoom / Telephoto View (FOV control)~~ | DONE v7 (3c): OPTICS section in VIEW panel (log slider 5–90°), 🔭 tray toggle 48°↔10° (normal is the renderer's 48° — 75° would oval-stretch spheres, v2 lesson), sse-fov persisted, Earthrise preset auto-telephoto, Through-the-Rings at 25°. NOT built: Alt+scroll-wheel FOV (slider + toggle cover the use cases; add on request). |
 | 13 | Ko-fi → Stripe for donations | Create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Fix before public launch. |
 
 Completed in v4c (removed from backlog): ghost time display, date
@@ -1056,8 +1140,11 @@ brand icons, tooltips.
 ```
 V5  — Earth + Moon — DONE (city lights, auroras, Apollo sites; ISS mode → V5.1)
 V6  — Mars — DONE (Olympus Mons, Valles Marineris, dust storms, polar caps,
-      Phobos + Deimos; surface landing experience → V6.1+)
-V7  — Saturn + Rings + Titan + Enceladus + Iapetus
+      Phobos + Deimos; surface landing experience dropped with Surface mode)
+V7  — Saturn — DONE (textured ring system + Cassini Division, ring shadows
+      both directions, fly-through particles, Titan haze, Enceladus geysers
+      + tiger stripes, Iapetus two-tone, Mimas/Tethys/Dione/Rhea, chaotic
+      Hyperion, retrograde Phoebe, telephoto optics, security hardening)
 V8  — Outer solar system (Uranus, Neptune, Triton, Pluto)
 ```
 
@@ -1090,7 +1177,7 @@ generative audio have no equivalent in NASA Eyes.
 
 | # | Feature | Notes |
 |---|---------|-------|
-| 1 | Saturn System | saturn.js config, particle ring system, Titan atmosphere shader, Enceladus geysers |
+| 1 | Saturn System | DONE v7 — see Version History. Remaining from spec: Hyperion/Phoebe maps (bug #57), F ring (bug #58), hardware eyeball pass (bug #56). |
 | 2 | Earth + Moon System | DONE v5 — see Version History. Remaining from spec: ISS Mode (live position API), 8K/seasonal/night textures, lightning particles beyond the shader flashes. |
 | 3 | Full Solar System Orrery | Camera Mode 8 (V key). All planets in correct orbital positions. Click any to travel. Scale-adjusted so all visible. Gateway to inter-system navigation. |
 | 4 | Inter-System Navigation | System selector UI in Mission Control. Cinematic hyperjump sequence (8-12s, skippable). Runtime system switching with GPU memory management. Floating origin / scale switching between AU and km coordinate systems. |

@@ -513,7 +513,8 @@ html, body {
   letter-spacing: 0.08em;
   color: var(--gray-light);
 }
-.alt-readout {
+.alt-readout,
+.fov-readout {
   font-family: var(--font-body);
   color: var(--blue-light);
   font-size: 0.8rem;

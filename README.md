@@ -1,32 +1,32 @@
 # Solar System Explorer
 
-A photorealistic, first-person 3D explorer of the solar system — v1 covers the **Jupiter system**, seen as Voyager saw it in March 1979. Built with Three.js + Vite, deployed on Cloudflare Pages.
+A photorealistic, first-person 3D explorer of the solar system — **four systems** live: Jupiter, Earth + Moon, Mars, and Saturn. Opens LIVE at the current UTC instant with physically calibrated sun geometry; historic-mission presets (Voyager 1979, Apollo 11, Viking 1) jump back to the epochs. Built with Three.js + Vite, deployed as a Cloudflare Worker.
 
 **Live demo:** https://solar-system-explorer.kyle-d06.workers.dev
 
 ## Features
 
-- **N-body physics** — velocity-Verlet integration of the Galilean moons with mutual perturbations (the 1:2:4 Io–Europa–Ganymede Laplace resonance emerges naturally); inner ring moons ride Keplerian orbits
-- **Seven camera modes** — Cinematic auto-pilot (`C`), Free Fly (`F`, WASD + mouse), Orbit (`O` + click), Surface (`S` + click), Chase (`H` + click), Orbit Insertion (`I`, physically accurate orbits incl. Jupiter GeoSync), System View (`G`)
-- **Altitude control** — scroll-wheel zoom with minimum safe altitude floors, ALT readout, one-click presets down to a 50 km skim, named surface-feature labels at low altitude
-- **In-app help** — press `?` for the full controls reference
-- **Time control** — pause to 10,000× (`Space`, `,`, `.`), simulation clock starts at the Voyager 1 flyby (March 5, 1979)
-- **Eclipses & transits** — moons darken dramatically in Jupiter's shadow cone; transit shadows track across the cloud tops; upcoming events tick down in the side panel
-- **Jupiter's four rings** — halo torus, main ring, and both gossamer rings, with forward-scattering shaders that light up when backlit
-- **Io volcanic plumes** — umbrella-shaped particle plumes at Pele, Loki, and Prometheus, with night-glowing hotspots
-- **Generative audio** — five procedural Web Audio soundscapes (Voyager plasma-wave radio, deep-space ambient, psychedelic journey, cosmic electronic) plus Spotify/YouTube embed drawers
-- **Post-processing** — bloom, lens flare, subtle depth of field, film grain, vignette (auto-tiered for desktop / tablet / mobile)
-- **Screenshot button**, Ko-fi support link, body info panels with NASA JPL data
+- **Four planetary systems** — travel between Jupiter (Galilean moons, GRS), Earth (city lights, auroras, Apollo sites), Mars (Olympus Mons, dust storms, polar caps), and Saturn (the full ring system) from the NAV panel
+- **N-body physics** — velocity-Verlet integration with mutual perturbations (the 1:2:4 Laplace resonance emerges naturally); smaller moons ride inclined Keplerian orbits — Phoebe genuinely orbits Saturn backwards, Hyperion tumbles chaotically
+- **Saturn's rings** — Cassini-derived radial color/opacity with the Cassini Division and Encke gap, ring shadows cast both ways (rings on cloud tops, Saturn on rings), and a fly-through ice-particle layer when you dip into the ring plane
+- **Six camera modes** — Cinematic (`C`), Free Fly (`F`, WASD + mouse), Orbit (`O` + click), Chase (`H` + click), Orbit Insertion (`I`, physically accurate orbits incl. GeoSync), System View (`G`)
+- **Telephoto optics** — 🔭 toggle and a 5–90° FOV slider; Earthrise finally looks like Apollo 8
+- **Procedural surface detail** — per-body GLSL layers that stage in with altitude: volcanic Io, cracked Europa, Titan's opaque orange haze, Enceladus tiger stripes + geysers, Iapetus's two-tone ridge line
+- **Time control** — pause to 10,000× (`Space`, `,`, `.`), date picker (1950–2050), 🔴 LIVE mode tracking the real clock
+- **Eclipses & transits** — shadow cones, transit shadow dots, upcoming-event toasts with a Watch button
+- **Generative audio** — procedural Web Audio soundscapes plus Spotify/YouTube embeds
+- **Post-processing** — bloom, lens flare, depth of field, film grain, vignette (auto-tiered for desktop / tablet / mobile)
+- **Hardened** — strict Content-Security-Policy and security headers, sanitized embed URLs, security.txt
 
 ## Architecture
 
-The engine is fully data-driven. Jupiter lives in [`src/data/systems/jupiter.js`](src/data/systems/jupiter.js); nothing Jupiter-specific exists in [`src/engine/`](src/engine/). To render another system, drop in a config with the same schema (a Saturn stub is included) and change one line in [`src/config.js`](src/config.js).
+The engine is fully data-driven. Each system lives in [`src/data/systems/`](src/data/systems/); nothing body-specific exists in [`src/engine/`](src/engine/). Adding a system means adding a config with the same schema — the engine renders it unchanged.
 
 ```
 /src
   /engine        renderer, physics, camera, audio, ui, postfx  (system-agnostic)
-  /data/systems  jupiter.js (active), saturn.js (stub)
-  config.js      TEXTURE_BASE_URL + SYSTEM_CONFIG
+  /data/systems  jupiter.js, earth.js, mars.js, saturn.js
+  config.js      TEXTURE_BASE_URL + AVAILABLE_SYSTEMS
   main.js        entry point
 ```
 
@@ -49,9 +49,11 @@ Production textures can be served from Cloudflare R2 by changing `TEXTURE_BASE_U
 
 ## Texture credits
 
-- Jupiter: [Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0, based on NASA data)
-- Io, Europa, Ganymede: USGS Astrogeology / NASA maps via [Steve Albers](https://stevealbers.net/albers/sos/sos.html)
+- Jupiter, Saturn + ring strip, Earth 8K, Mars, Moon: [Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0, based on NASA data)
+- Earth base: NASA Blue Marble Next Generation (public domain)
+- Io, Europa, Ganymede, Titan, Enceladus, Iapetus, Mimas, Tethys, Dione, Rhea: NASA/Cassini maps via [Steve Albers](https://stevealbers.net/albers/sos/sos.html) (non-commercial use by permission)
 - Callisto: [Björn Jónsson](https://bjj.mmedia.is/) planetary maps
+- Milky Way panorama: ESO/S. Brunier (CC BY 4.0); bright stars: HYG database
 - Orbital and physical data: NASA JPL
 
 ## Links
