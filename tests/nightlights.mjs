@@ -113,6 +113,9 @@ const cities = ['London', 'Paris', 'Milan', 'Cairo', 'Moscow'].map((c) => lum(sa
 const darks = ['Sahara', 'Atlantic', 'Kalahari'].map((c) => lum(samples[c])).filter((v) => v >= 0);
 const city = Math.max(...cities);
 const dark = Math.max(...darks, 0);
-console.log(`brightest city ${city.toFixed(0)}  vs  brightest dark ref ${dark.toFixed(0)}  (want city > 3x dark, city > 25)`);
+// V5b: the night side is deliberately no longer pure black (nightAmbient
+// keeps terrain at ~10%), so the dark references sit near 25-30 luminance.
+// Cities must clearly outshine that floor, not a black screen.
+console.log(`brightest city ${city.toFixed(0)}  vs  brightest dark ref ${dark.toFixed(0)}  (want city > 1.8x dark, city > 45)`);
 await browser.close();
-process.exit(city > dark * 3 && city > 25 ? 0 : 1);
+process.exit(city > dark * 1.8 && city > 45 ? 0 : 1);
