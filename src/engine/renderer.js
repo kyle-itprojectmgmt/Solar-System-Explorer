@@ -14,6 +14,7 @@ import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { TEXTURE_BASE_URL, KM_PER_UNIT, AU_KM } from '../config.js';
 import { applyDetailShader, detailBlend } from './detailShaders.js';
 import EARTH_ATMOSPHERE_GLSL from './shaders/earth-atmosphere.glsl?raw';
+import MARS_ATMOSPHERE_GLSL from './shaders/mars-atmosphere.glsl?raw';
 
 const K = 1 / KM_PER_UNIT; // km -> scene units
 
@@ -346,7 +347,9 @@ export class SceneRenderer {
       const atm = p.atmosphere;
       const glow = new THREE.Mesh(
         new THREE.SphereGeometry(1, 96, 64),
-        atm.style === 'rayleigh' ? makeRayleighMaterial(atm) : makeLimbScatterMaterial(atm)
+        atm.style === 'rayleigh' ? makeRayleighMaterial(atm)
+          : atm.style === 'dust' ? makeDustMaterial(atm)
+          : makeLimbScatterMaterial(atm)
       );
       const s = 1 + (atm.thickness || 0.025);
       glow.scale.set(rEq * s, rPol * s, rEq * s);
@@ -416,6 +419,17 @@ export class SceneRenderer {
           this.texLoader.load(this.texUrl(cfg.slug, cfg.textures.diffuse)));
       } else {
         matOpts.color = new THREE.Color(cfg.color || 0x888888);
+        // Detail styles read vMapUv, which three only compiles when a map
+        // exists — give untextured detail bodies a 1px white map so the
+        // varying exists and cfg.color still tints (V6: Phobos/Deimos are
+        // the first color-only bodies with a detail style).
+        if (cfg.detail) {
+          const white = new THREE.DataTexture(
+            new Uint8Array([255, 255, 255, 255]), 1, 1);
+          white.colorSpace = THREE.SRGBColorSpace;
+          white.needsUpdate = true;
+          matOpts.map = white;
+        }
       }
       const mat = new THREE.MeshPhongMaterial(matOpts);
       if (cfg.textures?.normal) {
@@ -868,7 +882,20 @@ export class SceneRenderer {
  * horizon line. Same shell geometry/blending as the limb scatter material.
  */
 function makeRayleighMaterial(atm) {
-  const [, rest] = EARTH_ATMOSPHERE_GLSL.split('// === VERTEX ===');
+  return makeShellAtmosphereMaterial(EARTH_ATMOSPHERE_GLSL, atm);
+}
+
+/**
+ * Dust-scattering atmosphere (V6, Worker 1's mars-atmosphere.glsl): Mars's
+ * thin salmon-pink limb. Same shell contract as the Rayleigh material —
+ * uSunW / uCamPos / uAltitude are updated by the same per-frame code.
+ */
+function makeDustMaterial(atm) {
+  return makeShellAtmosphereMaterial(MARS_ATMOSPHERE_GLSL, atm);
+}
+
+function makeShellAtmosphereMaterial(glslSource, atm) {
+  const [, rest] = glslSource.split('// === VERTEX ===');
   const [vertexShader, fragmentShader] = rest.split('// === FRAGMENT ===');
   return new THREE.ShaderMaterial({
     uniforms: {

@@ -743,6 +743,36 @@ export class UI {
         if (!best) return;
         this._flyToLatLon(best.lat, best.lon, 12000, `City lights — ${best.name} after dark`);
       } },
+      { label: '🌋 Olympus Mons Flyover', system: 'mars', fn: () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Descending to Olympus Mons…');
+        }
+      } },
+      { label: '🏔️ Valles Marineris', system: 'mars', fn: () => {
+        const preset = this.system.primary.navPresets?.[1];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Soaring over Valles Marineris…');
+        }
+      } },
+      { label: '🔴 Mars Global View', system: 'mars', fn: () => {
+        // Enter the mode FIRST — insertion entry re-derives altitude from
+        // the camera's current distance and would clobber the preset.
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 15000, incDeg: 30 });
+        this.notify('Global view — 15,000 km, 30° inclined orbit');
+      } },
+      { label: '🛸 Chase Phobos', system: 'mars', fn: () => {
+        this.cam.setMode('chase', 'Phobos');
+        this.notify('Chasing Phobos — the moon that outruns Mars\'s spin');
+      } },
+      { label: '❄️ North Polar Cap', system: 'mars', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 2000, incDeg: 85 });
+        this.notify('Polar orbit — water-ice cap and spiral troughs');
+      } },
       { label: '🌌 Aurora from Orbit', system: 'earth', fn: () => {
         // Magnetic poles carry the auroral ovals (earth-aurora.glsl); the
         // curtains are brightest on the night side, so visit the dark one.
@@ -982,6 +1012,34 @@ export class UI {
       const b = el('button', 'btn btn-small', grid);
       b.textContent = `${label} · ${km.toLocaleString()} km`;
       b.onclick = () => this.cam.flyToAltitude(km);
+    }
+
+    // Conditions (V6): data-driven — any primary whose detail params carry a
+    // dustIntensity gets the dust-storm control (Mars today). The slider
+    // writes the live uDustStorm uniform; persisted per system.
+    const dustParams = this.system.primary.detail?.params;
+    if (dustParams && 'dustIntensity' in dustParams) {
+      const cond = section(c, 'Conditions');
+      const key = `sse-dust-${this.system.slug}`;
+      const stored = parseFloat(localStorage.getItem(key));
+      const initial = Number.isFinite(stored)
+        ? Math.min(1, Math.max(0, stored)) : dustParams.dustIntensity;
+      const readout = el('div', 'alt-readout', cond);
+      this.dustSlider = el('input', 'slider', cond);
+      Object.assign(this.dustSlider, { type: 'range', min: 0, max: 1, step: 0.01, value: initial });
+      el('div', 'ins-scale', cond).innerHTML = '<span>Clear</span><span>Global storm</span>';
+      el('p', 'panel-desc', cond).textContent = 'Suspended dust — regional haze to a planet-engulfing storm';
+      const applyDust = (v) => {
+        readout.textContent = `DUST STORM: ${Math.round(v * 100)}%`;
+        const entry = this.r.detailEntries?.find((e) => e.name === this.system.primary.name);
+        if (entry?.uniforms?.uDustStorm) entry.uniforms.uDustStorm.value = v;
+      };
+      this.dustSlider.oninput = () => {
+        const v = +this.dustSlider.value;
+        applyDust(v);
+        localStorage.setItem(key, String(v));
+      };
+      applyDust(initial);
     }
   }
 

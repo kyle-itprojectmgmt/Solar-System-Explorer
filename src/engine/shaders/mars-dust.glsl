@@ -44,8 +44,9 @@ vec3 ms2_dustColor = vec3(0.0);
 
 // LAYER 1 — regional dust patches
 {
-  float patch = ms2_dustField(vObjPos, uTime, dOct);
-  float patchOp = smoothstep(0.5, 0.8, patch);
+  // ('patch' is a GLSL reserved word — don't shorten this name.)
+  float dustPatch = ms2_dustField(vObjPos, uTime, dOct);
+  float patchOp = smoothstep(0.5, 0.8, dustPatch);
 
   // Southern hemisphere spring/summer bias: dust season when uSunObj.y < 0
   float seasonBias = 0.6 + 0.4 * smoothstep(0.1, 0.4, -uSunObj.y);

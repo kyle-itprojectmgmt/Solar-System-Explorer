@@ -9,6 +9,7 @@ const BASE = process.env.SMOKE_URL || 'http://localhost:5175';
 
 const JUPITER_SET = ['Io Volcano Flyby', 'Triple Moon Shadow', 'GRS Close Pass', 'Voyager 1979', 'Moon Alignment'];
 const EARTH_SET = ['ISS Orbit View', 'Earthrise', 'Apollo 11', 'City Lights at Night', 'Aurora from Orbit'];
+const MARS_SET = ['Olympus Mons Flyover', 'Valles Marineris', 'Mars Global View', 'Chase Phobos', 'North Polar Cap'];
 
 let pass = 0, fail = 0;
 const check = (name, ok, detail = '') => {
@@ -43,9 +44,48 @@ const labels = (page) => page.evaluate(() =>
   const got = await labels(page);
   for (const want of JUPITER_SET)
     check(`jupiter shows "${want}"`, got.some((l) => l.includes(want)));
-  for (const not of EARTH_SET)
+  for (const not of [...EARTH_SET, ...MARS_SET])
     check(`jupiter hides "${not}"`, !got.some((l) => l.includes(not)));
   check('jupiter: zero page errors', errors.length === 0, errors[0]);
+  await page.close();
+}
+
+// ---- Mars scoping + preset behavior (V6) ----
+{
+  const { page, errors } = await load('mars');
+  const got = await labels(page);
+  for (const want of MARS_SET)
+    check(`mars shows "${want}"`, got.some((l) => l.includes(want)));
+  for (const not of [...EARTH_SET, ...JUPITER_SET])
+    check(`mars hides "${not}"`, !got.some((l) => l.includes(not)));
+
+  const run = (label) => page.evaluate((label) => {
+    const btn = [...document.querySelectorAll('.preset-row')]
+      .find((b) => b.textContent.includes(label));
+    if (!btn) return null;
+    btn.click();
+    const { cameraCtl, physics, renderer } = window.__sse;
+    for (let i = 0; i < 120; i++) cameraCtl.update(0.05);
+    renderer.update(physics, 0.016, 1);
+    return {
+      mode: cameraCtl.mode, target: cameraCtl.target,
+      insAlt: cameraCtl.ins?.altitudeKm, insInc: cameraCtl.ins?.incDeg,
+    };
+  }, label);
+
+  const glob = await run('Mars Global View');
+  check('Global View: insertion 15,000 km / 30°',
+    glob?.mode === 'insertion' && glob?.insAlt === 15000 && glob?.insInc === 30,
+    JSON.stringify(glob));
+  const chase = await run('Chase Phobos');
+  check('Chase Phobos: chase mode on Phobos',
+    chase?.mode === 'chase' && chase?.target === 'Phobos', JSON.stringify(chase));
+  const pole = await run('North Polar Cap');
+  check('North Polar Cap: insertion 2,000 km / 85°',
+    pole?.mode === 'insertion' && pole?.insAlt === 2000 && pole?.insInc === 85,
+    JSON.stringify(pole));
+
+  check('mars: zero page errors', errors.length === 0, errors[0]);
   await page.close();
 }
 
@@ -55,7 +95,7 @@ const labels = (page) => page.evaluate(() =>
   const got = await labels(page);
   for (const want of EARTH_SET)
     check(`earth shows "${want}"`, got.some((l) => l.includes(want)));
-  for (const not of JUPITER_SET)
+  for (const not of [...JUPITER_SET, ...MARS_SET])
     check(`earth hides "${not}"`, !got.some((l) => l.includes(not)));
 
   const clickAndSettle = (label) => page.evaluate((label) => {

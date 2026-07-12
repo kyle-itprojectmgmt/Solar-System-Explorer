@@ -99,9 +99,13 @@ export default {
     features: { atmosphericGlow: true, equatorialBulge: true },
 
     // Ares detail shader: procedural relief for dust-eroded terrain.
+    // Activation is deliberately HIGH (Earth-like) because the style also
+    // carries the dust-storm veil — a 2018-style global storm is visible
+    // from any distance, not just low orbit. Surface layers stage
+    // themselves in far lower via their own altitude gates.
     detail: {
       style: 'ares',
-      activationKm: 20000,
+      activationKm: 50000,
       fullKm: 400,
       params: { dustIntensity: 0.2 },
     },

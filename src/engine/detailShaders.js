@@ -23,6 +23,9 @@ import TERRA_LIGHTS from './shaders/earth-lights.glsl?raw';
 import TERRA_AURORA from './shaders/earth-aurora.glsl?raw';
 import TERRA_OCEAN from './shaders/earth-ocean.glsl?raw';
 import LUNA_DETAIL from './shaders/moon-detail.glsl?raw';
+import ARES_SURFACE from './shaders/mars-surface.glsl?raw';
+import ARES_DUST from './shaders/mars-dust.glsl?raw';
+import ARES_POLAR from './shaders/mars-polar.glsl?raw';
 
 /** Registry of detail styles. Populated per body type below. */
 export const DETAIL_STYLES = {};
@@ -416,6 +419,29 @@ DETAIL_STYLES.terra = {
 // framework's exactly), so it injects bare.
 DETAIL_STYLES.luna = {
   apply: LUNA_DETAIL,
+};
+
+// -- Ares (Mars) — V6 worker shader chunks ----------------------------------------
+// Chunk order matters: surface terrain first, polar caps paint over it, and
+// the dust layer goes LAST so a global storm (uDustStorm -> 1) veils caps
+// and terrain alike. uDustStorm is the style's extra uniform — the VIEW
+// panel's Dust Storm slider writes it directly.
+
+const aresSurface = splitChunk(ARES_SURFACE);
+const aresDust = splitChunk(ARES_DUST);
+const aresPolar = splitChunk(ARES_POLAR);
+
+DETAIL_STYLES.ares = {
+  uniforms: (p) => ({ uDustStorm: { value: p.dustIntensity ?? 0.2 } }),
+  decls: /* glsl */ `uniform float uDustStorm;`,
+  fns: aresSurface.fns + aresPolar.fns + aresDust.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${aresSurface.apply} }
+    { ${aresPolar.apply} }
+    { ${aresDust.apply} }
+    ${DETAIL_FINAL}
+  `,
 };
 
 // -- Gas giant: banded cloud turbulence + vortex + limb haze ---------------------

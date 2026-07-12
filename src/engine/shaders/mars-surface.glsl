@@ -29,8 +29,10 @@ float ms_vallesMarin(vec3 p, out float depth) {
   float latDist = abs(lat - latCenter);
   float canyonMask = (1.0 - smoothstep(0.035, 0.055, latDist)) * inLonRange;
 
-  // Depth modulation: fbm-warped floor, stronger at center.
-  float floorNoise = fbmN(p * 50.0, dOct) * 0.4;
+  // Depth modulation: fbm-warped floor, stronger at center. Fixed 3 octaves —
+  // dOct is a local of the injected apply block and doesn't exist at
+  // function scope.
+  float floorNoise = fbm3(p * 50.0) * 0.4;
   depth = -0.3 * (1.0 - smoothstep(0.0, 0.035, latDist)) * (1.0 + floorNoise);
 
   return canyonMask;
@@ -45,114 +47,112 @@ float ms_lum = dot(dBase, vec3(0.299, 0.587, 0.114));
 float ms_southWeight = smoothstep(0.1, -0.1, vObjPos.y); // stronger in southern hemisphere
 float ms_isHighland = smoothstep(0.35, 0.50, mix(ms_lum, 0.3, ms_southWeight));
 
-// HIGHLANDS: ancient cratered terrain with wind ripples
+// Olympus shield: real proportions — ~300 km basal radius ≈ 0.09 rad. The
+// young volcanic surface suppresses the crater field inside the shield.
+float ms_olympusD = acos(clamp(dot(vObjPos, ms_olympusDir), -1.0, 1.0));
+float ms_olympusMask = 1.0 - smoothstep(0.10, 0.13, ms_olympusD);
+
+// HIGHLANDS: ancient cratered terrain with wind ripples. Craters follow
+// Callisto's dUv pattern (the original xz projection stretched cells into
+// lattice-aligned ellipse columns near the equatorial limbs — measured at
+// 3,000 km) with the signed profile driving RELIEF, color only subtly.
+// Erosion character: soft rims, dust-filled floors slightly LIGHTER.
 {
   if (ms_isHighland > 0.001) {
-    // Craters at 2-3 scales, finest gated below 3,000 km
-    float crt = 0.0;
-    float crtAltFade = 1.0 - smoothstep(0.0, 3000.0, uAltitude);
+    // Continent-scale basins live in the 8K TEXTURE — procedural craters
+    // are the below-texture-resolution "infinite detail" only, so they
+    // stage in at LOW altitude (the freq-30 layer painted 1,300 km donut
+    // stamps over the whole disc at 3,000 km — measured).
+    float hl = ms_isHighland * ms_polar * (1.0 - ms_olympusMask);
 
-    // Coarse craters: always visible
-    {
-      vec2 p = vObjPos.xz * 15.0;
-      float cellId;
-      float crater = craterProfile(p, cellId);
-      crt = max(crt, crater * 0.6); // softened rims (eroded)
+    // Craters are a WHISPER: the 8K texture already carries every basin
+    // the eye expects at orbit altitudes (measured — the bare texture at
+    // 1,200 km beats every stamped-donut procedural version). Procedural
+    // bowls only add sub-texture roughness on final approach.
+    float crAct = 1.0 - smoothstep(600.0, 1500.0, uAltitude);
+    if (crAct > 0.001) {
+      float cFade = dtlFreqFade2(dUv, 300.0);
+      float id1; float c = craterProfile(dUv * 300.0 + 7.3, id1);
+      c *= 0.5 * step(0.4, fract(id1 * 7.77)); // eroded + hash-thinned
+      detail = mix(detail, detail * vec3(1.05, 1.03, 1.00),
+        clamp(-c, 0.0, 1.0) * 0.10 * crAct * cFade * hl);
+      gDetailHeight += clamp(c, -1.0, 1.0) * 0.06 * crAct * cFade * hl;
+
+      // Powdery regolith grain on final approach.
+      gDetailHeight += snoise(vObjPos * 900.0) * 0.03
+        * dtlFreqFade(vObjPos, 900.0) * crAct * hl;
     }
 
-    // Medium craters: visible down to 8 km
-    {
-      float medAlt = 1.0 - smoothstep(0.0, 8000.0, uAltitude);
-      if (medAlt > 0.001) {
-        vec2 p = vObjPos.xz * 35.0;
-        float cellId;
-        float crater = craterProfile(p, cellId);
-        crt = max(crt, crater * 0.45 * medAlt);
-      }
-    }
-
-    // Fine craters: visible only below 3 km, faded by freq
-    if (crtAltFade > 0.001) {
-      vec2 p = vObjPos.xz * 80.0;
-      float cellId;
-      float crater = craterProfile(p, cellId);
-      crt = max(crt, crater * 0.35 * crtAltFade * dtlFreqFade(vObjPos, 80.0));
-    }
-
-    // Wind ripples: elongated noise x4 along longitude (east-west).
-    float wind = fbmN(vObjPos * vec3(60.0, 14.0, 60.0), dOct) * 0.15;
-    wind *= ms_polar; // fade out at poles
-
-    // Highland palette: rust to ochre
-    vec3 darkRust = vec3(0.545, 0.145, 0.0);
-    vec3 lightOchre = vec3(0.784, 0.471, 0.235);
-    vec3 hlPal = mix(darkRust, lightOchre, ms_lum);
-
-    detail = mix(detail, hlPal, (crt * 0.25 + wind * 0.15) * ms_isHighland * ms_polar);
-    gDetailHeight += crt * 0.15 * ms_isHighland * ms_polar;
+    // Wind ripples: long east-west streaks = LOW frequency along the
+    // horizontal axes, high along y (the original had it inverted and
+    // painted north-south verticals).
+    float wind = fbmN(vObjPos * vec3(14.0, 60.0, 14.0), dOct);
+    detail = mix(detail, detail * vec3(1.05, 1.02, 0.99), (0.5 + 0.5 * wind) * 0.10 * hl);
   }
 }
 
 // LOWLANDS: smooth northern plains with sparse small craters, east-west streaks
 {
   if (ms_isHighland < 0.999) {
-    float lowlandMask = 1.0 - ms_isHighland;
+    float lowlandMask = (1.0 - ms_isHighland) * ms_polar;
 
-    // Sparse small craters: thinned by hash threshold
-    {
-      vec2 p = vObjPos.xz * 25.0;
+    // Sparse small craters (dUv like the highlands): hash-thinned cells,
+    // staged in below texture resolution like the highland field.
+    float lowCrAct = 1.0 - smoothstep(600.0, 1500.0, uAltitude);
+    if (lowCrAct > 0.001) {
       float cellId;
-      float crater = craterProfile(p, cellId);
-      float sparseMask = fract(cellId * 12.345) > 0.6 ? 1.0 : 0.0; // gate by hash
-      crater *= sparseMask;
-      gDetailHeight += crater * 0.08 * lowlandMask * ms_polar;
+      float crater = craterProfile(dUv * 380.0 + 3.1, cellId);
+      float sparseMask = step(0.65, fract(cellId * 12.345));
+      gDetailHeight += clamp(crater, -1.0, 1.0) * 0.05 * sparseMask
+        * dtlFreqFade2(dUv, 380.0) * lowlandMask * lowCrAct;
     }
 
-    // East-west wind streaks: very elongated (x8), faint
-    float streaks = fbmN(vObjPos * vec3(40.0, 8.0, 40.0), dOct) * 0.08;
-    streaks *= ms_polar;
+    // East-west wind streaks: very elongated, faint.
+    float streaks = fbmN(vObjPos * vec3(8.0, 40.0, 8.0), dOct) * 0.08;
 
     // Subtle lowland tint shift
-    detail = mix(detail, detail * vec3(1.05, 1.0, 0.98), streaks * lowlandMask * 0.1);
+    detail = mix(detail, detail * vec3(1.05, 1.0, 0.98), streaks * lowlandMask * 1.2);
   }
 }
 
-// OLYMPUS MONS: lat 18.65N, lon 226.2E, active below 8,000 km
+// OLYMPUS MONS: lat 18.65N, lon 226.2E, active below 8,000 km.
+// Real proportions: ~600 km across (0.09 rad basal radius), 80 km caldera.
 {
   float olympusAltFade = 1.0 - smoothstep(0.0, 8000.0, uAltitude);
   if (olympusAltFade > 0.001) {
-    float d = acos(clamp(dot(vObjPos, ms_olympusDir), -1.0, 1.0));
+    float d = ms_olympusD;
 
-    // Caldera depression within d < 0.012
+    // Shield rise: the whole edifice is gently raised toward the summit.
+    if (d < 0.10) {
+      gDetailHeight += (1.0 - smoothstep(0.0, 0.10, d)) * 0.25 * olympusAltFade;
+    }
+
+    // Caldera depression (~80 km across ≈ 0.012 rad, centered at summit)
     if (d < 0.012) {
-      gDetailHeight += -0.2 * (1.0 - smoothstep(0.0, 0.012, d)) * olympusAltFade;
+      gDetailHeight += -0.25 * (1.0 - smoothstep(0.004, 0.012, d)) * olympusAltFade;
       detail = mix(detail, detail * 0.85, 0.3 * olympusAltFade);
     }
 
-    // Scarp ring near d ≈ 0.16: a true annulus (the original's two-smoothstep
-    // product degenerated into a filled disc) — Olympus's 8 km basal cliff.
-    float scarp = smoothstep(0.13, 0.155, d) * (1.0 - smoothstep(0.165, 0.19, d));
+    // Basal scarp: Olympus's 8 km cliff at the shield edge — a smooth thin
+    // annulus with gentle brightness variation (ridged-noise blobs read as
+    // a "stone circle" of lumps, measured at 3,000 km).
+    float scarp = smoothstep(0.070, 0.085, d) * (1.0 - smoothstep(0.095, 0.115, d));
     if (scarp > 0.001) {
-      vec3 lavaRidge = ms_olympusDir;
-      vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), lavaRidge));
-      vec3 e2 = cross(lavaRidge, e1);
-      float radialNoise = snoise(vec3(dot(vObjPos - lavaRidge, e1), dot(vObjPos - lavaRidge, e2), 7.3)) * 0.4;
-      float ridgeLine = ridged(vObjPos * 30.0) * 0.7;
-      gDetailHeight += (ridgeLine + radialNoise) * 0.25 * scarp * olympusAltFade;
-      detail = mix(detail, detail * 1.1, scarp * 0.2 * olympusAltFade);
+      float cliff = 0.85 + 0.15 * snoise(vObjPos * 60.0);
+      gDetailHeight += cliff * 0.20 * scarp * olympusAltFade;
+      detail = mix(detail, detail * 1.08, scarp * 0.22 * olympusAltFade);
     }
 
-    // Radial lava-flow texture: noise elongated from center
-    if (d < 0.18) {
-      vec3 lavaCenter = ms_olympusDir;
-      vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), lavaCenter));
-      vec3 e2 = cross(lavaCenter, e1);
-      vec2 lavaUv = vec2(dot(vObjPos - lavaCenter, e1), dot(vObjPos - lavaCenter, e2)) * 20.0;
-      lavaUv.x *= 3.0; // radial stretch
-      float lavaFlow = fbmN(vec3(lavaUv, d * 50.0), dOct) * 0.4;
-      float lavaFade = 1.0 - smoothstep(0.0, 0.18, d);
-      vec3 lavaTint = vec3(0.50, 0.30, 0.15) * lavaFlow;
-      detail = mix(detail, detail + lavaTint, lavaFade * 0.15 * olympusAltFade);
+    // Radial lava-flow texture across the shield flanks.
+    if (d < 0.11) {
+      vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), ms_olympusDir));
+      vec3 e2 = cross(ms_olympusDir, e1);
+      vec2 lavaUv = vec2(dot(vObjPos - ms_olympusDir, e1), dot(vObjPos - ms_olympusDir, e2)) * 60.0;
+      float ang = atan(lavaUv.y, lavaUv.x);
+      // Flows elongate RADIALLY: vary with angle, slowly with distance.
+      float lavaFlow = fbmN(vec3(ang * 3.0, d * 25.0, 4.4), dOct) * 0.4;
+      float lavaFade = 1.0 - smoothstep(0.02, 0.11, d);
+      detail = mix(detail, detail * (1.0 + lavaFlow * 0.25), lavaFade * olympusAltFade);
     }
   }
 }
