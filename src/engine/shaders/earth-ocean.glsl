@@ -34,11 +34,20 @@ if (oceanMask > 0.001 && uDetailBlend > 0.001) {
   // Glint calculation: reflected sun direction aligned with camera view.
   vec3 R = reflect(-uSunObj, nBase);
   float align = max(dot(R, viewDirObj), 0.0);
-  float glint = pow(align, 400.0) * oceanMask * dayside;
+  // V5c bug #42: a fixed pow(400) rendered a ~450 km undithered white disc
+  // at 2,000 km (normal rotation and view rotation nearly cancel at that
+  // altitude, so the lobe decays very slowly across the surface). Sharpness
+  // now scales with altitude — very tight point close, softer wide sparkle
+  // far — and a screen-space dither feathers the rim.
+  float sharpness = mix(6000.0, 150.0, smoothstep(2000.0, 20000.0, uAltitude));
+  float glint = pow(align, sharpness) * oceanMask * dayside;
+  float dither = (fract(gl_FragCoord.x * 0.5 + gl_FragCoord.y) - 0.5) * 0.15;
+  glint = clamp(glint + dither * glint, 0.0, 1.0);
 
-  // Bright white-gold glint, additive into emissive (up to ~1.5 intensity).
+  // Bright white-gold glint, additive into emissive. The 2.5 rise + cap
+  // keeps a hot tight core without a blinding saturated plateau.
   vec3 glintColor = vec3(1.0, 0.95, 0.8); // white-gold
-  gDetailEmissive += glintColor * glint * 1.5 * uDetailBlend;
+  gDetailEmissive += glintColor * min(glint * 2.5, 1.5) * uDetailBlend;
 
   // ========== WHITECAPS ==========
   // Faint white flecks at mid-latitudes, indicating wave action.

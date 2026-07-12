@@ -129,13 +129,18 @@ float ec_polar   = smoothstep(0.88, 0.96, ec_ay);
 }
 
 // LAYER 5 — altitude-staged fine structure: below ~8,000 km the cloud
-// edges erode into puffs instead of smooth blobs (footprint-faded so the
-// extra octave never shimmers at distance).
+// EDGES erode into ragged puffs (footprint-faded so the extra octave never
+// shimmers at distance). V5c bug #42: the old ±0.18 ADDITIVE term speckled
+// entire decks with wall-to-wall dots at low altitude — the puff now only
+// eats where coverage is mid-range (edges); dense centers and clear sky
+// are untouched. Domain warp breaks the simplex-lattice dots-in-rows.
 {
   float lowAlt = 1.0 - smoothstep(3000.0, 8000.0, uAltitude);
   if (lowAlt > 0.001 && ec_cloud > 0.001) {
-    float puff = snoise(ec_flow * 140.0) * dtlFreqFade(ec_flow, 140.0);
-    ec_cloud = clamp(ec_cloud + puff * 0.18 * lowAlt * smoothstep(0.05, 0.4, ec_cloud), 0.0, 1.0);
+    vec3 warp = ec_flow * 140.0 + snoise(ec_flow * 35.0) * 1.7;
+    float puff = snoise(warp) * dtlFreqFade(ec_flow, 140.0) * 0.09;
+    float edgeMask = clamp(1.0 - abs(ec_cloud - 0.5) * 2.5, 0.0, 1.0);
+    ec_cloud = clamp(ec_cloud - puff * edgeMask * lowAlt, 0.0, 1.0);
   }
 }
 
