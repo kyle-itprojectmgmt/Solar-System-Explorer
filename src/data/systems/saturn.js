@@ -42,16 +42,19 @@ export default {
     // Sun direction at the EPOCH in Saturn's equatorial frame. Calibrated
     // the marscal way (the ephemeris FLATTENS this vector's declination and
     // rebuilds it from tilt — the seasonal phase lives in λ0):
-    //   Anchor observable: Saturn's ring-plane equinox on 2009-08-11
-    //   (sun crosses the ring plane, δ = 0 rising) is 1,867 days after the
-    //   epoch = 62.5° of orbital travel, so λ0 = 90° − 62.5° = +27.5°.
-    //   Resulting epoch declination: δ = asin(−cos λ0 · sin 26.73°) =
-    //   −23.5° — matches Cassini SOI imagery (southern summer, south ring
-    //   face sunlit). Vector form (cos λ0·cos tilt, −cos λ0·sin tilt,
-    //   −sin λ0); verified by tests/saturncal.mjs.
-    // NOTE circular-orbit model; Saturn e = 0.056 → subsolar longitude can
-    // lead/lag a few degrees across the 29.5-year orbit. Fine for lighting.
-    direction: [0.7923, -0.3991, -0.4617],
+    //   ANCHOR CHOICE: the circular-orbit model (e = 0.056 real) cannot be
+    //   right at every date across a 29.5-year orbit. Every system opens
+    //   LIVE, and the ring tilt TODAY is the visible seasonal feature — so
+    //   λ0 is anchored to the most recent ring-plane crossing,
+    //   2025-03-23 (sun crossing to the SOUTH ring face, δ = 0 falling):
+    //   7,570 days after the epoch = 253.3° of travel, λ = 270° there →
+    //   λ0 = +16.7°. Costs ~2° of declination back at the 2004 epoch
+    //   (model −25.5° vs real −23.6°) and ~5° around the 2009 equinox —
+    //   accepted so 2020s–2030s LIVE lighting is right (2026: δ ≈ −7°,
+    //   rings nearly edge-on, matching the real sky).
+    //   Vector form (cos λ0·cos tilt, −cos λ0·sin tilt, −sin λ0);
+    //   verified by tests/saturncal.mjs.
+    direction: [0.8556, -0.4309, -0.2874],
   },
 
   primary: {
