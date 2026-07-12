@@ -9,7 +9,7 @@ const BASE = process.env.SMOKE_URL || 'http://localhost:5175';
 
 const JUPITER_SET = ['Io Volcano Flyby', 'Triple Moon Shadow', 'GRS Close Pass', 'Voyager 1979', 'Moon Alignment'];
 const EARTH_SET = ['ISS Orbit View', 'Earthrise', 'Apollo 11', 'City Lights at Night', 'Aurora from Orbit'];
-const MARS_SET = ['Olympus Mons Flyover', 'Valles Marineris', 'Mars Global View', 'Chase Phobos', 'North Polar Cap'];
+const MARS_SET = ['Viking 1', 'Olympus Mons Flyover', 'Valles Marineris', 'Mars Global View', 'Chase Phobos', 'North Polar Cap'];
 
 let pass = 0, fail = 0;
 const check = (name, ok, detail = '') => {

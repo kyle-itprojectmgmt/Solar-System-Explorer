@@ -135,6 +135,27 @@ async function freshPage(url) {
   await page.close();
 }
 
+// ---- Mars (V7 1d): fresh load = LIVE now; Viking 1 preset = 1976 ---------
+{
+  const page = await freshPage(`${BASE}/?system=mars`);
+  const r = await page.evaluate(() => {
+    const { physics, ui } = window.__sse;
+    const out = {};
+    out.liveOn = ui.liveMode === true;
+    out.driftS = Math.abs(physics.epochMs + physics.simSeconds * 1000 - Date.now()) / 1000;
+    const btn = [...document.querySelectorAll('.preset-row')]
+      .find((b) => b.textContent.includes('Viking'));
+    out.vikingBtn = !!btn;
+    btn?.click();
+    out.vikingSimS = physics.simSeconds;
+    out.liveOffAfter = ui.liveMode === false;
+    return out;
+  });
+  check('Mars fresh load: LIVE on at current UTC (not 1976)', r.liveOn && r.driftS < 60, `drift ${r.driftS.toFixed(1)}s`);
+  check('Viking 1 preset -> 1976 epoch + LIVE off', r.vikingBtn && Math.abs(r.vikingSimS) < 60 && r.liveOffAfter);
+  await page.close();
+}
+
 await browser.close();
 const failed = checks.filter((c) => !c).length;
 console.log(failed ? `FAIL (${failed})` : 'PASS');

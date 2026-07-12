@@ -743,6 +743,15 @@ export class UI {
         if (!best) return;
         this._flyToLatLon(best.lat, best.lon, 12000, `City lights — ${best.name} after dark`);
       } },
+      // Mars's epoch moment (V7 1d, house pattern — Voyager for Jupiter,
+      // Apollo 11 for Earth): the only way back to the 1976 epoch now that
+      // every system opens LIVE at current UTC.
+      { label: '🛰️ Viking 1 — 1976', system: 'mars', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('Viking 1 touchdown at Chryse Planitia — July 20, 1976');
+      } },
       { label: '🌋 Olympus Mons Flyover', system: 'mars', fn: () => {
         const preset = this.system.primary.navPresets?.[0];
         if (preset) {
