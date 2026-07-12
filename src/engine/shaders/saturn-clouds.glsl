@@ -48,22 +48,36 @@ vec3 sc_c0 = detail;
   sc_cloud = smoothstep(thr, thr + 0.28, weather) * 0.80;
 }
 
-// LAYER 2 — band turbulence: subtle undulation in the zonal bands.
-// Saturn's bands are faint pastel streaks, not the dramatic dark belts of Jupiter.
+// LAYER 2 — per-latitude band palette (post-v7 hardware fix: the
+// texture-luminance version read as one uniform tan — measured 4%
+// zone/belt contrast). Distinct cream zones / warm brown belts /
+// blue-grey poles, with crisp transitions (blend width halved vs the
+// first cut) and fbm meander so band edges aren't machined circles.
+// The base texture's real storm features survive as a brightness
+// modulation on top of the palette.
 {
-  float bandTurb = fbmN(sc_flow * 12.0 + vec3(0.0, sc_t, 0.0), dOct) * 0.5 + 0.5;
-  float bandMod = mix(0.15, 0.25, bandTurb);  // gentle mix factor
+  float sc_lat = abs(asin(clamp(vObjPos.y, -1.0, 1.0)));
+  vec3 sc_zoneColor = vec3(0.96, 0.93, 0.82);   // bright cream
+  vec3 sc_beltColor = vec3(0.72, 0.52, 0.30);   // warm brown
+  vec3 sc_polarColor = vec3(0.48, 0.56, 0.62);  // blue-grey
 
-  // Derive zone brightness from base texture, like Jupiter/Earth patterns.
-  float sc_lum = dot(detail, vec3(0.299, 0.587, 0.114));
-  float sc_isZone = smoothstep(0.35, 0.50, sc_lum);
+  // ~5 alternating bands per hemisphere, edges meandered by fbm.
+  float sc_bandPos = fract(sc_lat * 3.5 + fbm3(vObjPos * 4.0) * 0.15);
+  float sc_isBelt = smoothstep(0.35, 0.45, sc_bandPos)
+                  * (1.0 - smoothstep(0.85, 0.95, sc_bandPos));
+  float sc_isPolar = smoothstep(1.05, 1.22, sc_lat);
 
-  // Mix zone color (cream-yellow) vs belt color (warm tan) based on texture.
-  vec3 sc_zoneColor = vec3(0.965, 0.91, 0.753);   // pale cream-yellow #F5E8C0
-  vec3 sc_beltColor = vec3(0.784, 0.66, 0.471);   // warm tan #C8A878
-  vec3 sc_bandColor = mix(sc_beltColor, sc_zoneColor, sc_isZone);
+  vec3 sc_bandColor = mix(sc_zoneColor, sc_beltColor, sc_isBelt);
+  sc_bandColor = mix(sc_bandColor, sc_polarColor, sc_isPolar);
 
-  detail = mix(detail, sc_bandColor, bandMod * (sc_subtrop + sc_midlat + sc_polar));
+  // North polar hexagon REGION tint (Fix D): the whole cap above ~69°N
+  // shifts blue-grey — the hexagon boundary layer below adds the shape.
+  float sc_hexRegion = smoothstep(1.20, 1.35, sc_lat) * step(0.0, vObjPos.y);
+  sc_bandColor = mix(sc_bandColor, vec3(0.40, 0.52, 0.65), sc_hexRegion * 0.6);
+
+  // Palette leads; texture luminance carries the real storm detail.
+  float sc_texLum = dot(detail, vec3(0.299, 0.587, 0.114));
+  detail = mix(detail, sc_bandColor * (0.55 + 0.6 * sc_texLum), 0.62);
 }
 
 // LAYER 3 — altitude-staged fine structure below 15,000 km

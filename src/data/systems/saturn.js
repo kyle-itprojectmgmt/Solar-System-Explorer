@@ -107,9 +107,11 @@ export default {
 
     features: { atmosphericGlow: true, equatorialBulge: true },
 
-    // Unified shader convention (V7 1b, surface-base.glsl).
+    // Unified shader convention (V7 1b, surface-base.glsl). Terminator
+    // widened post-v7 (hardware pass): Saturn's thick atmosphere scatters
+    // light well past the geometric shadow line — Earth-like soft band.
     shaderParams: {
-      dayFadeSoft0: -0.12, dayFadeSoft1: 0.10, // gas giant, no hard surface
+      dayFadeSoft0: -0.25, dayFadeSoft1: 0.20,
       grazeFade0: 0.15, grazeFade1: 0.50,
     },
 
