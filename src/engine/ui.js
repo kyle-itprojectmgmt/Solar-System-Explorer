@@ -861,6 +861,108 @@ export class UI {
         const dark = north && north.dot(sunW) > 0 ? [-74, 127] : [82, -111];
         this._flyToLatLon(dark[0], dark[1], 4500, 'Auroral oval — curtains shimmer above 1,000 km');
       } },
+      // — V8: Mercury / Venus / Uranus / Neptune. Epoch presets follow the
+      // Voyager/Apollo/Viking house pattern; insertion presets setMode
+      // FIRST then setInsertion (entry re-derives altitude — house rule).
+      { label: '🛰️ MESSENGER — 2011', system: 'mercury', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('MESSENGER orbit insertion — March 18, 2011');
+      } },
+      { label: '💥 Caloris Basin', system: 'mercury', fn: () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Descending to Caloris Basin…');
+        }
+      } },
+      { label: '🌗 Terminator Line', system: 'mercury', fn: () => {
+        const preset = this.system.primary.navPresets?.[1];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Skirting the 600°C divide…');
+        }
+      } },
+      { label: '🌍 Global Mercury', system: 'mercury', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 8000, incDeg: 30 });
+        this.notify('Global view — the most cratered planet');
+      } },
+      { label: '🛰️ Magellan — 1990', system: 'venus', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('Magellan orbit insertion — August 10, 1990');
+      } },
+      { label: '☁️ Cloud Ocean', system: 'venus', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 12000, incDeg: 20 });
+        this.notify('The endless sulfuric acid cloud deck');
+      } },
+      { label: '🌀 Polar Vortex', system: 'venus', fn: () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Descending to the polar vortex…');
+        }
+      } },
+      { label: '🌒 Crescent Venus', system: 'venus', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 50000, incDeg: 0 });
+        this.notify('Crescent Venus — brighter than any star from Earth');
+      } },
+      { label: '🛰️ Voyager 2 — 1986', system: 'uranus', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('Voyager 2 at Uranus — January 24, 1986 (south pole sunward)');
+      } },
+      { label: '🌀 Polar Sun View', system: 'uranus', fn: () => {
+        // LIVE-era signature: the sun stands near the north pole until the
+        // ~2028 solstice — a polar orbit shows the bullseye lighting.
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 45000, incDeg: 90 });
+        this.notify('Polar orbit — sunlight straight down the pole, like no other planet');
+      } },
+      { label: '💍 Narrow Rings', system: 'uranus', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 35000, incDeg: 15 });
+        this.notify('Nine charcoal threads — nothing like Saturn\'s bright ice');
+      } },
+      { label: '🏔️ Verona Rupes', system: 'uranus', fn: () => {
+        this.cam.setMode('insertion', 'Miranda');
+        this.cam.setInsertion({ altitudeKm: 400, incDeg: 30 });
+        this.notify('Miranda — the 20 km cliff, tallest in the solar system');
+      } },
+      { label: '🛰️ Voyager 2 — 1989', system: 'neptune', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        this.notify('Voyager 2 at Neptune — August 25, 1989, the last flyby');
+      } },
+      { label: '🔵 Deep Blue Neptune', system: 'neptune', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 40000, incDeg: 20 });
+        this.notify('The most vivid blue in the solar system');
+      } },
+      { label: '🌀 Great Dark Spot', system: 'neptune', fn: () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Approaching the Great Dark Spot…');
+        }
+      } },
+      { label: '💨 Triton Geysers', system: 'neptune', fn: () => {
+        this.cam.setMode('insertion', 'Triton');
+        this.cam.setInsertion({ altitudeKm: 300, incDeg: 80 });
+        this.notify('South polar pass — nitrogen geysers on the coldest surface known');
+      } },
+      { label: '🍈 Cantaloupe Terrain', system: 'neptune', fn: () => {
+        this.cam.setMode('insertion', 'Triton');
+        this.cam.setInsertion({ altitudeKm: 500, incDeg: 20 });
+        this.notify('Terrain found nowhere else in the solar system');
+      } },
     ];
     this.voyagerBtn = null;
     for (const p of curated) {

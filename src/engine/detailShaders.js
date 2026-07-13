@@ -30,6 +30,12 @@ import ARES_POLAR from './shaders/mars-polar.glsl?raw';
 import KRONOS_CLOUDS from './shaders/saturn-clouds.glsl?raw';
 import ENCELADUS_DETAIL from './shaders/enceladus.glsl?raw';
 import IAPETUS_DETAIL from './shaders/iapetus.glsl?raw';
+import HERMES_SURFACE from './shaders/mercury-surface.glsl?raw';
+import APHRODITE_CLOUDS from './shaders/venus-clouds.glsl?raw';
+import OURANOS_CLOUDS from './shaders/uranus-clouds.glsl?raw';
+import MIRANDA_DETAIL from './shaders/miranda-surface.glsl?raw';
+import POSEIDON_CLOUDS from './shaders/neptune-clouds.glsl?raw';
+import TRITON_DETAIL from './shaders/triton-surface.glsl?raw';
 
 /** Registry of detail styles. Populated per body type below. */
 export const DETAIL_STYLES = {};
@@ -520,6 +526,76 @@ DETAIL_STYLES.iapetus = {
   apply: /* glsl */ `
     ${DETAIL_PREAMBLE}
     { ${iapetusDetail.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+// -- Hermes (Mercury) + Aphrodite (Venus) + Ouranos/Miranda (Uranus) +
+// -- Poseidon/Triton (Neptune) — V8 worker shader chunks ---------------------------
+// Same brace-isolated chunk pattern as terra/ares/kronos. One chunk per
+// style; the cloud styles (aphrodite/ouranos/poseidon) run on gas-giant
+// altitude-staged octaves, the surface styles on moon octaves.
+
+const hermesSurface = splitChunk(HERMES_SURFACE);
+const aphroditeClouds = splitChunk(APHRODITE_CLOUDS);
+const ouranosClouds = splitChunk(OURANOS_CLOUDS);
+const mirandaDetail = splitChunk(MIRANDA_DETAIL);
+const poseidonClouds = splitChunk(POSEIDON_CLOUDS);
+const tritonDetail = splitChunk(TRITON_DETAIL);
+
+DETAIL_STYLES.hermes = {
+  fns: hermesSurface.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${hermesSurface.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.aphrodite = {
+  fns: aphroditeClouds.fns,
+  octaves: OCTAVES_GAS_GIANT,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${aphroditeClouds.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.ouranos = {
+  fns: ouranosClouds.fns,
+  octaves: OCTAVES_GAS_GIANT,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${ouranosClouds.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.miranda = {
+  fns: mirandaDetail.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${mirandaDetail.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.poseidon = {
+  fns: poseidonClouds.fns,
+  octaves: OCTAVES_GAS_GIANT,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${poseidonClouds.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.triton = {
+  fns: tritonDetail.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${tritonDetail.apply} }
     ${DETAIL_FINAL}
   `,
 };
