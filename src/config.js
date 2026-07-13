@@ -15,6 +15,7 @@ export const APP_URL = 'https://app.solarexplorer.co';
 // Systems with a complete config in /src/data/systems/<name>.js.
 // Append new systems here as their configs land.
 export const AVAILABLE_SYSTEMS = [
+  'sun', // first — the center of everything (V9)
   'jupiter', 'earth', 'mars', 'saturn',
   'mercury', 'venus', 'uranus', 'neptune',
 ];

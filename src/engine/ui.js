@@ -511,7 +511,9 @@ export class UI {
   _buildAltPanel(c) {
     // Continuous logarithmic altitude slider — equal travel = equal zoom
     // factor; readout tracks the camera live (see update()).
-    const ALT_MIN = 50, ALT_MAX = 500000;
+    // Ceiling is config-driven (V9): the Sun's usable altitudes run to
+    // 5,000,000 km — 500,000 km is under one solar radius.
+    const ALT_MIN = 50, ALT_MAX = this.system.primary.maxInsertionAltKm ?? 500000;
     this._altT = (km) => Math.log10(km / ALT_MIN) / Math.log10(ALT_MAX / ALT_MIN);
     this._altKm = (t) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, t);
     this.altSec = el('div', 'side-section', c);
@@ -636,7 +638,21 @@ export class UI {
     for (const p of SOLAR_SYSTEM) {
       const isCurrent = p.name === this.system.primary.name;
       const row = el('button', 'body-row', list);
-      if (p.star) {
+      if (p.star && isCurrent) {
+        // The Sun IS the active system (V9).
+        row.classList.add('current');
+        row.innerHTML = '<span>☀️ Sun</span><span class="here-badge">HERE</span>';
+        row.onclick = () => { this.cam.focusBody(p.name); this.showInfo(p.name); };
+        this._sunRow = row;
+      } else if (p.star && AVAILABLE_SYSTEMS.includes('sun')) {
+        // Built star system: travel row (V9), same flow as the planets.
+        row.innerHTML = '<span>☀️ Sun</span><span class="body-chev">→</span>';
+        row.onclick = () => {
+          this.notify('Traveling to the Sun…');
+          switchSystem('sun');
+        };
+        this._sunRow = row;
+      } else if (p.star) {
         row.innerHTML = '<span>☀️ Sun</span>';
         row.onclick = () => this.notify('Solar Observatory — coming in a future update');
         this._sunRow = row;
@@ -1262,6 +1278,30 @@ export class UI {
       };
       applyDust(initial);
     }
+
+    // Solar Activity (V9): star systems only — drives sunspot count, corona
+    // brightness, and flare frequency through the shared uActivity uniform.
+    if (this.system.isStar) {
+      const cond = section(c, 'Solar Activity');
+      const initial = this.r.sunActivity ?? 0.75;
+      const readout = el('div', 'alt-readout', cond);
+      readout.style.color = '#FFB800'; // Solar Gold — Sun-specific accent
+      this.activitySlider = el('input', 'slider', cond);
+      Object.assign(this.activitySlider, { type: 'range', min: 0, max: 1, step: 0.01, value: initial });
+      el('div', 'ins-scale', cond).innerHTML = '<span>Solar Min</span><span>Solar Max</span>';
+      el('p', 'panel-desc', cond).textContent =
+        'The 11-year solar cycle — sunspots, flares, and corona brightness';
+      const applyActivity = (v) => {
+        readout.textContent = `SOLAR ACTIVITY: ${Math.round(v * 100)}%`;
+        this.r.setSunActivity?.(v);
+      };
+      this.activitySlider.oninput = () => {
+        const v = +this.activitySlider.value;
+        applyActivity(v);
+        localStorage.setItem('sse-sun-activity', String(v));
+      };
+      applyActivity(initial);
+    }
   }
 
   // -- 6f Help panel ----------------------------------------------------------------------
@@ -1313,7 +1353,7 @@ export class UI {
   // -- Orbit insertion panel --------------------------------------------------------
 
   _buildInsertionPanel() {
-    const ALT_MIN = 10, ALT_MAX = 500000;
+    const ALT_MIN = 10, ALT_MAX = this.system.primary.maxInsertionAltKm ?? 500000;
     const altToT = (km) => Math.log10(km / ALT_MIN) / Math.log10(ALT_MAX / ALT_MIN);
     const tToAlt = (t) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, t);
 
@@ -1942,7 +1982,11 @@ export class UI {
       spd: 'SPD — Orbit speed',
     };
     for (const [id, b] of Object.entries(this.stackButtons)) t.attach(b, stackTips[id]);
-    t.attach(this._sunRow, 'Solar Observatory — coming in a future update');
+    t.attach(this._sunRow, this.system.isStar
+      ? 'The Sun — you are here'
+      : AVAILABLE_SYSTEMS.includes('sun')
+        ? 'Travel to the Sun — photosphere, corona, and solar activity'
+        : 'Solar Observatory — coming in a future update');
 
     // Mode indicator: free look hint (2b).
     t.attach(this.modeEl, 'Hold Alt to look around freely while maintaining orbital position');
