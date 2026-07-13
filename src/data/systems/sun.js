@@ -49,7 +49,9 @@ export default {
     rotationPhaseAtEpochDeg: 84.176,
 
     surfaceGravity: 274.0,             // m/s²
-    surfaceTempRange: [5500, 5778],    // K — photosphere (body card)
+    // Body card renders °C: sunspot umbra (~3,700 K) to photosphere
+    // (~5,772 K effective temperature).
+    surfaceTempRange: [3430, 5500],
 
     // No textures — fully procedural surface.
     textures: {},

@@ -454,6 +454,9 @@ export class SceneRenderer {
     this.root.add(coronaMesh);
 
     this.sunMats = { photoMat, chromoMat, coronaMat };
+    // Exposed for the diff-render test probes (house rule: halo visibility
+    // is measured with-vs-without the shell, never by raw luminance).
+    this.sunMeshes = { photo: this.primaryMesh, chromo: chromoMesh, corona: coronaMesh };
     this.bodyMeshes.set(p.name, {
       cfg: p, mesh: this.primaryMesh, group: this.primaryMesh,
       radiusUnits: R, isPrimary: true,

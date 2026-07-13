@@ -990,6 +990,28 @@ export class UI {
         this.cam.setInsertion({ altitudeKm: 500, incDeg: 20 });
         this.notify('Terrain found nowhere else in the solar system');
       } },
+      // V9 Sun presets. House rule: setMode FIRST, then setInsertion —
+      // entry re-derives altitude from camera distance otherwise.
+      { label: '☀️ Corona View', system: 'sun', fn: () => {
+        this.cam.setMode('insertion', 'Sun');
+        this.cam.setInsertion({ altitudeKm: 500000, incDeg: 20 });
+        this.notify('The million-degree corona — hotter than the surface below it');
+      } },
+      { label: '🌞 Photosphere Close-Up', system: 'sun', fn: () => {
+        this.cam.setMode('insertion', 'Sun');
+        this.cam.setInsertion({ altitudeKm: 100000, incDeg: 0 });
+        this.notify('Granulation cells — each bright island is rising plasma the size of Texas');
+      } },
+      { label: '🌀 Polar Plumes', system: 'sun', fn: () => {
+        this.cam.setMode('insertion', 'Sun');
+        this.cam.setInsertion({ altitudeKm: 300000, incDeg: 80 });
+        this.notify('Polar pass — plumes fan out here near solar minimum (try the VIEW slider)');
+      } },
+      { label: '🔆 Solar Limb', system: 'sun', fn: () => {
+        this.cam.setMode('insertion', 'Sun');
+        this.cam.setInsertion({ altitudeKm: 1200000, incDeg: 0 });
+        this.notify('The full disc — chromosphere ring and prominence arcs at the limb');
+      } },
     ];
     this.voyagerBtn = null;
     for (const p of curated) {
