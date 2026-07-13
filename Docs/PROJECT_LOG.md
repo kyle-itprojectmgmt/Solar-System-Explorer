@@ -1269,6 +1269,99 @@ landing page at the apex is separate and unchanged). Changes:
   needed: disable RUM injection in the dashboard (privacy-policy
   aligned) or allow it in CSP script-src/connect-src.
 
+### v9 — The Sun: First Star System (Complete — 2026-07-12, commits 05e090e → see final + docs)
+Per Docs/V9_SUN.md. Version 9.0.0. NAV now travels all 8 planets AND the
+Sun. Live-verified: all 9 systems at v9.0.0 on app.solarexplorer.co and
+workers.dev, zero console errors, security suite 28/28 vs the live URL,
+npm audit clean.
+
+**Prompt-vs-reality (grounded before any work — the V8 lesson):** no
+`radiusNormalized` exists ("Jupiter = 1.0 world units" is false — the
+engine is true-scale km, KM_PER_UNIT 1000), so the Sun ships at real
+radiusKm 696,000 (696 units; log depth buffer + the 1.8e6-unit starfield
+absorb it). The prompt's corona pseudocode sampled length(vWorldPos) for
+radial falloff — CONSTANT on a shell; replaced with the view ray's IMPACT
+PARAMETER b (closest approach to the origin), which is the correct
+"distance from the sun" for any glow shell. The prescribed PointLight
+"illuminating the corona from inside" was dropped — every sun material is
+an emissive raw shader that ignores scene lights. Config-side
+curatedPresets still don't exist (presets live in the ui.js tagged list).
+
+**Phase 1 — isStar infrastructure (orchestrator):**
+- system.isStar branches: _buildSunLights (ambient only — no directional
+  sun, no planet-shine, no sprite/lens flare) and _buildSunPrimary
+  (photosphere sphere + chromosphere 1.005x + corona 8x BackSide additive
+  shells, all with the V7 logdepthbuf chunks). _syncSunDirection guarded.
+- Config-driven maxInsertionAltKm (default 500,000; Sun 5,000,000 —
+  500,000 km is less than one solar radius above the photosphere): camera
+  entry/zoom/setInsertion clamps + both ui.js ALT slider ceilings.
+- main.js loading fix: a texture-less system never fires
+  loadingManager.onLoad — isStar reveals after 600 ms instead of the 12 s
+  fallback stall.
+- NAV star row: HERE badge when current, travel row when built, stub
+  otherwise. SOLAR ACTIVITY slider in VIEW (star systems only, Solar Gold
+  readout, sse-sun-activity persisted, default 0.75 = Cycle 25 max).
+- sun.js skeleton: J2000 epoch, star block for engine parity
+  (distanceAU 0 makes the HUD signal-delay formula yield the true ~8 min
+  20 s to Earth), IAU W0 = 84.176° rotation phase, Carrington 609.12 h.
+- Gate: tests/sunskeleton.mjs (15) + full 18-suite regression green
+  BEFORE workers spawned.
+
+**Phase 2 — 4 parallel Haiku workers, exclusive file ownership:**
+W1 sun-photosphere.glsl, W2 sun-corona + sun-chromosphere, W3
+sun-spots.glsl (a GLSL library prepended to the photosphere fragment —
+no RTT pass; spot state lives on the CPU), W4 sun.js completion. The
+house rule held a FIFTH time — review caught real bugs BEFORE commit:
+the 2-plane worley2 projection degenerated (equatorial bands stretch into
+a near-1D domain + hemispheres mirror; fixed with a LOCAL 3D worley
+(ph_worley3) sampled directly on the sphere direction — no projection at
+all); faculae threshold inverted (1−smoothstep(0,…) selected the dark
+HALF of the noise field, ~50% coverage instead of sparse bright patches);
+corona polar plumes had no radial attenuation (constant fan to the shell
+edge with a hard cut at b=8); sunspot filaments normalized a zero vector
+at the exact spot center (NaN propagates through 0*NaN).
+
+**Phase 3 — integration + measured calibration:**
+- Sunspot lifecycle (CPU): spawn in the ±30° belt, drift at the residual
+  Snodgrass rate (the SAME residual the granulation shader uses, so spots
+  stay pinned to their plasma; the mesh carries the equatorial term —
+  rotationPhaseAtEpochDeg stays meaningful), 7–21 sim-day lives, count
+  tracks the activity slider with ~1.5 s wall-clock spawn/retire blends
+  folded into the shader's age-fade windows (a sim-day fade is invisible
+  at 1×).
+- Differential rotation precision: uTime wraps at 1e6 s (drifts use the
+  closed-loop circular noise trick, integer K — granulation K=1667 ≈
+  600 s cycle); the unwrapped uDays uniform carries the secular residual
+  drift (float32-safe for decades where raw simSeconds is not).
+- Flares: particle arcs from live sunspots (80 sprites along a loop,
+  additive, parented to the photosphere mesh in unit object space so they
+  ride rotation), wall-clock 4–9 s lives, probability ∝ activity × spot
+  count with a mild log10(multiplier) boost. Prominences: 4 deterministic
+  (mulberry32) CatmullRom tube loops at the limb, calibrated from
+  cartoon-red rings (0.5 opacity) to thin deep-red plasma arcs.
+- Screenshot calibration (3 rounds, house precedent): granulation LOD —
+  dtlFreqFade at freq 8/20 fades each worley octave toward its mean well
+  before sub-pixel, so the disc is granulated at ≤500k km and a clean
+  limb-darkened disc by ~2–3M km (the first cut read as white confetti
+  from orbit — the v4b shimmer class); output gain 1.6 → 1.35 (blown
+  whites); body-card temps corrected to °C (fmtTempRange renders °C —
+  Kelvin values would have mislabeled).
+- 4 Sun curated presets in the ui.js tagged list (setMode FIRST, then
+  setInsertion — the v6 order rule).
+- Suites: tests/suntest.mjs NEW (28 — limb darkening via analytic disc
+  projection because the insertion forward tilt offsets the disc; corona
+  diff-render VISIBLE at 500k / OCCLUDED at 50k; spot-count-vs-slider;
+  flare spawn+cleanup; presets incl. the 1.2M km altitude surviving
+  entry; Sun→Earth/Jupiter cross-system lighting restoration),
+  sunshots.mjs (5 calibration screenshots), prodboot.mjs (all-9-systems
+  boot probe, works on preview AND live). GOTCHA: diff-render probes must
+  pause physics + double-render raw (renderer.render + readPixels in ONE
+  evaluate) — the postfx film grain is temporal and defeats
+  screenshot-pair diffs (first probe version measured grain, not corona).
+- Full regression green at 9.0.0: all 20 prior suites + sunskeleton 15 +
+  suntest 28. Deployed (7ea4abd6); both URLs live-verified — first probe
+  hit the stale edge cache (v8.0.1 for ~20 s), second pass clean.
+
 ---
 
 ## Known Bugs / In Progress
@@ -1340,7 +1433,8 @@ landing page at the apex is separate and unchanged). Changes:
 | 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard (matches the no-analytics Privacy Policy stance) or allow the host in CSP script-src + connect-src. workers.dev is unaffected. | Needs decision | — |
 | 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. ALSO (v8.0.1): Moon wrinkle-ridge patches read as dark spidery squiggles at ~2,500 km (relief shading under normalScale 2.5; knobs: wRegion/wrinkles in moon-detail.glsl LAYER 2). | Needs review | V8_REMAINING_PLANETS.md |
 | 64 | Mercury terminator longitude: the circular ephemeris cannot track e = 0.206 — subsolar longitude oscillates ±23° (equation of center) around the mean-longitude anchor every 88-day year. Zero-mean by construction; fine for lighting. Refine when the ephemeris gains eccentricity (same item as the Mars ±10° note in mars.js). | Data choice — ephemeris eccentricity is a backlog item | — |
-| 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only; the roadmap's outer-system line originally listed Pluto too. NAV shows Pluto as Coming Soon. A V9 session could add it (Pluto+Charon binary barycenter would be a new physics pattern). | Future session | — |
+| 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only; the roadmap's outer-system line originally listed Pluto too. NAV shows Pluto as Coming Soon. A future session could add it (Pluto+Charon binary barycenter would be a new physics pattern; V9 built the Sun instead). | Future session | — |
+| 66 | V9 Sun shader calibration done from headless screenshots — granulation cell scale/contrast, corona streamer balance vs polar plumes, chromosphere rim strength, prominence subtlety, flare frequency/brightness may need real-hardware tuning (joins the #9/#27/#56/#63 eyeball-pass class). Knobs: uGranScale/limbDarkeningCoeff/supergranulationAmp in sun.js photosphere block, dtlFreqFade freqs + 1.35 gain in sun-photosphere.glsl, baseOpacity/activityScale in the corona block, prominence opacity/tubeR in renderer._buildProminences, flare probability constant 0.0025 in _updateSolarFlares. | Needs review | V9_SUN.md |
 
 ---
 
@@ -1354,7 +1448,7 @@ landing page at the apex is separate and unchanged). Changes:
 | 4 | Release preparation — supporting pages | Add About page (project story, AI-built in 48hrs narrative, tech stack, author bio linking to ITprojectMGMT.com and LinkedIn), Contact page (kyle@itprojectmgmt.com), Legal/Disclaimer page (NASA texture credits and CC BY 4.0 attribution, Solar System Scope CC BY 4.0, Björn Jónsson public domain credits, no warranty disclaimer, not affiliated with NASA or any space agency), Privacy Policy (no tracking, no user data collected, localStorage only for user preferences, no cookies, no analytics). All pages accessible from a minimal persistent footer. Style matches brand. Mobile-friendly. |
 | 5 | ~~Release preparation — security hardening~~ | DONE v7 (1a): CSP + XFO + XCTO + Referrer-Policy + Permissions-Policy + COOP + CORP via public/_headers (Workers Static Assets); security.txt; embed URL sanitization; npm audit clean; no secrets in source (audited); localStorage holds prefs only. NOT done: SRI on Google Fonts (their CSS is dynamically generated per-UA — SRI hashes won't hold; CSP style-src/font-src pinning covers the risk); ISS API rate limiting (feature not built). Observatory scan on the live URL logged below. |
 | 6 | Sharpness calibration eyeball pass | Bug #9 — review relief/crater/speckle strength on real hardware; knobs: normalScale in jupiter.js, gDetailHeight weights in detailShaders.js |
-| 7 | Sun — basic corona visuals | Sun sits in the Bodies panel (v4c) with a Solar Observatory stub toast. Remaining: subtle corona glow shader, slow sunspot texture, occasional flare particles. Full Solar Observatory mode = V6+. |
+| 7 | ~~Sun — basic corona visuals~~ | DONE v9 — far exceeded: the Sun is a full navigable system (photosphere granulation with differential rotation, corona streamers + polar plumes, chromosphere, sunspot lifecycle, flares, prominences, solar activity slider). |
 | 8 | System-wide labels | Toggle exists in the Display panel (v4c stub) — implement with the Solar System Orrery view. |
 | 9 | Velocity vectors | Toggle exists in the Display panel (v4c stub) — draw per-moon velocity arrows in System View. |
 | 10 | Steve Albers attribution — confirm before launch | Check renderer.js and config files for any runtime fetches from stevealbers.net (grep -r "stevealbers" src/). If textures downloaded locally, add Steve Albers credit to legal/credits page. His Galilean moon maps are non-commercial use by permission — attribution required. Compiled from NASA/JPL + Björn Jónsson data. |
@@ -1396,7 +1490,10 @@ V7  — Saturn — DONE (textured ring system + Cassini Division, ring shadows
 V8  — Mercury + Venus + Uranus + Neptune — DONE (all 8 planets live;
       Triton retrograde + geysers, Miranda coronae, Venus super-rotation,
       Uranus polar-sun geometry + narrow rings; Pluto NOT built — bug #65)
-V9  — Pluto + Charon (binary barycenter), Sun corona, orrery view
+V9  — The Sun — DONE (first star system: photosphere granulation +
+      differential rotation, corona, chromosphere, sunspots, flares,
+      prominences, solar activity slider; isStar engine path)
+V10 — Pluto + Charon (binary barycenter), Solar System Orrery view
 ```
 
 ### Build Order Decision — Mars Before Saturn

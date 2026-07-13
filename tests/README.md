@@ -95,6 +95,24 @@ SMOKE_URL=http://localhost:5173 node tests/livedefault.mjs
 # surface" report was the city-light speckle grid (simplex-lattice dot
 # rows), fixed by domain-warping the speckle in earth-lights.glsl.
 
+# v9 additions (The Sun — first star system):
+SMOKE_URL=http://localhost:5173 node tests/sunskeleton.mjs
+# Phase-1 gate (15 checks): isStar build path, true-scale 696-unit radius,
+# no directional light, NAV travel row, activity slider + persistence,
+# config-driven 5M km ALT ceiling, zero console errors both directions.
+SMOKE_URL=http://localhost:5173 node tests/suntest.mjs
+# Full sun suite (28 checks): limb darkening (analytic disc projection —
+# the insertion forward tilt offsets the disc, never guess pixel coords),
+# granulation patch spread, sunspot count vs activity slider, corona
+# diff-render visible at 500k km / occluded at 50k km, chromosphere rim,
+# flare spawn+cleanup, 4 curated presets, cross-system regression.
+# NOTE: diff-render probes MUST use the haloshots.mjs technique (pause
+# physics + raw renderer.render + readPixels twice in ONE evaluate) — the
+# postfx film grain is temporal and defeats screenshot-pair diffs.
+SMOKE_URL=http://localhost:5173 node tests/sunshots.mjs
+# Calibration screenshots (corona 500k, photosphere 100k, mid 250k,
+# solar-minimum polar, wide 2M) → tests/shots/sun-*.png for eyeball review.
+
 # sun-calibration hotfix guard:
 SMOKE_URL=http://localhost:5173 node tests/suncal.mjs
 # Subsolar point (geographic lat/lon) vs the real sun at 4 UTC dates
