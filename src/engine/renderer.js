@@ -458,6 +458,195 @@ export class SceneRenderer {
       cfg: p, mesh: this.primaryMesh, group: this.primaryMesh,
       radiusUnits: R, isPrimary: true,
     });
+
+    // Sunspot lifecycle state (3d): CPU-side — spots spawn in the activity
+    // belt, drift with differential rotation, and decay over sim-days.
+    this.sunspots = [];
+    this._sunSimLast = null;
+    this.solarFlares = [];
+    this._buildProminences();
+  }
+
+  /** Prominences (3c): plasma loops at the limb — TubeGeometry arcs
+   *  parented to the photosphere MESH (unit object space; the mesh's
+   *  uniform scale and rotation carry them). MeshBasicMaterial is a
+   *  built-in — it inherits log-depth support automatically. */
+  _buildProminences() {
+    const rand = mulberry32(20260712); // deterministic placement
+    this.prominences = [];
+    for (let i = 0; i < 4; i++) {
+      const lat = (rand() - 0.5) * 1.1;          // within ±~31°
+      const lon = rand() * Math.PI * 2;
+      const span = 0.10 + rand() * 0.08;         // angular footprint (rad)
+      const hFrac = 0.05 + rand() * 0.05;        // loop apex: 35k–70k km
+      const azim = rand() * Math.PI * 2;         // footpoint azimuth
+      const A = latLonDir(lat, lon);
+      const t1 = new THREE.Vector3(0, 1, 0).cross(A).normalize();
+      const t2 = A.clone().cross(t1);
+      const step = t1.clone().multiplyScalar(Math.cos(azim))
+        .add(t2.clone().multiplyScalar(Math.sin(azim)));
+      const B = A.clone().addScaledVector(step, span).normalize();
+      const pts = [];
+      for (let k = 0; k <= 16; k++) {
+        const t = k / 16;
+        const dir = A.clone().lerp(B, t).normalize();
+        pts.push(dir.multiplyScalar(1.0 + hFrac * Math.sin(t * Math.PI)));
+      }
+      const tubeR = 0.005 + rand() * 0.005; // 3.5k–7k km plasma rope
+      // Calibration: 0.5-opacity bright red read as cartoon rings floating
+      // off the limb — thinner, dimmer, deeper red reads as plasma.
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xc22808, transparent: true, opacity: 0.3,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const tube = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, tubeR, 8, false),
+        mat);
+      tube.renderOrder = 1;
+      this.primaryMesh.add(tube);
+      this.prominences.push(tube);
+    }
+  }
+
+  /** Sunspot lifecycle (3d) + flare triggers (3b). Sim-time driven: spots
+   *  live 7–21 sim-days and drift with the same residual Snodgrass rate the
+   *  photosphere granulation uses, so they stay pinned to their plasma.
+   *  Spawn/retire visibility blends over ~1.5 wall-seconds so the activity
+   *  slider feels immediate (a sim-day fade is invisible at 1×). */
+  _updateSunspots(physics, dt) {
+    const cfg = this.system.primary.sunspots || {};
+    const simNow = physics.simSeconds;
+    const dtSim = this._sunSimLast === null ? 0 : simNow - this._sunSimLast;
+    this._sunSimLast = simNow;
+
+    const maxCount = Math.min(cfg.maxCount ?? 12, 12);
+    const target = Math.round(this.sunActivity * maxCount);
+    const belt = ((cfg.activityBeltDeg ?? 30) * Math.PI) / 180;
+
+    // Age + drift (differential-rotation residual, matches the shader).
+    for (const s of this.sunspots) {
+      s.age += dtSim;
+      const s2 = Math.sin(s.lat) ** 2;
+      const residDegPerDay = -(2.396 * s2 + 1.787 * s2 * s2);
+      s.lon += (residDegPerDay * Math.PI / 180) * (dtSim / 86400);
+      // Wall-clock spawn/retire blend.
+      s.blend = THREE.MathUtils.clamp(s.blend + (s.dying ? -dt : dt) * 0.7, 0, 1);
+    }
+    // Natural death + slider-down retirement.
+    this.sunspots = this.sunspots.filter((s) => !(s.blend <= 0 && (s.dying || s.age >= s.maxAge)));
+    for (const s of this.sunspots) if (s.age >= s.maxAge) s.dying = true;
+    const alive = this.sunspots.filter((s) => !s.dying);
+    for (let i = alive.length - 1; i >= target; i--) alive[i].dying = true;
+    // Spawn up to target (revive nothing — fresh spots only).
+    while (this.sunspots.filter((s) => !s.dying).length < target
+      && this.sunspots.length < 12) {
+      this.sunspots.push({
+        lat: (Math.random() * 2 - 1) * belt,
+        lon: Math.random() * Math.PI * 2,
+        radius: 0.02 + Math.random() * 0.04,   // angular radius (rad)
+        age: 0,
+        maxAge: (7 + Math.random() * 14) * 86400, // 7–21 sim-days
+        blend: 0,
+        dying: false,
+      });
+    }
+
+    // Write the (frozen) uniform contract. Presented age folds the
+    // wall-clock blend into the shader's fade-in/fade-out windows.
+    const u = this.sunMats.photoMat.uniforms;
+    const n = Math.min(this.sunspots.length, 12);
+    for (let i = 0; i < n; i++) {
+      const s = this.sunspots[i];
+      u.uSpotPos.value[i].set(s.lat, s.lon);
+      u.uSpotRad.value[i] = s.radius;
+      const simAge = THREE.MathUtils.clamp(s.age / s.maxAge, 0, 1);
+      u.uSpotAge.value[i] = s.dying
+        ? Math.max(simAge, 1.0 - 0.25 * s.blend)   // retire: run out the fade window
+        : Math.min(Math.max(simAge, 0.15 * s.blend), 0.75); // spawn: fade in, hold visible
+    }
+    u.uSpotCount.value = n;
+
+    this._updateSolarFlares(dt);
+  }
+
+  /** Solar flares (3b): brief particle arcs erupting from active sunspots.
+   *  Wall-clock lifetime (a flare is an "event", not a physics body) with a
+   *  mild boost at high time multipliers. PointsMaterial is a built-in —
+   *  log-depth safe. Parented to the photosphere mesh in unit object space
+   *  so arcs ride the rotation. */
+  _updateSolarFlares(dt) {
+    // Advance + cull live flares.
+    for (const f of this.solarFlares) {
+      f.life += dt;
+      const t = f.life / f.duration;
+      if (t >= 1) {
+        this.primaryMesh.remove(f.points);
+        f.points.geometry.dispose();
+        f.points.material.dispose();
+        f.done = true;
+        continue;
+      }
+      // Particles sweep along the arc; brightness spikes then decays.
+      const arr = f.points.geometry.attributes.position.array;
+      for (let i = 0; i < f.count; i++) {
+        const pt = (f.seeds[i] * 0.4 + t * 0.8) % 1;
+        const k = Math.min(f.arc.length - 1, Math.floor(pt * (f.arc.length - 1)));
+        const p = f.arc[k];
+        arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z;
+      }
+      f.points.geometry.attributes.position.needsUpdate = true;
+      f.points.material.opacity = 0.9 * (t < 0.2 ? t / 0.2 : 1 - (t - 0.2) / 0.8);
+    }
+    this.solarFlares = this.solarFlares.filter((f) => !f.done);
+
+    // Trigger: per active spot per second, scaled by activity and (mildly)
+    // by time multiplier. At 100% activity with 12 spots ≈ one flare every
+    // ~30 wall-seconds at 1×.
+    const mult = this.system.isStar ? (this._lastMult ?? 1) : 1;
+    const boost = Math.min(3, 1 + Math.log10(Math.max(1, mult)));
+    const live = this.sunspots.filter((s) => !s.dying && s.blend > 0.5);
+    const p = live.length * this.sunActivity * 0.0025 * boost * dt;
+    if (live.length && Math.random() < p && this.solarFlares.length < 4) {
+      const s = live[Math.floor(Math.random() * live.length)];
+      this._spawnFlare(s);
+    }
+  }
+
+  _spawnFlare(spot) {
+    const A = latLonDir(spot.lat, spot.lon);
+    const azim = Math.random() * Math.PI * 2;
+    const t1 = new THREE.Vector3(0, 1, 0).cross(A).normalize();
+    const t2 = A.clone().cross(t1);
+    const step = t1.multiplyScalar(Math.cos(azim)).add(t2.multiplyScalar(Math.sin(azim)));
+    const span = spot.radius * (2.5 + Math.random() * 2);
+    const B = A.clone().addScaledVector(step, span).normalize();
+    const hFrac = 0.04 + Math.random() * 0.10; // apex 28k–97k km
+    const arc = [];
+    for (let k = 0; k <= 32; k++) {
+      const t = k / 32;
+      arc.push(A.clone().lerp(B, t).normalize()
+        .multiplyScalar(1.002 + hFrac * Math.sin(t * Math.PI)));
+    }
+    const count = 80;
+    const pos = new Float32Array(count * 3);
+    const seeds = new Float32Array(count);
+    for (let i = 0; i < count; i++) seeds[i] = Math.random();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      map: makeFlareTexture(64, 'rgba(255,255,180,1)'),
+      color: 0xffffaa, size: 6, // world units (unaffected by parent scale)
+      transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+    });
+    const points = new THREE.Points(geo, mat);
+    points.frustumCulled = false;
+    this.primaryMesh.add(points);
+    this.solarFlares.push({
+      points, arc, seeds, count, life: 0,
+      duration: 4 + Math.random() * 5, // wall seconds
+    });
   }
 
   _storedSunActivity() {
@@ -890,6 +1079,8 @@ export class SceneRenderer {
       this.sunShared.uTime.value = physics.simSeconds % 1e6;
       this.sunShared.uDays.value = physics.simSeconds / 86400;
       this.sunShared.uCamPos.value.copy(this.camera.position);
+      this._lastMult = physics.timeMultiplier;
+      this._updateSunspots(physics, dt);
     }
 
     for (const b of physics.bodies) {
@@ -1480,6 +1671,15 @@ function bvToColor(bv) {
   else if (t < 0.8) { r = 1.0; g = 0.94 - 0.15 * (t - 0.4) / 0.4; b = 1.0 - 0.4 * (t - 0.4) / 0.4; }
   else { r = 1.0; g = 0.79 - 0.35 * (t - 0.8) / 1.2; b = 0.6 - 0.45 * (t - 0.8) / 1.2; }
   return { r: Math.min(1, r), g: Math.max(0, g), b: Math.max(0, b) };
+}
+
+/** Unit direction from lat/lon radians — house convention (matches the
+ *  feature-sprite and plume placement formulas). */
+function latLonDir(lat, lon) {
+  return new THREE.Vector3(
+    Math.cos(lat) * Math.cos(lon),
+    Math.sin(lat),
+    -Math.cos(lat) * Math.sin(lon));
 }
 
 function mulberry32(a) {

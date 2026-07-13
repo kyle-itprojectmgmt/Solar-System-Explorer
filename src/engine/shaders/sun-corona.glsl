@@ -52,14 +52,39 @@ void main() {
   vec3 pCa = uCamPos + rayDir * max(tCa, 0.0); // closest-approach point
   float b = length(pCa) / uSurfaceR;           // 1.0 = grazing the limb
 
-  // Phase-1 stub: smooth 1/b² glow off the limb. Worker 2 replaces from
-  // here down: streamer structure (noise over the closest-approach
-  // direction pCa/|pCa|), equatorial brightening, polar plumes at low
-  // uActivity, white-inner → warm-outer color ramp.
-  float fall = clamp(1.0 / (b * b), 0.0, 1.0) * smoothstep(0.98, 1.05, b);
-  float activityBoost = 0.5 + uActivity * uActivityScale;
-  vec3 col = mix(vec3(1.0, 0.95, 0.75), vec3(1.0), fall);
-  float opacity = fall * activityBoost * uBaseOpacity;
+  // Radial falloff: 1/b² times limb onset
+  float co_rimFall = clamp(1.0 / (b * b), 0.0, 1.0) * smoothstep(0.98, 1.05, b);
 
-  gl_FragColor = vec4(col, clamp(opacity, 0.0, 0.6));
+  // Sample 3D noise over the closest-approach direction
+  vec3 co_dir = normalize(pCa);
+
+  // Streamers: radial rays with equatorial elongation
+  float co_a = 6.2831853 * uTime * (8.0 / 1.0e6);
+  vec3 co_drift = vec3(cos(co_a), sin(co_a), 0.0) * 0.5;
+  float co_streamer = fbm3(co_dir * vec3(6.0, 2.5, 6.0) + co_drift) * 0.6 + 0.4;
+
+  // Equatorial brightening: enhance brightness toward the equator
+  float co_equat = 0.5 + 0.5 * (1.0 - abs(co_dir.y));
+
+  // Polar plumes: faint ray fans at solar minimum (high uActivity suppresses)
+  float co_plumeRegion = smoothstep(0.70, 0.92, abs(co_dir.y));
+  float co_a_plume = 6.2831853 * uTime * (12.0 / 1.0e6);
+  vec3 co_drift_plume = vec3(cos(co_a_plume), sin(co_a_plume), 0.0) * 0.5;
+  float co_plume = co_plumeRegion * (fbm3(co_dir * 9.0 + co_drift_plume) * 0.5 + 0.5) * (1.0 - uActivity) * 0.35;
+
+  // Activity boost: brighter corona during active periods
+  float co_boost = 0.5 + uActivity * uActivityScale;
+
+  // Color ramp: white near limb, grading to warm far out
+  float co_whiteBlend = 1.0 - smoothstep(1.0, 4.0, b);
+  vec3 col = mix(vec3(1.0, 0.93, 0.72), vec3(1.0), co_whiteBlend);
+
+  // Composite opacity. Plumes ride the same radial falloff as the main
+  // corona (review finding: an unattenuated plume term painted a constant
+  // fan out to the shell edge with a hard cut at b = 8).
+  float opacity = co_rimFall
+    * (co_streamer * co_equat * co_boost * uBaseOpacity + co_plume);
+  opacity = clamp(opacity, 0.0, 0.65);
+
+  gl_FragColor = vec4(col, opacity);
 }

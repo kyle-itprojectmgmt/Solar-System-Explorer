@@ -92,8 +92,55 @@ export default {
       ],
     },
 
-    // Worker 4 fills: navPresets, surfaceFeatures, notableFeatures,
-    // moreInfo, facts.
+    // UI navigation shortcuts to corona-anchored vantage points.
+    navPresets: [
+      {
+        label: '☀️ Corona View',
+        altitudeKm: 500000,
+        uv: [0.5, 0.5],
+        message: 'Ascending to the million-degree corona — an atmospheric shell orders of magnitude hotter than the photosphere below',
+      },
+      {
+        label: '🔥 Photosphere Close-Up',
+        altitudeKm: 100000,
+        uv: [0.5, 0.5],
+        message: 'Descending into the photosphere — granulation cells the size of Texas and roiling sunspot fields of magnetic storm',
+      },
+      {
+        label: '🌀 Polar Plumes',
+        altitudeKm: 300000,
+        uv: [0.5, 0.97],
+        message: 'Rising toward the solar poles — plumes of plasma streaming outward from the magnetic arcades that anchor each pole',
+      },
+    ],
+
+    // Surface feature landmarks visible from orbit (longitude ±180°).
+    surfaceFeatures: [
+      { name: 'North Polar Region',      latDeg: 85,   lonDeg: 0 },
+      { name: 'South Polar Region',      latDeg: -85,  lonDeg: 0 },
+      { name: 'Active Region Belt (N)',  latDeg: 20,   lonDeg: 0 },
+      { name: 'Active Region Belt (S)',  latDeg: -20,  lonDeg: 180 },
+    ],
+
+    notableFeatures: [
+      'The core fuses 620 million tonnes of hydrogen per second at 15 million degrees Celsius, powering all life on Earth',
+      'The corona is hundreds of times hotter than the photosphere — a temperature inversion that remains one of astrophysics\' deepest mysteries',
+      'Solar flares and coronal mass ejections disrupt GPS, radio communications, and power grids, with impacts felt across technologies we depend on',
+      'In roughly 5 billion years, the Sun will exhaust its hydrogen fuel and expand into a red giant, engulfing Mercury, Venus, and Earth',
+    ],
+
+    moreInfo: {
+      composition: '73% hydrogen, 25% helium, and 2% heavier elements — a mixture forged in the Big Bang and stellar nucleosynthesis',
+      energy: 'The Sun converts 620 million tonnes of hydrogen into helium every second via nuclear fusion, releasing the energy that sustains the solar system',
+      light: 'Photons take roughly 100,000 years to escape the core through the radiative zone, then 8 minutes 20 seconds to reach Earth after leaving the photosphere',
+      cycle: 'The solar activity cycle oscillates on an 11-year timescale — sunspots, flares, and coronal brightness rise and fall. Currently in Solar Cycle 25, which began in 2020',
+    },
+
+    facts: [
+      'The Sun rotates differentially — its equator completes a rotation in 25 days while the poles take 34 days, a consequence of the turbulent plasma beneath the photosphere',
+      'The Sun accounts for 99.86% of all mass in the solar system; Jupiter comprises most of the remaining 0.14%',
+      'Sound waves and gravity waves ring through the Sun like a bell, creating oscillation modes astronomers measure with helioseismology to map its internal structure',
+    ],
   },
 
   bodies: [],   // the Sun has no moons here — planets are the other systems

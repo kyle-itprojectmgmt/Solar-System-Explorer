@@ -45,12 +45,23 @@ void main() {
   vec3 n = normalize(vWNormal);
   vec3 viewDir = normalize(uCamPos - vWPos);
 
-  // Very tight limb-only rim.
+  // Very tight limb-only rim
   float rim = pow(1.0 - abs(dot(viewDir, n)), 8.0);
 
-  // Phase-1 stub: clean rim. Worker 2 adds spicule texture (fine
-  // high-frequency noise over vObjPos) and prominence-scale unevenness.
-  float opacity = rim * uIntensity;
+  // Spicule texture: fine jets from high-frequency noise over surface position
+  float sp_a = 6.2831853 * uTime * (10.0 / 1.0e6);
+  vec3 sp_drift = vec3(cos(sp_a), sin(sp_a), 0.0) * 0.5;
+  float sp_spic = fbm3(normalize(vObjPos) * 40.0 + sp_drift) * 0.3 + 0.7;
+
+  // Prominence-scale unevenness: larger features on the rim
+  float sp_unevenness = fbm3(normalize(vObjPos) * 6.0) * 0.15 + 0.925;
+
+  // Activity lift: chromosphere brightens during high activity
+  float sp_activityLift = 0.85 + 0.3 * uActivity;
+
+  // Opacity: rim modulated by spicules, unevenness, activity, and configured intensity
+  float opacity = rim * sp_spic * sp_unevenness * sp_activityLift * uIntensity;
+  opacity = clamp(opacity, 0.0, 1.0);
 
   gl_FragColor = vec4(uColor, opacity);
 }
