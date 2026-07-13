@@ -365,6 +365,9 @@ rotate with the surface. Same fix required as volcanic plumes (Bug #4).**
 | Callisto | Björn Jónsson | Public Domain |
 | Saturn + ring strip | Solar System Scope | CC BY 4.0 |
 | Titan, Enceladus, Iapetus, Mimas, Tethys, Dione, Rhea | Steve Albers SOS (Cassini data) | Non-commercial by permission — attribution required (see backlog #10) |
+| Mercury, Venus (atmosphere), Uranus, Neptune | Solar System Scope | CC BY 4.0 |
+| Triton | Steve Albers SOS (Voyager 2 data) | Non-commercial by permission — attribution required (see backlog #10) |
+| Uranus rings | Generated in-house (GDI+ radial strip, true ring radii) | — |
 
 Full credits in README.md.
 
@@ -1114,6 +1117,88 @@ rings wrapping the night side. Universal fix (Titan + Saturn EXEMPT):
 - Regression green: smoke 22/22, limb, moonlimb, earthtest 14/14,
   marstest 13/13, titanprobe (shell ratio 1.10 + opaque haze intact).
 
+### v8 — Mercury + Venus + Uranus + Neptune: the 8-planet solar system
+### (Complete — 2026-07-12, commits 87436b7 → eaed2f1 + docs)
+Per Docs/V8_REMAINING_PLANETS.md. Version 8.0.0. NAV now travels all
+EIGHT planets. Live-verified: all 8 systems at v8.0.0 on
+app.solarexplorer.co, zero console errors, CSP intact, npm audit clean.
+
+**Prompt-vs-reality (the V8 prompt assumed a foreign schema — grounded
+against mars.js/saturn.js before any work):** no `luminosity`/`oblateness`/
+`surface.shader`/`polarOrbitingMoons`/config-side curatedPresets exist.
+Key discovery: the engine works in the primary's EQUATORIAL frame, so
+Uranus's "moons over the poles" needs ZERO physics changes — moons+rings
+live in the equatorial plane automatically and the 97.77° tilt expresses
+itself through the calibrated sun direction (root.rotation.z carries the
+tilt for the starfield). Retrograde ROTATION (Venus 177.36°, Uranus
+97.77°) uses positive periods + the >90° tilt convention; retrograde
+ORBIT (Triton) is inclinationDeg 156.885 (Phoebe convention, verified:
+Triton steps −0.164 rad while Proteus steps +0.933).
+
+**Phase 1 — textures + calibration + skeletons (orchestrator):**
+- SSS Mercury 8K (+2K GDI+ base), Venus atmosphere 4K (+2K base; the
+  clouds ARE the diffuse — the radar surface map is NOT shipped, URL in
+  venus.js), Uranus/Neptune 2K (SSS max — featureless planets). Triton:
+  real Voyager 2 map (Steve Albers SOS 4K, attribution required).
+  uranus/rings.png GENERATED (GDI+ 2048×32 radial strip, 9 narrow rings
+  + ε at true radii 41,837–51,149 km, widths ~5x so 1-px rings survive).
+- Ephemeris λ0 anchors (scratch v8cal.mjs verified through the engine's
+  own sunDirectionAt): Uranus λ0 −3.69° from the 2007-12-07 equinox —
+  reproduces Voyager 1986 (δ −81.4°, SOUTH pole sunward) AND LIVE 2026
+  (δ +77.1°, sun near the NORTH pole — the signature view). Neptune λ0
+  −34.81° from the 2005 southern solstice (Voyager −22.9°, 2026 −19.3°).
+  Venus δ = ±2.6° via the 177.36° tilt. Mercury: MEAN-longitude anchor —
+  e = 0.206 makes the circular model oscillate ±23° (equation of
+  center), zero-mean by construction, documented in mercury.js.
+- Epochs (house pattern): MESSENGER OI 2011, Magellan OI 1990,
+  Voyager 2 1986-01-24, Voyager 2 1989-08-25.
+- renderer geysers.tint config override (Enceladus stays white ice;
+  Triton's nitrogen plumes entrain dark dust). tests/v8skeleton.mjs.
+
+**Phase 2 — 4 parallel Haiku workers, exclusive file ownership:**
+W1 mercury-surface + mercury.js, W2 venus-clouds + venus.js, W3
+uranus-clouds + miranda-surface + uranus.js, W4 neptune-clouds +
+triton-surface + neptune.js (~50–65k tokens each). The house rule held a
+FOURTH time — every worker shipped real bugs caught in review BEFORE
+commit: reversed-smoothstep UB at SIX sites; Uranus storm anchored to
+vObjPos so every fragment computed its own storm center (v5 hurricane
+class); Triton geyser zone compared radians against sin-space constants
+(a 1° sliver at −49° instead of −31..−57°); Venus "morphing" was a
+global sin(uTime) amplitude that periodically flattened the planet;
+Venus lightning hashed per-PIXEL (white-noise static, fixed with
+cell-quantized flashes); cantaloupe "septa" drawn as an annulus around
+each cell center = the banned donut-rim pattern (real walls live at
+HIGH Worley distance); Miranda's crater suppression ran AFTER the
+grooves it was meant to spare; Caloris gained a third crater field
+instead of suppressing (real floor is smooth plains).
+
+**Phase 3 — integration + measured visual calibration:**
+- 6 detail styles registered (hermes/aphrodite/ouranos/miranda/
+  poseidon/triton, brace-isolated chunks; cloud styles on gas-giant
+  octaves). 16 curated presets (4/system) in the ui.js tagged list,
+  incl. the 4 epoch presets (MESSENGER/Magellan/Voyager 2 ×2).
+- Venus super-rotation: 3.9-day cloud deck vs 243-day planet via
+  time-drifting UV resample of the diffuse. Rate is EXACTLY 3.0e-6
+  rev/s so the 1e6-s uTime wrap advances an integer 3 revolutions —
+  no pattern pop. (uTime in detail styles is SIM seconds — freezes on
+  pause, scales with multiplier; super-rotation is physical.)
+- Screenshot calibration (v6 four-iteration precedent, three rounds):
+  Miranda corona grooves 0.20→0.025 + fbm amplitude variation +
+  normalScale 2.0→1.2 (the first cut was zebra-print bullseyes);
+  Triton dimples soft-edged/per-cell-hashed/70%-thinned + normalScale
+  1.5→1.0 (bubble wrap); Mercury crater tier halved + thinned to
+  20%/15% (pepper speckle over an 8K map that already carries craters);
+  Venus lightning 0.6% duty/wider/dimmer (read as stuck pixels).
+- Suites: tests/v8test.mjs NEW (21 — all six styles compile at close
+  range, Triton retrograde vs Proteus, Miranda world-Y amplitude
+  0.99 R = over the poles, polar sun, geyser mesh-parenting),
+  v8shots.mjs (7 screenshot probes), v8live.mjs (live URL: CSP +
+  bundle feature strings + all 8 systems boot). Full regression green:
+  smoke 22, earthtest 14, marstest 13, marscal, saturntest 22,
+  saturncal, presets 60, v5b 18, livedefault, nightlights, hurricane,
+  glint, incmeasure 6, ringfloor 7, haloshots, v8skeleton 10, v8test 21.
+- Deployed (92af3d44); all 8 systems live-verified with cache-bust.
+
 ### v7.0.3 — Custom Domain app.solarexplorer.co (2026-07-12)
 Primary URL is now https://app.solarexplorer.co (zone solarexplorer.co;
 landing page at the apex is separate and unchanged). Changes:
@@ -1209,6 +1294,9 @@ landing page at the apex is separate and unchanged). Changes:
 | 60 | Thin-atmosphere halos render as thick rings wrapping the night side (hardware-confirmed by Kyle: Earth at ~3,000 km, Io at ~370 km). Cause: soft fresnel pow + wide lit gate on all thin-atmosphere shells, plus Earth's v5b night-scatter alpha floor keeping the halo alive on the night limb. Fixed v7.0.2: per-body fresnelPower/thickness/intensity config, universal tight lit gate (−0.05..0.20), Earth night-scatter term removed, ISS horizon arc opt-in via horizonGlow. Titan/Saturn exempt. Guard: tests/haloshots.mjs (diff-render probe). | Resolved v7.0.2 | — |
 | 61 | tests/stack.mjs stale since v7 — 4 checks assert the pre-v7 world (6 stack buttons vs 9 with ALT/INC/SPD, "camera panel + 7 modes", Saturn "Coming Soon" toast though Saturn is built, Tab cycle count). Share/preset/?view= checks still green and meaningful. Refresh the assertions. | Needs fix (test-only) | — |
 | 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard (matches the no-analytics Privacy Policy stance) or allow the host in CSP script-src + connect-src. workers.dev is unaffected. | Needs decision | — |
+| 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. | Needs review | V8_REMAINING_PLANETS.md |
+| 64 | Mercury terminator longitude: the circular ephemeris cannot track e = 0.206 — subsolar longitude oscillates ±23° (equation of center) around the mean-longitude anchor every 88-day year. Zero-mean by construction; fine for lighting. Refine when the ephemeris gains eccentricity (same item as the Mars ±10° note in mars.js). | Data choice — ephemeris eccentricity is a backlog item | — |
+| 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only; the roadmap's outer-system line originally listed Pluto too. NAV shows Pluto as Coming Soon. A V9 session could add it (Pluto+Charon binary barycenter would be a new physics pattern). | Future session | — |
 
 ---
 
@@ -1260,7 +1348,10 @@ V7  — Saturn — DONE (textured ring system + Cassini Division, ring shadows
       both directions, fly-through particles, Titan haze, Enceladus geysers
       + tiger stripes, Iapetus two-tone, Mimas/Tethys/Dione/Rhea, chaotic
       Hyperion, retrograde Phoebe, telephoto optics, security hardening)
-V8  — Outer solar system (Uranus, Neptune, Triton, Pluto)
+V8  — Mercury + Venus + Uranus + Neptune — DONE (all 8 planets live;
+      Triton retrograde + geysers, Miranda coronae, Venus super-rotation,
+      Uranus polar-sun geometry + narrow rings; Pluto NOT built — bug #65)
+V9  — Pluto + Charon (binary barycenter), Sun corona, orrery view
 ```
 
 ### Build Order Decision — Mars Before Saturn
