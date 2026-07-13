@@ -1430,6 +1430,30 @@ review clean — a first.
   green at 10.0.0 (25 suites). Deployed (3ddff730); both URLs live-
   verified, all 10 systems, zero console errors.
 
+### v10.0.1 — About section, donate URL, HUD site link (2026-07-13)
+- Donate: KOFI_URL placeholder replaced by DONATE_URL →
+  https://solarexplorer.co/support (tray ☕ button; .kofi-btn class kept —
+  tooltip/tray suites reference it). SITE_URL added to config.js.
+- HELP panel: About section at the bottom (divider, ABOUT title, blurb,
+  `v${__APP_VERSION__} · Built by Kyle Ewing`, 🌐 solarexplorer.co link,
+  privacy line). Version string reads the Vite define — never hardcode it.
+- HUD: persistent #site-link (solarexplorer.co) inside .hud-ghost below
+  the ghost clock; hides with the HUD in presentation mode. No CSP change
+  needed (plain target=_blank navigation, not a fetch).
+- Physics "pause inactive systems" optimization: MEASURED, NOT SHIPPED.
+  The premise was false — one PhysicsEngine exists per page (system switch
+  is a full page navigation, config.js switchSystem), so inactive systems
+  never tick. tests/physbench.mjs baseline: worst case 2.0 µs/frame
+  (Jupiter, 4 n-body moons) — 250x under the 0.5 ms target. Frame-skipping
+  would risk 6x-coarser rotation stepping at 10,000x for a ~2 µs gain.
+- Suites: tests/about.mjs NEW (27 — donate href, About content/styling,
+  site-link + presentation-mode hide, Triton retrograde, zero console
+  errors on all 10 systems), tests/physbench.mjs NEW (per-system physics
+  µs/frame). smoke 22, ringfloor 7, orbitdir, datepicker, plutotest 28
+  all green. tray/tooltip/stack failures confirmed PRE-EXISTING on clean
+  HEAD via git stash (stale v4c-era selectors: data-audio-mode,
+  .presentation-btn, 6-vs-9 stack buttons, Saturn Coming Soon toast).
+
 ---
 
 ## Known Bugs / In Progress
@@ -1757,7 +1781,7 @@ Prevents floating point precision artifacts at large distances
 Before each deploy:
 - [ ] `npm run build` succeeds with no errors
 - [ ] `npm run preview` verified at localhost:4173
-- [ ] Ko-fi handle updated in src/config.js
+- [ ] DONATE_URL / SITE_URL correct in src/config.js
 - [ ] R2 texture URL updated in src/config.js (if textures changed)
 - [ ] README live URL updated
 - [ ] PROJECT_LOG.md updated with session changes

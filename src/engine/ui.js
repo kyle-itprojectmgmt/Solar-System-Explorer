@@ -5,10 +5,12 @@
 // brand system (Montserrat / Lato, #0077CC / #66B2FF).
 // ---------------------------------------------------------------------------
 
+/* global __APP_VERSION__ */
+
 import * as THREE from 'three';
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
-import { APP_URL, KOFI_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
+import { APP_URL, SITE_URL, DONATE_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
 
 // Surface mode removed permanently in V7 (was hidden since v4d; the
 // first-person ground experience is a future rebuild, not a revival).
@@ -89,6 +91,15 @@ export class UI {
     this.multEl = el('span', 'ghost-mult', line2);
     el('span', 'ghost-sep', line2).textContent = ' · ';
     this.delayEl = el('span', 'ghost-delay', line2);
+
+    // Persistent site link below the clock (v10.0.1) — always visible,
+    // hides with the rest of the ghost HUD in presentation mode.
+    const siteLink = el('a', '', tl);
+    siteLink.id = 'site-link';
+    siteLink.href = SITE_URL;
+    siteLink.target = '_blank';
+    siteLink.rel = 'noopener noreferrer';
+    siteLink.textContent = 'solarexplorer.co';
 
     this._buildDatePicker();
     // LIVE defaults ON (V5.1.2): every system opens at the current real UTC
@@ -1396,6 +1407,22 @@ export class UI {
       ['📅', 'Click the date to pick any year 1950–2050'],
       ['🔗', 'Share any saved view with a link'],
     ]);
+
+    // About (v10.0.1) — version, author, site link, privacy statement.
+    el('div', 'help-divider', c);
+    const about = el('div', 'help-about', c);
+    el('div', 'help-section-title', about).textContent = 'ABOUT';
+    el('p', 'help-about-desc', about).textContent =
+      'A photorealistic solar system simulator — explore all 8 planets, the Sun, Pluto, and 30+ moons.';
+    el('div', 'help-about-meta', about).textContent =
+      `v${__APP_VERSION__} · Built by Kyle Ewing`;
+    const site = el('a', 'help-about-link', about);
+    site.href = SITE_URL;
+    site.target = '_blank';
+    site.rel = 'noopener noreferrer';
+    site.textContent = '🌐 solarexplorer.co';
+    el('div', 'help-about-privacy', about).textContent =
+      'No tracking · No cookies · No data collected';
   }
 
   _activateMode(m) {
@@ -1660,7 +1687,7 @@ export class UI {
       this.r.camera.fov < UI.FOV_TELE_THRESHOLD ? UI.FOV_NORMAL : UI.FOV_TELE);
 
     const kofi = el('a', 'tray-btn kofi-btn', tray);
-    kofi.href = KOFI_URL;
+    kofi.href = DONATE_URL;
     kofi.target = '_blank';
     kofi.rel = 'noopener';
     kofi.textContent = '☕';

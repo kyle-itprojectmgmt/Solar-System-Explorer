@@ -131,6 +131,16 @@ SMOKE_URL=http://localhost:5173 node tests/orbitdir.mjs
 # OPPOSITE conventions: insertion (cos φ, −sin φ) → phase INCREASES for
 # prograde; orbit mode (cos θ, +sin θ) → orbTheta DECREASES for prograde.
 
+# v10.0.1 additions:
+SMOKE_URL=http://localhost:5173 node tests/about.mjs
+# Donate URL, HELP About section (content + computed styles), #site-link
+# in the ghost HUD (incl. presentation-mode hide), Triton retrograde,
+# zero console errors across all 10 systems. 27 checks.
+node tests/physbench.mjs
+# Physics update cost per system (µs per update() call at 1x and 10,000x).
+# Baseline 2026-07-13: worst case 2.0 µs (Jupiter). One PhysicsEngine per
+# page — there are no "inactive systems" to pause; don't re-attempt that.
+
 # v5a additions:
 SMOKE_URL=http://localhost:5173 node tests/nightlights.mjs
 # City-light placement guard: finds a sim hour with Paris in night, aims

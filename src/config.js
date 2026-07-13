@@ -12,6 +12,9 @@ export const TEXTURE_BASE_URL = import.meta.env.DEV
 // is visited via the legacy workers.dev host.
 export const APP_URL = 'https://app.solarexplorer.co';
 
+// Marketing site root — HUD link and the HELP About section.
+export const SITE_URL = 'https://solarexplorer.co';
+
 // Systems with a complete config in /src/data/systems/<name>.js.
 // Append new systems here as their configs land.
 export const AVAILABLE_SYSTEMS = [
@@ -61,8 +64,5 @@ export const SOLAR_SYSTEM = [
   { name: 'Pluto', moons: ['Charon'], icon: '♇' }, // dwarf-planet symbol (V10)
 ];
 
-// Ko-fi handle for the donate button.
-export const KOFI_URL = 'https://ko-fi.com/YOUR_HANDLE';
-if (import.meta.env.DEV && KOFI_URL.includes('YOUR_HANDLE')) {
-  console.warn('Ko-fi handle not set — update KOFI_URL in config.js');
-}
+// Donate button target (bottom tray).
+export const DONATE_URL = 'https://solarexplorer.co/support';

@@ -160,6 +160,23 @@ html, body {
   opacity: 0.4;
 }
 
+/* Persistent site link below the clock (v10.0.1). */
+#site-link {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: rgba(217, 217, 217, 0.5);
+  text-decoration: none;
+  margin-top: 2px;
+  letter-spacing: 0.03em;
+  pointer-events: auto;
+  transition: color 0.2s;
+}
+#site-link:hover {
+  color: rgba(217, 217, 217, 0.85);
+  text-decoration: underline;
+}
+
 /* -- Date picker (V4c G5) ------------------------------------------------------- */
 
 .date-picker {
@@ -822,6 +839,54 @@ body.presentation-mode .bottom-tray > *:not([data-tray="presentation"]) { displa
   min-width: 96px;
 }
 .help-desc { color: var(--gray-light); font-weight: 300; }
+
+/* About section (v10.0.1) — bottom of the HELP panel. */
+.help-divider {
+  border-top: 1px solid rgba(217, 217, 217, 0.2);
+  margin: 16px 0;
+}
+.help-section-title {
+  font-family: var(--font-head);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue-light);
+  margin-bottom: 8px;
+}
+.help-about-desc {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--gray-light);
+  margin-bottom: 8px;
+}
+.help-about-meta {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--gray-light);
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+.help-about-link {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--blue);
+  text-decoration: none;
+  margin-bottom: 8px;
+}
+.help-about-link:hover {
+  color: var(--blue-light);
+  text-decoration: underline;
+}
+.help-about-privacy {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--gray-light);
+  opacity: 0.5;
+}
 
 /* -- Event toasts (V4c G7) ----------------------------------------------------------------------------- */
 
