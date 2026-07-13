@@ -367,6 +367,7 @@ rotate with the surface. Same fix required as volcanic plumes (Bug #4).**
 | Titan, Enceladus, Iapetus, Mimas, Tethys, Dione, Rhea | Steve Albers SOS (Cassini data) | Non-commercial by permission — attribution required (see backlog #10) |
 | Mercury, Venus (atmosphere), Uranus, Neptune | Solar System Scope | CC BY 4.0 |
 | Triton | Steve Albers SOS (Voyager 2 data) | Non-commercial by permission — attribution required (see backlog #10) |
+| Pluto, Charon | Steve Albers SOS (New Horizons LORRI+MVIC data) | Non-commercial by permission — attribution required (see backlog #10). Pluto map rolled 180° to the engine's center-origin convention |
 | Uranus rings | Generated in-house (GDI+ radial strip, true ring radii) | — |
 
 Full credits in README.md.
@@ -1362,6 +1363,73 @@ at the exact spot center (NaN propagates through 0*NaN).
   suntest 28. Deployed (7ea4abd6); both URLs live-verified — first probe
   hit the stale edge cache (v8.0.1 for ~20 s), second pass clean.
 
+### v10 — Pluto + Charon: the dwarf-planet binary (Complete — 2026-07-13,
+### commits f808359 → see final + docs)
+Per Docs/V10_PLUTO.md. Version 10.0.0. NAV now travels all 8 planets, the
+Sun, AND Pluto (♇ icon via the new SOLAR_SYSTEM per-body icon field).
+Live-verified: all 10 systems at v10.0.0 on app.solarexplorer.co, zero
+console errors, security 28/28 vs the live URL, npm audit clean.
+
+**Prompt-vs-reality (grounded first, house rule):** no `luminosity`/
+`oblateness`/`surface.shader`/config `curatedPresets` (the V8 finding
+again) — real schema is star.intensity+direction, detail styles,
+atmosphere.style, ui.js tagged presets. The prompt's `rotationPeriodHours:
+-153.293` violates the house retrograde convention (tilt 122.53° > 90 +
+POSITIVE period). The "binary barycenter physics pattern" (bug #65) was
+NOT needed: Charon as a Keplerian moon + equal periods gives the mutual
+lock BY CONSTRUCTION — measured sub-Charon meridian pinned at 0.000°E at
+epoch, quarter-orbit, and two orbits (Pluto's ~2,110 km barycenter wobble
+is the only unmodeled part).
+
+**Phase 1 — textures + calibration + skeleton:**
+- Albers SOS New Horizons color mosaics: Pluto 8K (2K base + 8K
+  progressive, Mercury pattern), Charon 4K. Non-commercial by permission,
+  attribution required (joins backlog #10).
+- Ephemeris λ0 = +158.1° (tests/plutocal.mjs, 8 checks): flyby subsolar
+  +51.5°N (heart sunlit, south pole in decades-long dark) AND LIVE-era
+  +57.0° approaching the 2029-30 solstice max 57.47° = 180 − tilt.
+- Epoch 2015-07-14T11:49Z (New Horizons closest approach, house pattern).
+
+**Phase 2 — 3 parallel Haiku workers (exclusive files):** W1
+pluto-surface + pluto-atmosphere, W2 charon-surface, W3 pluto.js. The
+house rule held a SIXTH time — review before commit caught: Sputnik
+convection dimples at cell CENTERS (bubble wrap), dtlFreqFade pinned at
+freq 40 under 120/240-cycle ridge noise (v4b shimmer class), and the
+atmosphere forwardScatter with a +dot that peaks on the DAY side
+(forward-scattered light exits along −uSunW). Charon's chunk passed
+review clean — a first.
+
+**Phase 3 — integration + measured calibration:**
+- TEXTURE CONVENTION FINDING: the Albers Pluto map centers on 180°E (the
+  standard NH presentation — heart at center) but the ENGINE convention
+  is 0°E at map center (Earth precedent, suncal pixel-verified; measured
+  via flyToFeature landing 180.7° off). Shipped jpgs ROLLED 180° with
+  exact pixel clones (a DrawImage first cut left a seam line); the heart
+  wraps the u seam at 0.989 (shader masks made wrap-aware). Charon's map
+  is already center-origin — untouched.
+- rotationPhaseAtEpochDeg −139.2 IN LOCKSTEP with Charon phaseDeg −139.2:
+  subsolar lands 176.0°E (heart center) at the epoch while the lock keeps
+  sub-Charon at 0°E (IAU prime meridian) — heart at the anti-Charon point
+  exactly as in reality. Charon's local lon 0 faces Pluto (the
+  plutoshine +X assumption, verified).
+- Screenshot calibration (3 rounds): Sputnik polygons rewritten as a
+  per-cell TONE MOSAIC (color only, zero relief) — BOTH worley-F1 relief
+  cuts stamped rings, because high-F1 regions circle feature points (true
+  cell boundaries need F2−F1, not in the GLSL library). Blue haze ring:
+  negated forward-scatter dot + dedicated wider fresnel (pow 2.5, 4x
+  gain) — the backlit crescent now shows the NH blue ring; crescent
+  preset switched to sunRel offset (absolute theta landed lit-side).
+- 5 curated presets (NH 2015 epoch preset returns the sim to the flyby
+  AND frames the heart; binary preset shows both worlds + the Sun as a
+  brilliant star). Boot cinematic lit (settled cam·sun 0.947).
+- Suites: tests/plutotest.mjs NEW (28 — epoch/lock/heart/Cthulhu probes,
+  haze diff-render blue-dominance, moonnight night gate 0 bright px,
+  binary NDC framing, Mordor pole-vs-mid patch, all presets, cross-system
+  boots), plutoshots.mjs (6 calibration screenshots), plutocal.mjs (8).
+  prodboot extended to 10 systems + version-agnostic. Full regression
+  green at 10.0.0 (25 suites). Deployed (3ddff730); both URLs live-
+  verified, all 10 systems, zero console errors.
+
 ---
 
 ## Known Bugs / In Progress
@@ -1433,8 +1501,9 @@ at the exact spot center (NaN propagates through 0*NaN).
 | 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard (matches the no-analytics Privacy Policy stance) or allow the host in CSP script-src + connect-src. workers.dev is unaffected. | Needs decision | — |
 | 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. ALSO (v8.0.1): Moon wrinkle-ridge patches read as dark spidery squiggles at ~2,500 km (relief shading under normalScale 2.5; knobs: wRegion/wrinkles in moon-detail.glsl LAYER 2). | Needs review | V8_REMAINING_PLANETS.md |
 | 64 | Mercury terminator longitude: the circular ephemeris cannot track e = 0.206 — subsolar longitude oscillates ±23° (equation of center) around the mean-longitude anchor every 88-day year. Zero-mean by construction; fine for lighting. Refine when the ephemeris gains eccentricity (same item as the Mars ±10° note in mars.js). | Data choice — ephemeris eccentricity is a backlog item | — |
-| 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only; the roadmap's outer-system line originally listed Pluto too. NAV shows Pluto as Coming Soon. A future session could add it (Pluto+Charon binary barycenter would be a new physics pattern; V9 built the Sun instead). | Future session | — |
+| 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only. | Resolved v10 — full binary system live; barycenter physics NOT needed (Keplerian Charon + equal periods = mutual lock by construction; only Pluto's ~2,110 km wobble is unmodeled) | V10_PLUTO.md |
 | 66 | V9 Sun shader calibration done from headless screenshots — granulation cell scale/contrast, corona streamer balance vs polar plumes, chromosphere rim strength, prominence subtlety, flare frequency/brightness may need real-hardware tuning (joins the #9/#27/#56/#63 eyeball-pass class). Knobs: uGranScale/limbDarkeningCoeff/supergranulationAmp in sun.js photosphere block, dtlFreqFade freqs + 1.35 gain in sun-photosphere.glsl, baseOpacity/activityScale in the corona block, prominence opacity/tubeR in renderer._buildProminences, flare probability constant 0.0025 in _updateSolarFlares. | Needs review | V9_SUN.md |
+| 67 | V10 Pluto/Charon shader calibration done from headless screenshots — Sputnik tone-mosaic strength (0.04 in pluto-surface.glsl LAYER 1), mountain/bladed relief amplitudes, haze ring gain (4.0 + pow 2.5 in pluto-atmosphere.glsl) vs day-side rim (intensity 0.5 in pluto.js), Mordor mottling, Serenity Chasma depth, plutoshine 0.035 may need real-hardware tuning (joins the eyeball-pass class). Screenshot tool: tests/plutoshots.mjs (6 views incl. the backlit crescent). | Needs review | V10_PLUTO.md |
 
 ---
 
@@ -1493,7 +1562,10 @@ V8  — Mercury + Venus + Uranus + Neptune — DONE (all 8 planets live;
 V9  — The Sun — DONE (first star system: photosphere granulation +
       differential rotation, corona, chromosphere, sunspots, flares,
       prominences, solar activity slider; isStar engine path)
-V10 — Pluto + Charon (binary barycenter), Solar System Orrery view
+V10 — Pluto + Charon — DONE (the dwarf-planet binary: mutual tidal lock
+      by construction, Tombaugh Regio calibrated to the NH flyby epoch,
+      blue backlit haze ring, Mordor Macula; 10 navigable systems)
+V11 — Solar System Orrery view, inter-system hyperjump polish
 ```
 
 ### Build Order Decision — Mars Before Saturn
