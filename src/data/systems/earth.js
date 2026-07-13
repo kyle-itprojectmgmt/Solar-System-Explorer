@@ -151,6 +151,13 @@ export default {
       textures: { diffuse: 'diffuse.jpg' },
       normalScale: 2.5, // ancient cratered relief
       detailFloor: { softKm: 20, hardKm: 1 }, // LRO data supports 1 km floor
+      // v8.0.1 (Kyle hardware pass): airless body — razor terminator, and
+      // the graze band gates the crater relief so nothing sparkles past it
+      // (Mars bug #55 class; measured night mean 14% before the fix).
+      shaderParams: {
+        dayFadeSoft0: -0.02, dayFadeSoft1: 0.06,
+        grazeFade0: 0.15, grazeFade1: 0.50,
+      },
       color: 0x9a9a94,
       type: 'Rocky Moon',
       surfaceGravity: 1.62,

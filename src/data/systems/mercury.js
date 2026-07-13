@@ -76,9 +76,11 @@ export default {
     // Razor-sharp terminator (no atmosphere): dayFadeSoft thresholds
     // narrow the blend band; grazeFade gate fine details at low sun angle
     // to prevent grazing-light sparkle on the night-facing slopes.
+    // v8.0.1 (Kyle hardware pass): tightened further — no atmosphere,
+    // sharpest terminator in the sim.
     shaderParams: {
-      dayFadeSoft0: -0.02, dayFadeSoft1: 0.05,
-      grazeFade0: 0.15, grazeFade1: 0.50,
+      dayFadeSoft0: -0.01, dayFadeSoft1: 0.03,
+      grazeFade0: 0.10, grazeFade1: 0.40,
     },
 
     // Hermes detail shader: cratered regolith with Caloris Basin signature.

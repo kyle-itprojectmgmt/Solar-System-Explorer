@@ -836,12 +836,17 @@ export class CameraController {
   _defaultCinematicSequence() {
     const primary = () => this.r.system.primary.name;
     const moons = this.r.system.bodies.filter((b) => b.physics === 'nbody').map((b) => b.name);
+    // sunRel (v8.0.1, bug: systems opened on the dark side): startTheta is
+    // an OFFSET from the sun's live world azimuth, so every system opens
+    // on the lit hemisphere regardless of its calibrated sun direction.
+    // Offsets stay within ±1 rad of subsolar. Scripted presets (Voyager,
+    // Earthrise) pass absolute thetas and are untouched.
     return [
-      { target: primary(), dist: 14, height: 3.5, orbitRate: 0.02, duration: 12, startTheta: 0.3 },   // reveal
-      { target: primary(), dist: 4.2, height: 1.1, orbitRate: 0.05, duration: 14, startTheta: 2.1 },  // slow orbit
-      { target: moons[0] || primary(), dist: 6, height: 1.6, orbitRate: 0.09, duration: 11, startTheta: 4.0 }, // dive to Io
-      { target: primary(), dist: 22, height: 6, orbitRate: 0.015, duration: 12, startTheta: 5.2 },    // pull back
-      { target: moons[1] || primary(), dist: 7, height: 2, orbitRate: 0.07, duration: 12, startTheta: 1.0 },   // drift near Europa
+      { target: primary(), dist: 14, height: 3.5, orbitRate: 0.02, duration: 12, startTheta: 0.3, sunRel: true },   // reveal
+      { target: primary(), dist: 4.2, height: 1.1, orbitRate: 0.05, duration: 14, startTheta: -0.8, sunRel: true }, // slow orbit
+      { target: moons[0] || primary(), dist: 6, height: 1.6, orbitRate: 0.09, duration: 11, startTheta: 0.9, sunRel: true }, // dive to a moon
+      { target: primary(), dist: 22, height: 6, orbitRate: 0.015, duration: 12, startTheta: 0.5, sunRel: true },    // pull back
+      { target: moons[1] || primary(), dist: 7, height: 2, orbitRate: 0.07, duration: 12, startTheta: -0.5, sunRel: true },  // second moon drift
     ];
   }
 
@@ -859,12 +864,27 @@ export class CameraController {
     const cur = seq[this.cineIndex % seq.length];
     const center = this.r.bodyWorldPos(cur.target, this._v).clone();
     const bodyR = this.r.bodyRadius(cur.target);
-    const theta = (cur.startTheta || 0) - this.cineTime * (cur.orbitRate || 0.03); // decreasing = prograde drift
     const dist = bodyR * cur.dist;
+    let theta = (cur.startTheta || 0) - this.cineTime * (cur.orbitRate || 0.03); // decreasing = prograde drift
+    let camY = bodyR * (cur.height || 1.5);
+    let xzR = dist;
+    if (cur.sunRel) {
+      // Sun-relative shot (v8.0.1): azimuth measured from the subsolar
+      // azimuth, and for near-polar suns (Uranus: dec ±77-81°) the camera
+      // ELEVATION follows the sun too — an equatorial orbit would see
+      // mostly night there no matter the azimuth.
+      const sunW = this._sunW ??= new THREE.Vector3();
+      sunW.set(this.physics.sunDir.x, this.physics.sunDir.y, this.physics.sunDir.z)
+        .applyQuaternion(this.r.root.quaternion).normalize();
+      theta += Math.atan2(sunW.z, sunW.x);
+      const elev = sunW.y * 0.75; // fraction of dist lifted toward the lit pole
+      camY = dist * elev + bodyR * (cur.height || 1.5) * (1 - Math.abs(sunW.y));
+      xzR = dist * Math.sqrt(Math.max(0.08, 1 - elev * elev));
+    }
     const pos = new THREE.Vector3(
-      center.x + dist * Math.cos(theta),
-      center.y + bodyR * (cur.height || 1.5),
-      center.z + dist * Math.sin(theta)
+      center.x + xzR * Math.cos(theta),
+      center.y + camY,
+      center.z + xzR * Math.sin(theta)
     );
     const lookTarget = cur.lookAt ? this.r.bodyWorldPos(cur.lookAt, new THREE.Vector3()) : center;
     return { pos, quat: lookQuat(pos, lookTarget) };

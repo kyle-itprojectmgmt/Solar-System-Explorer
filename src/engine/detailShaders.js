@@ -356,6 +356,13 @@ DETAIL_STYLES.cratered = {
     ${DETAIL_PREAMBLE}
     float t1 = uTime * 0.00001; // geologically dead — near-zero motion
 
+    // v8.0.1 night discipline (Mars bug #55 class, measured on Ariel:
+    // night mean 6% with 38k bright ring pixels before the fix): relief
+    // and color deltas fade through the terminator; the finest crater
+    // scales additionally fade with sun elevation. Day side unchanged.
+    float crDayFade = sse_dayFade(dot(vObjPos, uSunObj), uDayFade0, uDayFade1);
+    float crGrazeFade = sse_grazeFade(dot(vObjPos, uSunObj), uGrazeFade0, uGrazeFade1);
+
     // LAYER 2 — dark carbonaceous regolith base with warm dust patches.
     float dustN = fbmN(vObjPos * 48.0 + vec3(t1), dOct);
     detail = mix(detail,
@@ -380,14 +387,16 @@ DETAIL_STYLES.cratered = {
     float c3Fade = dtlFreqFade2(dUv, 340.0);
     detail = mix(detail, vec3(0.10), clamp(-c3, 0.0, 1.0) * 0.5 * crAct * c3Fade);
     detail = mix(detail, vec3(0.27, 0.23, 0.17), clamp(c3, 0.0, 1.0) * 0.32 * crAct * c3Fade);
-    // Micro-cratering / powdery regolith.
+    // Micro-cratering / powdery regolith (graze-faded — sub-pixel bumps
+    // sparkle as isolated glints under any grazing light).
     detail *= 1.0 + (clamp(c4, -1.0, 1.0) * 0.18 * dtlFreqFade2(dUv, 1040.0)
-      + snoise(vObjPos * 1100.0) * 0.05 * dtlFreqFade(vObjPos, 1100.0)) * crAct;
+      + snoise(vObjPos * 1100.0) * 0.05 * dtlFreqFade(vObjPos, 1100.0)) * crAct * crGrazeFade;
 
     // Relief height (0g): rims lit, floors shadowed, at every crater scale.
+    // Finest scale graze-fades (v8.0.1).
     gDetailHeight = clamp(c1, -1.0, 1.0) * 0.45
       + clamp(c2, -1.0, 1.0) * 0.25 * (0.4 + 0.6 * crAct)
-      + clamp(c3, -1.0, 1.0) * 0.12 * crAct;
+      + clamp(c3, -1.0, 1.0) * 0.12 * crAct * crGrazeFade;
 
     // LAYER 3 — bright ice floors in the freshest craters.
     float fresh = step(0.82, id2) * clamp(-c2, 0.0, 1.0);
@@ -405,6 +414,11 @@ DETAIL_STYLES.cratered = {
       float core = 1.0 - smoothstep(0.05, 0.12, basinAngle);
       detail = mix(detail, vec3(0.784, 0.753, 0.690), core * 0.45);    // #C8C0B0
     }
+
+    // v8.0.1: night side reverts to the base texture/color — no relief,
+    // no painted detail past the terminator.
+    gDetailHeight *= crDayFade;
+    detail = mix(dBase, detail, crDayFade);
     ${DETAIL_FINAL}
   `,
 };

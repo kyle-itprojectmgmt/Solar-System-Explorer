@@ -542,25 +542,36 @@ export class UI {
       // Read first: entering insertion mode syncs this slider from the old
       // ins state, which would clobber the value being dragged.
       const incDeg = +this.mcIncSlider.value;
-      // Dragging inclination outside Orbit Insertion auto-switches (bug #23)
-      // — the intent is clearly "orbit at this angle". The new inclination
-      // is applied BEFORE setMode so the entry phase derives in the target
-      // plane (otherwise a stale stored inclination could snap the camera
-      // toward the pole on entry).
-      if (this.cam.mode !== 'insertion') {
+      // v8.0.1 (Kyle): INC adjusts the CURRENT orbit — no forced mode
+      // switch from orbit/insertion. The v4c auto-switch (bug #23) now
+      // applies only from non-orbital modes (cinematic/free/chase/system),
+      // where "orbit at this angle" is still clearly the intent — and the
+      // toast fires only on that real switch, never per drag.
+      if (this.cam.mode === 'insertion') {
+        this.cam.setInsertion({ incDeg });
+      } else if (this.cam.mode === 'orbit') {
+        // Orbit mode: inclination = the camera's polar tilt about the
+        // target. Keep ins.incDeg in sync so a later insertion entry
+        // starts from the same angle.
+        this.cam.ins.incDeg = incDeg;
+        this.cam.orbPhi = THREE.MathUtils.clamp(
+          Math.PI / 2 - (incDeg * Math.PI) / 180, 0.05, Math.PI - 0.05);
+      } else {
         const target = this.cam.target || this.cam.lastTarget || this.system.primary.name;
+        // Applied BEFORE setMode so the entry phase derives in the target
+        // plane (a stale stored inclination could snap toward the pole).
         this.cam.ins.incDeg = incDeg;
         this.cam.setMode('insertion', target);
         this.notify('Switched to Orbit Insertion for inclination');
+        this.cam.setInsertion({ incDeg });
       }
-      this.cam.setInsertion({ incDeg });
       this.mcIncLabel.textContent = incShort(incDeg);
     };
     const mcIncScale = el('div', 'ins-scale', this.incSecMC);
     mcIncScale.innerHTML = '<span>-90° retro</span><span>0° equatorial</span><span>90° polar</span>';
     this.mcIncLabel.textContent = incShort(this.cam.ins.incDeg);
     this.incNote = el('p', 'panel-desc', this.incSecMC);
-    this.incNote.textContent = 'Orbital plane tilt — dragging switches to Orbit Insertion';
+    this.incNote.textContent = 'Orbital plane tilt — adjusts the current orbit (switches to Orbit Insertion from other modes)';
   }
 
   _buildSpdPanel(c) {
@@ -1527,6 +1538,15 @@ export class UI {
     shot.dataset.tray = 'screenshot';
     shot.onclick = () => this.onScreenshot?.();
 
+    // ⏸/▶ pause toggle (v8.0.1). Icon shows the CURRENT state (▶ playing,
+    // ⏸ paused — Kyle's spec); resume restores the last non-zero speed via
+    // physics.pausedIndex. Kept in sync with Space / the TIME panel by
+    // update(). Under LIVE, pausing suspends the LIVE sync (see update()).
+    this.pauseBtn = el('button', 'tray-btn', tray);
+    this.pauseBtn.textContent = '▶';
+    this.pauseBtn.dataset.tray = 'pause';
+    this.pauseBtn.onclick = () => this.physics.togglePause();
+
     this.presBtn = el('button', 'tray-btn', tray);
     this.presBtn.textContent = '👁';
     this.presBtn.dataset.tray = 'presentation';
@@ -1848,6 +1868,7 @@ export class UI {
 
     // Sound modes
     t.attach(this.musicBtn, 'Music and soundscapes — generative modes, Spotify, YouTube');
+    t.attach(this.pauseBtn, 'Pause / Resume simulation');
     t.attach(this.teleBtn, 'Telephoto zoom — narrows the field of view for distant objects. Makes Earth fill the frame from lunar orbit.');
     t.attach(this.trayVol, 'Volume');
     t.attach(this.muteBtn, 'Mute / unmute all audio');
@@ -1941,7 +1962,10 @@ export class UI {
     // the stall time for a further minute after waking (reported as "HUD
     // shows local time": the stalled value happened to trail real UTC by
     // the tab-hidden duration). Drift > 2 s snaps on the first frame back.
-    if (this.liveMode) {
+    // Paused overrides LIVE (v8.0.1): the sync would instantly un-pause
+    // (forced 1×) and snap the clock. Resuming re-enters this branch and
+    // the >2 s drift snap catches the clock up on the first frame.
+    if (this.liveMode && !this.physics.paused) {
       if (this.physics.timeIndex !== 1) this.physics.setTimeIndex(1);
       const nowMs = Date.now();
       const driftS = Math.abs(
@@ -1956,6 +1980,9 @@ export class UI {
     const iso = simSecondsToDate(this.physics.simSeconds, this.physics.epochMs);
     this.dateEl.textContent = `${iso.slice(0, 10)}  ${iso.slice(11, 19)} UTC`;
     this.multEl.textContent = this.physics.paused ? 'PAUSED' : `${this.physics.timeMultiplier.toLocaleString()}×`;
+    // Pause tray button mirrors the state (▶ playing / ⏸ paused) no matter
+    // which control changed it (Space, TIME panel, tray click).
+    if (this.pauseBtn) this.pauseBtn.textContent = this.physics.paused ? '⏸' : '▶';
     this.timeSlider.value = this.physics.timeIndex;
     this.rootEl.querySelectorAll('[data-time-index]').forEach((b) => {
       b.classList.toggle('active', +b.dataset.timeIndex === this.physics.timeIndex);

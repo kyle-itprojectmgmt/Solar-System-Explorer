@@ -40,8 +40,8 @@ for (const sys of ['jupiter', 'earth', 'mars', 'saturn', 'mercury', 'venus', 'ur
     const ver = await page.$eval('#loading-version', (e) => e.textContent);
     // The Cloudflare RUM beacon CSP block is known bug #62 — not a V8 regression.
     const real = errors.filter((e) => !e.includes('cloudflareinsights'));
-    check(`${sys}: live at v8.0.0, zero console errors`,
-      ver.includes('v8.0.0') && real.length === 0,
+    check(`${sys}: live at v8.0.1, zero console errors`,
+      ver.includes('v8.0.1') && real.length === 0,
       `${ver.trim()} | ${real.slice(0, 2).join(' | ')}`);
   } catch (e) {
     check(`${sys}: live`, false, String(e).slice(0, 100));

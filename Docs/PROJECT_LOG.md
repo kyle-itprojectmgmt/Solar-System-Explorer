@@ -1199,6 +1199,50 @@ instead of suppressing (real floor is smooth plains).
   glint, incmeasure 6, ringfloor 7, haloshots, v8skeleton 10, v8test 21.
 - Deployed (92af3d44); all 8 systems live-verified with cache-bust.
 
+### v8.0.1 — Hardware-Review Fix Batch (2026-07-12)
+Kyle's real-hardware pass on v8: four items, all measured before fixing.
+- **INC slider no longer forces Orbit Insertion**: adjusts the current
+  orbit in orbit mode (orbPhi = π/2 − inc) and insertion mode directly;
+  the v4c auto-switch + toast now fire only from non-orbital modes.
+- **Moon night side (bug class = Mars #55)**: measured 14% mean night
+  luminance with EVERY pixel bright at 3,480 km. moon-detail.glsl had no
+  night discipline at all, ±rim relief, painted "lit rims", a terminator
+  drama layer amplifying relief on BOTH sides of the terminator, and a
+  reversed-smoothstep earthshine gate (UB). Now: bowl-only relief, rim
+  paint removed, per-chunk day fade + graze fade on fine scales,
+  day-gated terminator drama, earthshine 0.06→0.015 LINEAR (the emissive
+  was the entire flat night glow — linear 0.06 sRGB-encodes to ~14%
+  output; 0.015 ≈ the 8% spec; the prescribed `earthshine` config field
+  never existed — it is hardcoded in the chunk). Moon shaderParams added
+  (−0.02/0.06 + 0.15/0.50). DAY-side bycatch (screenshot): the v5 mare
+  "white ejecta" painted positive rims — a full donut-ring sheet at
+  2,500 km — now bright fresh-crater FLOORS. Wrinkle-ridge dark
+  squiggles remain (pre-v8 character, logged with #63).
+- **cratered style audit**: Ariel measured 38k bright night ring pixels
+  — the shared style (Callisto/Phobos/Saturn+Uranus moons/Proteus) had
+  no night fade either; added captured-baseline day fade + graze fade on
+  its finest scales (accepted day-side look untouched). Mercury/Miranda/
+  Triton measured PURE ZERO before any fix — the V8 chunks' night
+  discipline held. Mercury shaderParams tightened (−0.01/0.03 +
+  0.10/0.40). Guard: tests/moonnight.mjs (anti-solar luminance probe;
+  GATE=1: all six probes ≤ 8% / zero bright pixels).
+- **Lit-hemisphere entry**: default cinematic shots are now SUN-RELATIVE
+  (startTheta = offset from the live subsolar azimuth) and the camera
+  ELEVATION follows the sun for near-polar suns (Uranus) — all 8 systems
+  open at cam·sun ≈ 0.93. Scripted presets (Voyager, Earthrise) keep
+  absolute thetas. (The prescribed ins.phase fix targeted the wrong API —
+  boot enters cinematic mode, not insertion.)
+- **⏸/▶ pause button** in the tray between 📷 and 👁: icon mirrors state,
+  resume restores the last non-zero speed (physics.pausedIndex), Space
+  was already bound, PAUSED HUD label synced. LIVE fix: pause now
+  suspends the LIVE sync (it used to force 1× back instantly); resume
+  re-syncs via the >2 s drift snap.
+- Guards: tests/v801.mjs (18 checks) + moonnight GATE. Full regression
+  green (smoke, earthtest, marstest, saturntest, v8skeleton, v8test,
+  incmeasure, ringfloor, polesnap, incroll, presets, v5b, livedefault,
+  nightlights). Deployed (658e3c61); all 8 systems live-verified at
+  v8.0.1, zero console errors.
+
 ### v7.0.3 — Custom Domain app.solarexplorer.co (2026-07-12)
 Primary URL is now https://app.solarexplorer.co (zone solarexplorer.co;
 landing page at the apex is separate and unchanged). Changes:
@@ -1294,7 +1338,7 @@ landing page at the apex is separate and unchanged). Changes:
 | 60 | Thin-atmosphere halos render as thick rings wrapping the night side (hardware-confirmed by Kyle: Earth at ~3,000 km, Io at ~370 km). Cause: soft fresnel pow + wide lit gate on all thin-atmosphere shells, plus Earth's v5b night-scatter alpha floor keeping the halo alive on the night limb. Fixed v7.0.2: per-body fresnelPower/thickness/intensity config, universal tight lit gate (−0.05..0.20), Earth night-scatter term removed, ISS horizon arc opt-in via horizonGlow. Titan/Saturn exempt. Guard: tests/haloshots.mjs (diff-render probe). | Resolved v7.0.2 | — |
 | 61 | tests/stack.mjs stale since v7 — 4 checks assert the pre-v7 world (6 stack buttons vs 9 with ALT/INC/SPD, "camera panel + 7 modes", Saturn "Coming Soon" toast though Saturn is built, Tab cycle count). Share/preset/?view= checks still green and meaningful. Refresh the assertions. | Needs fix (test-only) | — |
 | 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard (matches the no-analytics Privacy Policy stance) or allow the host in CSP script-src + connect-src. workers.dev is unaffected. | Needs decision | — |
-| 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. | Needs review | V8_REMAINING_PLANETS.md |
+| 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. ALSO (v8.0.1): Moon wrinkle-ridge patches read as dark spidery squiggles at ~2,500 km (relief shading under normalScale 2.5; knobs: wRegion/wrinkles in moon-detail.glsl LAYER 2). | Needs review | V8_REMAINING_PLANETS.md |
 | 64 | Mercury terminator longitude: the circular ephemeris cannot track e = 0.206 — subsolar longitude oscillates ±23° (equation of center) around the mean-longitude anchor every 88-day year. Zero-mean by construction; fine for lighting. Refine when the ephemeris gains eccentricity (same item as the Mars ±10° note in mars.js). | Data choice — ephemeris eccentricity is a backlog item | — |
 | 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only; the roadmap's outer-system line originally listed Pluto too. NAV shows Pluto as Coming Soon. A V9 session could add it (Pluto+Charon binary barycenter would be a new physics pattern). | Future session | — |
 
