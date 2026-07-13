@@ -667,8 +667,9 @@ export class UI {
           m.onclick = () => this.cam.focusBody(b.name);
         }
       } else if (AVAILABLE_SYSTEMS.includes(p.name.toLowerCase())) {
-        // Built system: travel there (V5 1d).
-        row.innerHTML = `<span>● ${p.name}</span><span class="body-chev">→</span>`;
+        // Built system: travel there (V5 1d). Optional per-body icon from
+        // SOLAR_SYSTEM (V10 — Pluto's ♇ dwarf-planet symbol).
+        row.innerHTML = `<span>${p.icon || '●'} ${p.name}</span><span class="body-chev">→</span>`;
         row.onclick = () => {
           this.notify(`Traveling to the ${p.name} system…`);
           switchSystem(p.name.toLowerCase());

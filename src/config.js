@@ -18,6 +18,7 @@ export const AVAILABLE_SYSTEMS = [
   'sun', // first — the center of everything (V9)
   'jupiter', 'earth', 'mars', 'saturn',
   'mercury', 'venus', 'uranus', 'neptune',
+  'pluto', // the 10th system — dwarf planet binary (V10)
 ];
 
 // Active system: ?system= URL parameter, validated against the list.
@@ -57,7 +58,7 @@ export const SOLAR_SYSTEM = [
   { name: 'Saturn', moons: ['Titan', 'Enceladus', 'Rhea', 'Iapetus'] },
   { name: 'Uranus', moons: ['Miranda', 'Ariel', 'Umbriel', 'Titania', 'Oberon'] },
   { name: 'Neptune', moons: ['Triton', 'Proteus'] },
-  { name: 'Pluto', moons: ['Charon'] },
+  { name: 'Pluto', moons: ['Charon'], icon: '♇' }, // dwarf-planet symbol (V10)
 ];
 
 // Ko-fi handle for the donate button.
