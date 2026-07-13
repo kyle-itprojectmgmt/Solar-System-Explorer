@@ -8,8 +8,9 @@
 ## Repository
 
 Root: C:\dev\Solar-System-Explorer
-Live: https://solar-system-explorer.kyle-d06.workers.dev
-Host: Cloudflare Worker (workers.dev URL — NOT Cloudflare Pages)
+Live: https://app.solarexplorer.co (primary custom domain)
+Fallback: https://solar-system-explorer.kyle-d06.workers.dev
+Host: Cloudflare Worker (NOT Cloudflare Pages)
 Textures: Cloudflare R2 (zero egress fees)
 
 ---

@@ -1320,6 +1320,7 @@ landing page at the apex is separate and unchanged). Changes:
 | 14 | Custom domain URL update — app.solarexplorer.co | Update src/config.js APP_URL to https://app.solarexplorer.co. Update wrangler.toml routes. Grep and replace all hardcoded solar-system-explorer.kyle-d06.workers.dev URLs in codebase. Verify share URL generator uses new domain. Landing page (solarexplorer.co) also needs its Launch Explorer links updated to app.solarexplorer.co — coordinate with landing page chat. |
 | 15 | instructions.md location wrong | .claude/instructions.md says PROJECT_LOG.md is at repo root but it actually lives in Docs/. Update instructions.md path reference. Also update any other path references that may be wrong. |
 | 16 | Callisto + Jupiter horizon curated preset | The Callisto/Jupiter telephoto shot (Callisto surface in foreground, Jupiter above horizon, Milky Way background) is one of the best views in the simulator. Add as a curated preset in jupiter.js. Position: low orbit over Callisto, Alt+drag tilted to show Jupiter above the horizon, telephoto FOV ~10°. |
+| 17 | Disable Cloudflare RUM beacon (bug #62) | Cloudflare dashboard → Speed → Optimization → Real User Monitoring → Disable. 2-click fix, no code change. Eliminates CSP console error on app.solarexplorer.co for all users. Aligned with no-analytics Privacy Policy. |
 
 Completed in v4c (removed from backlog): ghost time display, date
 picker + LIVE toggle, icon-stack Mission Control redesign (Camera /
