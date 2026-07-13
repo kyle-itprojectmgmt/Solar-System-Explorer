@@ -18,6 +18,11 @@ import MARS_ATMOSPHERE_GLSL from './shaders/mars-atmosphere.glsl?raw';
 import SATURN_ATMOSPHERE_GLSL from './shaders/saturn-atmosphere.glsl?raw';
 import TITAN_GLSL from './shaders/titan.glsl?raw';
 import SATURN_RINGS_GLSL from './shaders/saturn-rings.glsl?raw';
+import SUN_PHOTOSPHERE_GLSL from './shaders/sun-photosphere.glsl?raw';
+import SUN_CORONA_GLSL from './shaders/sun-corona.glsl?raw';
+import SUN_CHROMOSPHERE_GLSL from './shaders/sun-chromosphere.glsl?raw';
+import SUN_SPOTS_GLSL from './shaders/sun-spots.glsl?raw';
+import SIMPLEX_GLSL from './glsl/simplex.glsl?raw';
 
 const K = 1 / KM_PER_UNIT; // km -> scene units
 
@@ -67,9 +72,12 @@ export class SceneRenderer {
     this.resizeHooks = []; // extra consumers (postfx) resize through here
     this.detailEntries = []; // bodies with procedural detail shaders
 
-    this._buildLights();
+    // Star systems (V9, system.isStar): the primary IS the light source —
+    // self-luminous shader spheres instead of a lit textured planet, and no
+    // external directional sun / sprite / lens flare.
+    if (system.isStar) this._buildSunLights(); else this._buildLights();
     this._buildStarfield();
-    this._buildPrimary();
+    if (system.isStar) this._buildSunPrimary(); else this._buildPrimary();
     this._buildRings();
     this._buildBodies();
     this._buildOrbitLines();
@@ -365,6 +373,103 @@ export class SceneRenderer {
       cfg: p, mesh: this.primaryMesh, group: this.primaryMesh,
       radiusUnits: rEq, isPrimary: true,
     });
+  }
+
+  // -- Star primary (V9) ----------------------------------------------------------
+
+  /** Lighting for a star system: the body is self-luminous (every sun
+   *  material is an emissive raw shader that ignores scene lights), so no
+   *  directional sun, no planet-shine, no sprite/lens flare. sunDir is kept
+   *  in sync with physics for engine parity but drives nothing visual. */
+  _buildSunLights() {
+    const star = this.system.star;
+    this.sunDir = new THREE.Vector3(...star.direction).normalize();
+    const amb = this.system.nightAmbient;
+    this.scene.add(new THREE.AmbientLight(
+      typeof amb === 'object' ? amb.color : 0x223344,
+      (typeof amb === 'object' ? amb.intensity : amb) ?? 0.06));
+  }
+
+  /** Photosphere + chromosphere + corona at true scale (radiusKm, house
+   *  convention — the log depth buffer handles the 696-unit sphere and the
+   *  5,568-unit corona shell without precision issues). */
+  _buildSunPrimary() {
+    const p = this.system.primary;
+    const R = p.radiusKm * K;
+
+    // Shared per-frame uniforms — one write updates every sun material.
+    this.sunActivity = this._storedSunActivity();
+    this.sunShared = {
+      uTime: { value: 0 },
+      uDays: { value: 0 },
+      uActivity: { value: this.sunActivity },
+      uCamPos: { value: new THREE.Vector3() },
+    };
+
+    // Photosphere: opaque self-luminous surface. simplex + the sunspot
+    // library are prepended to the fragment stage (see the .glsl contracts).
+    const ph = p.photosphere || {};
+    const photoMat = makeSunShaderMaterial(SUN_PHOTOSPHERE_GLSL, {
+      ...this.sunShared,
+      uGranScale: { value: ph.granulationScale ?? 28.0 },
+      uLimbCoeff: { value: ph.limbDarkeningCoeff ?? 0.6 },
+      uSuperAmp: { value: ph.supergranulationAmp ?? 0.08 },
+      uSpotPos: { value: Array.from({ length: 12 }, () => new THREE.Vector2()) },
+      uSpotRad: { value: new Array(12).fill(0) },
+      uSpotAge: { value: new Array(12).fill(0) },
+      uSpotCount: { value: 0 },
+    }, { fragmentPrelude: SIMPLEX_GLSL + '\n' + SUN_SPOTS_GLSL });
+    this.primaryMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 96), photoMat);
+    this.primaryMesh.scale.setScalar(R);
+    this.primaryMesh.renderOrder = 0;
+    this.primaryMesh.name = p.name;
+    this.root.add(this.primaryMesh);
+    this.pickables.push(this._makePicker(p.name, this.primaryMesh, R));
+
+    // Chromosphere: thin H-alpha rim shell. BackSide + depth test keeps it
+    // outside the disc silhouette (the far hemisphere is disc-occluded).
+    const ch = p.chromosphere || {};
+    const chromoMat = makeSunShaderMaterial(SUN_CHROMOSPHERE_GLSL, {
+      ...this.sunShared,
+      uColor: { value: new THREE.Color(...(ch.color || [0.95, 0.15, 0.20])) },
+      uIntensity: { value: ch.intensity ?? 0.6 },
+    }, { shell: true, fragmentPrelude: SIMPLEX_GLSL });
+    const chromoMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), chromoMat);
+    chromoMesh.scale.setScalar(R * (ch.thickness ?? 1.005));
+    chromoMesh.renderOrder = 1;
+    this.root.add(chromoMesh);
+
+    // Corona: large additive glow shell. Shading works on the view ray's
+    // impact parameter (see sun-corona.glsl) — shell radius is cosmetic.
+    const co = p.corona || {};
+    const coronaMat = makeSunShaderMaterial(SUN_CORONA_GLSL, {
+      ...this.sunShared,
+      uSurfaceR: { value: R },
+      uBaseOpacity: { value: co.baseOpacity ?? 0.4 },
+      uActivityScale: { value: co.activityScale ?? 0.8 },
+    }, { shell: true, fragmentPrelude: SIMPLEX_GLSL });
+    const coronaMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), coronaMat);
+    coronaMesh.scale.setScalar(R * (co.radius ?? 8.0));
+    coronaMesh.renderOrder = 2;
+    this.root.add(coronaMesh);
+
+    this.sunMats = { photoMat, chromoMat, coronaMat };
+    this.bodyMeshes.set(p.name, {
+      cfg: p, mesh: this.primaryMesh, group: this.primaryMesh,
+      radiusUnits: R, isPrimary: true,
+    });
+  }
+
+  _storedSunActivity() {
+    const def = this.system.primary.sunspots?.defaultActivity ?? 0.75;
+    const stored = parseFloat(localStorage.getItem('sse-sun-activity'));
+    return Number.isFinite(stored) ? Math.min(1, Math.max(0, stored)) : def;
+  }
+
+  /** Live solar-activity level (VIEW slider) — one shared uniform. */
+  setSunActivity(v) {
+    this.sunActivity = v;
+    if (this.sunShared) this.sunShared.uActivity.value = v;
   }
 
   // -- Rings ---------------------------------------------------------------------
@@ -778,6 +883,15 @@ export class SceneRenderer {
     this.primaryMesh.rotation.y = physics.primaryRotation;
     this._updateDetailShaders(physics);
 
+    // Sun materials (V9): shared uniforms across photosphere/chromosphere/
+    // corona. uTime wraps at 1e6 (house rule — drifts must loop); uDays is
+    // unwrapped for slow secular drifts (differential rotation).
+    if (this.sunShared) {
+      this.sunShared.uTime.value = physics.simSeconds % 1e6;
+      this.sunShared.uDays.value = physics.simSeconds / 86400;
+      this.sunShared.uCamPos.value.copy(this.camera.position);
+    }
+
     for (const b of physics.bodies) {
       const entry = this.bodyMeshes.get(b.name);
       if (!entry || entry.isPrimary) continue;
@@ -930,6 +1044,8 @@ export class SceneRenderer {
   /** Ephemeris (V5): follow physics.sunDir when the date moves the sun —
    *  light, sun sprite, lens flare and the ring-shadow uniforms all track. */
   _syncSunDirection(physics) {
+    // Star systems have no external sun to track (no sunLight/sunAnchor).
+    if (this.system.isStar) return;
     const d = physics.sunDir;
     if (Math.abs(d.x - this.sunDir.x) < 1e-5
       && Math.abs(d.y - this.sunDir.y) < 1e-5
@@ -999,6 +1115,29 @@ function makeRayleighMaterial(atm) {
  */
 function makeDustMaterial(atm) {
   return makeShellAtmosphereMaterial(MARS_ATMOSPHERE_GLSL, atm);
+}
+
+/**
+ * Sun shader material (V9): splits a sun .glsl file on the house
+ * VERTEX/FRAGMENT markers, optionally prepending shared GLSL libraries
+ * (simplex noise, the sunspot library) to the fragment stage. The sun
+ * shaders carry their own logdepthbuf chunks (V7 Titan lesson).
+ */
+function makeSunShaderMaterial(glslSource, uniforms, opts = {}) {
+  const [, rest] = glslSource.split('// === VERTEX ===');
+  const [vertexShader, fragmentShader] = rest.split('// === FRAGMENT ===');
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader,
+    fragmentShader: (opts.fragmentPrelude || '') + '\n' + fragmentShader,
+    ...(opts.shell ? {
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false,
+    } : {}),
+  });
+  return mat;
 }
 
 function makeShellAtmosphereMaterial(glslSource, atm) {

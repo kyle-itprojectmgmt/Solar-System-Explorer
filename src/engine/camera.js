@@ -144,10 +144,11 @@ export class CameraController {
           // with the rings arcing across the whole frame.
           const derivedKm = (local.length() - entry.radiusUnits) * KM_PER_UNIT;
           const frameKm = entry.radiusUnits * KM_PER_UNIT * 3.7;
-          this.ins.altitudeKm = Math.max(
+          const maxKm = this._maxInsertionAltKm(this.ins.body);
+          this.ins.altitudeKm = Math.min(maxKm, Math.max(
             this._minInsertionAltKm(this.ins.body),
-            derivedKm > 500000 ? frameKm : derivedKm
-          );
+            derivedKm > maxKm ? frameKm : derivedKm
+          ));
         }
       }
       // Default view: nadir plus a forward tilt that adapts to how large
@@ -411,7 +412,8 @@ export class CameraController {
       const min = this._minInsertionAltKm(this.ins.body);
       const f = Math.exp(-delta * 0.0016 * resist(this.ins.body, this.ins.altitudeKm));
       this.ins.altitudeKm = THREE.MathUtils.clamp(
-        Math.max(this.ins.altitudeKm, min * 1.001) * f, min, 500000);
+        Math.max(this.ins.altitudeKm, min * 1.001) * f, min,
+        this._maxInsertionAltKm(this.ins.body));
       this.onInsertionChange?.(this.ins);
     } else {
       // Free fly / cinematic (which hands off to free on input anyway):
@@ -694,6 +696,13 @@ export class CameraController {
     return Math.max(detailKm, ringKm);
   }
 
+  /** Insertion/zoom altitude ceiling — config-driven (V9): the 500,000 km
+   *  house default is less than one solar radius over the Sun's photosphere,
+   *  so star-scale bodies raise it via cfg.maxInsertionAltKm. */
+  _maxInsertionAltKm(name) {
+    return this.r.bodyMeshes.get(name)?.cfg?.maxInsertionAltKm ?? 500000;
+  }
+
   _bodyRotationRateRadS(name) {
     const entry = this.r.bodyMeshes.get(name);
     if (!entry) return 0;
@@ -726,7 +735,8 @@ export class CameraController {
     Object.assign(this.ins, params);
     if (params.body) { this.target = params.body; this.lastTarget = params.body; }
     const min = this._minInsertionAltKm(this.ins.body);
-    this.ins.altitudeKm = THREE.MathUtils.clamp(this.ins.altitudeKm, min, 500000);
+    this.ins.altitudeKm = THREE.MathUtils.clamp(this.ins.altitudeKm, min,
+      this._maxInsertionAltKm(this.ins.body));
     // (Re)anchor the geosync lock at the camera's current longitude when the
     // lock engages or the locked body changes — no jump, just hold station.
     if (this.ins.locked && (!wasLocked || params.body)) {

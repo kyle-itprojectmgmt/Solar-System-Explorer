@@ -174,11 +174,13 @@ async function boot() {
   }
 
   // Wait for the texture manager to finish (or 12 s max) before revealing.
+  // Star systems (V9) are fully procedural — nothing ever enters the
+  // loading manager, so onLoad never fires; reveal after a short beat.
   await new Promise((resolve) => {
     let settled = false;
     const finish = () => { if (!settled) { settled = true; resolve(); } };
     renderer.loadingManager.onLoad = finish;
-    setTimeout(finish, 12000);
+    setTimeout(finish, system.isStar ? 600 : 12000);
   });
 
   loader.done();
