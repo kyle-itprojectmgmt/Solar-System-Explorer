@@ -24,9 +24,13 @@ float pl_mapped = smoothstep(0.24, 0.30, dUv.y);
 // Mask: ellipse around (0.489, 0.62) AND high luminance (> 0.6).
 // Visual: bright white-pink with subtle convection-cell texture (worley2), glacier-smooth surface.
 {
-  // Ellipse mask (smooth soft edge).
-  vec2 pl_t_center = vec2(0.489, 0.62);
-  vec2 pl_t_delta = vec2(dUv.x - pl_t_center.x, (dUv.y - pl_t_center.y) * 0.833);  // aspect ratio ~1.2:1
+  // Ellipse mask (smooth soft edge). The map is rolled to the engine's
+  // center-origin convention (0degE at u 0.5, Earth precedent), which puts
+  // the heart (176degE) at u 0.989 ACROSS THE WRAP SEAM — the u-distance
+  // must wrap (fract(d + 0.5) - 0.5 maps into [-0.5, 0.5]).
+  vec2 pl_t_center = vec2(0.989, 0.62);
+  float pl_t_du = fract(dUv.x - pl_t_center.x + 0.5) - 0.5;
+  vec2 pl_t_delta = vec2(pl_t_du, (dUv.y - pl_t_center.y) * 0.833);  // aspect ratio ~1.2:1
   float pl_t_ellipse = 1.0 - smoothstep(0.08, 0.12, length(pl_t_delta));
 
   // Luminance mask.
@@ -35,16 +39,17 @@ float pl_mapped = smoothstep(0.24, 0.30, dUv.y);
 
   float pl_t_alt = 1.0 - smoothstep(1000.0, 3500.0, uAltitude);
   if (pl_t_alt > 0.001 && pl_t_ellipse > 0.001) {
-    // Convection-cell texture from worley2 at low frequency (cells ~40 km ≈ freq 70 in dUv).
-    float pl_t_cFade = dtlFreqFade2(dUv, 70.0);
-    vec2 pl_t_w = worley2(dUv * 70.0 + 11.2);
-
-    // Cell walls at HIGH worley distance (equidistant from cell centers).
-    // Orchestrator fix: the trough goes at the WALLS — Sputnik Planitia's
-    // signature is polygonal tiles separated by boundary troughs (upwelling
-    // cell centers ride high); dimples at centers read as bubble wrap.
-    float pl_t_wallMask = smoothstep(0.30, 0.45, pl_t_w.x);
-    gDetailHeight -= pl_t_wallMask * 0.03 * pl_t_alt * pl_t_cFade * pl_t_ellipse * pl_t_brightMask;
+    // Convection-cell mosaic (cells ~50 km ≈ freq 150 in dUv). Screenshot
+    // calibration, TWO failed relief cuts: any height signal derived from
+    // worley F1 renders as stamped rings (high-F1 regions circle each
+    // feature point — true cell BOUNDARIES need F2−F1, which the library
+    // does not provide). The real NH appearance is a mosaic of subtly
+    // different-toned polygonal tiles anyway — per-cell tone from the cell
+    // id hash, COLOR ONLY, zero relief. The ring pathology cannot exist.
+    float pl_t_cFade = dtlFreqFade2(dUv, 150.0);
+    vec2 pl_t_w = worley2(dUv * 150.0 + 11.2);
+    float pl_t_tone = (fract(pl_t_w.y * 7.73) - 0.5) * 0.04;
+    detail *= 1.0 + pl_t_tone * pl_t_alt * pl_t_cFade * pl_t_ellipse * pl_t_brightMask;
 
     // Color nudge toward bright white-pink (glacier smooth).
     vec3 pl_t_tonePink = vec3(0.96, 0.92, 0.90);
@@ -99,9 +104,11 @@ float pl_mapped = smoothstep(0.24, 0.30, dUv.y);
 // Mask: soft edge band of heart ellipse AND mid luminance (0.40–0.70).
 // Visual: ridgedFbm3 relief (positive ridges = mountains), grey-white tint.
 {
-  // Ellipse mask (inner soft edge out, outer soft edge in).
-  vec2 pl_m_center = vec2(0.489, 0.62);
-  vec2 pl_m_delta = vec2(dUv.x - pl_m_center.x, (dUv.y - pl_m_center.y) * 0.833);
+  // Ellipse mask (inner soft edge out, outer soft edge in). Same wrap-aware
+  // u-distance as LAYER 1 — the heart straddles the texture seam.
+  vec2 pl_m_center = vec2(0.989, 0.62);
+  float pl_m_du = fract(dUv.x - pl_m_center.x + 0.5) - 0.5;
+  vec2 pl_m_delta = vec2(pl_m_du, (dUv.y - pl_m_center.y) * 0.833);
   float pl_m_r = length(pl_m_delta);
   float pl_m_rimMask = smoothstep(0.11, 0.14, pl_m_r) * (1.0 - smoothstep(0.17, 0.21, pl_m_r));
 
@@ -126,11 +133,11 @@ float pl_mapped = smoothstep(0.24, 0.30, dUv.y);
 }
 
 // LAYER 4 — BLADED TERRAIN (Tartarus Dorsa, anisotropic N-S ridges east of heart).
-// Mask: u ∈ [0.60, 0.76], v ∈ [0.50, 0.66] with soft edges.
+// Mask: u ∈ [0.10, 0.26] on the ROLLED map (was 0.60–0.76 pre-roll), v ∈ [0.50, 0.66].
 // Visual: anisotropic fbm3 (stretched u axis), pale yellow-white ridges.
 {
   // Soft bounding box for Tartarus Dorsa region.
-  float pl_b_uMask = smoothstep(0.58, 0.62, dUv.x) * (1.0 - smoothstep(0.74, 0.78, dUv.x));
+  float pl_b_uMask = smoothstep(0.08, 0.12, dUv.x) * (1.0 - smoothstep(0.24, 0.28, dUv.x));
   float pl_b_vMask = smoothstep(0.48, 0.52, dUv.y) * (1.0 - smoothstep(0.64, 0.68, dUv.y));
 
   float pl_b_alt = 1.0 - smoothstep(1200.0, 3500.0, uAltitude);

@@ -17,6 +17,12 @@
 // mosaics via Steve Albers SOS (stevealbers.net/albers/sos/) —
 // pluto_rgb_cyl_8k.png (shipped as 2K diffuse.jpg + 8K diffuse_8k.jpg
 // progressive swap) and pluto/charon/charon_rgb_cyl.jpg (4K).
+// PLUTO MAP ROLLED 180°: the source is centered on 180°E (the standard
+// NH presentation — heart at center); the engine's texture convention is
+// 0°E at map CENTER (Earth precedent, suncal pixel-verified), so the
+// shipped jpgs are rolled half a width. The heart (176°E) wraps the seam
+// at u ≈ 0.989. Charon's map is already center-origin (Pluto-facing
+// encounter hemisphere at center) — NOT rolled.
 // Non-commercial by permission, attribution required (backlog #10).
 // The southern winter hemispheres are smooth fill — New Horizons flew
 // by during northern summer; the south was in decades-long darkness.
@@ -59,7 +65,13 @@ export default {
     // Sidereal day = Charon's orbital period (mutually tidally locked).
     // POSITIVE period + tilt > 90 deg = retrograde rotation (house rule).
     rotationPeriodHours: 153.2935,
-    rotationPhaseAtEpochDeg: 0,  // Phase 3: calibrate so Tombaugh Regio faces the sunlit entry at epoch
+    // Measured through the engine (subsolar-longitude probe, suncal
+    // convention): subsolar lon = 176.0degE — the heart center — at the NH
+    // epoch. MUST move in lockstep with Charon's phaseDeg below: the pair
+    // preserves the sub-Charon meridian at 0degE (the IAU prime-meridian
+    // convention, which the mutual lock holds at ALL epochs), so the heart
+    // (176degE) sits at the anti-Charon point exactly as in reality.
+    rotationPhaseAtEpochDeg: -139.2,
     orbitalPeriodDays: 90560,    // 248 years
     axialTiltDeg: 122.53,
     surfaceGravity: 0.62,        // m/s² — you'd weigh 6% of Earth weight
@@ -92,13 +104,13 @@ export default {
       {
         label: '❤️ Tombaugh Regio',
         altitudeKm: 5000,
-        uv: [0.489, 0.62],
+        uv: [0.989, 0.62],  // rolled map: heart (176degE) wraps the seam
         message: 'Approaching Pluto\'s iconic heart — a nitrogen ice plain spanning 1,000 km',
       },
       {
         label: '🌑 Cthulhu Macula',
         altitudeKm: 4000,
-        uv: [0.28, 0.47],
+        uv: [0.78, 0.47],  // rolled map (100degE)
         message: 'Descending toward the dark tholin-stained whale of Cthulhu Macula',
       },
     ],
@@ -139,8 +151,10 @@ export default {
       name: 'Charon', slug: 'charon',
       radiusKm: 606.0, massKg: 1.586e21,
       // Same period as Pluto's rotation — the mutual tidal lock. phaseDeg
-      // calibrated in Phase 3 so Charon hangs over the anti-heart point.
-      semiMajorAxisKm: 19596, periodDays: 6.387229, phaseDeg: 0, inclinationDeg: 0.001,
+      // moves in lockstep with rotationPhaseAtEpochDeg above (measured:
+      // sub-Charon lon 0.000degE at epoch, quarter-orbit, and two orbits —
+      // Charon hangs stationary over the anti-heart hemisphere forever).
+      semiMajorAxisKm: 19596, periodDays: 6.387229, phaseDeg: -139.2, inclinationDeg: 0.001,
       physics: 'kepler', tidallyLocked: true,
       textures: { diffuse: 'diffuse.jpg' },
       normalScale: 2.0,

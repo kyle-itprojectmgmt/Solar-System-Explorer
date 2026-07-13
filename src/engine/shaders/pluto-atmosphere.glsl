@@ -53,9 +53,12 @@ void main() {
   // Multiply alpha by (0.85 + 0.15 * sin(...)) for vertical striping effect.
   float layerBand = 0.85 + 0.15 * sin(fresnel * 28.0);
 
-  // Backlit boost: when looking toward the sun through the limb (forwardScatter),
-  // multiply alpha up to ~2.5x and brighten color toward brighter blue.
-  float forwardScatter = pow(max(0.0, dot(viewDir, uSunW)), 3.0);
+  // Backlit boost (orchestrator fix: forward-scattered light EXITS along the
+  // propagation direction -uSunW, so the camera catches it when viewDir is
+  // ANTI-sunward — the worker's +dot peaked on the day side instead. Viewed
+  // anti-solar the whole limb is the terminator ring, so this term paints
+  // the full blue ring New Horizons made famous).
+  float forwardScatter = pow(max(0.0, -dot(viewDir, uSunW)), 3.0);
 
   // Gate backlit boost to the lit/terminator limb (ascending edges: zero in
   // deep night below sunDot -0.15 — no night-ring alpha floor, v7 lesson).
@@ -70,8 +73,11 @@ void main() {
   float alpha = fresnel * lit * layerBand;
   alpha = clamp(alpha, 0.0, 0.6) * uIntensity * 0.30;
 
-  // Backlit alpha boost: multiply up to 2.5x only for the forward-scatter term.
-  alpha += fresnel * forwardScatter * uIntensity * 0.30 * 2.5;
+  // Backlit ring: its own WIDER fresnel (pow 2.5 vs the day-side 6.0 — the
+  // pow-6 annulus is 2 px and reads as nothing; NH's ring is thin but
+  // unmistakable) and stronger gain. Still zero in deep night via backitGate.
+  float ringFresnel = pow(1.0 - abs(dot(viewDir, n)), 2.5);
+  alpha += ringFresnel * forwardScatter * uIntensity * 0.30 * 4.0;
   alpha = clamp(alpha, 0.0, 0.8);
 
   gl_FragColor = vec4(hazeColor, alpha);

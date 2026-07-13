@@ -1037,10 +1037,11 @@ export class UI {
       } },
       { label: '🌙 Blue Haze Crescent', system: 'pluto', fn: () => {
         // The iconic backlit NH departure shot: camera on the night side
-        // looking back at the lit limb. Cinematic shots are sun-relative
-        // (v8.0.1), so startTheta ≈ π parks the camera anti-solar.
+        // looking back at the lit limb. sunRel makes startTheta an OFFSET
+        // from the live subsolar azimuth (v8.0.1) — ≈π parks it anti-solar
+        // with the sun just off-axis behind the disc.
         this.cam.playSequence([
-          { target: 'Pluto', dist: 4.5, height: 0.35, orbitRate: 0.02, duration: 45, startTheta: Math.PI * 0.88 },
+          { target: 'Pluto', dist: 4.5, height: 0.35, orbitRate: 0.015, duration: 60, startTheta: Math.PI * 0.94, sunRel: true },
         ]);
         this.notify('Backlit crescent — the blue nitrogen haze New Horizons saw looking home');
       } },
