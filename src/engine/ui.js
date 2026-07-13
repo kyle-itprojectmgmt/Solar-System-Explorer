@@ -1013,6 +1013,42 @@ export class UI {
         this.cam.setInsertion({ altitudeKm: 1200000, incDeg: 0 });
         this.notify('The full disc — chromosphere ring and prominence arcs at the limb');
       } },
+      // V10 Pluto presets. Epoch preset follows the house pattern; the
+      // flyby preset ALSO frames the heart (the encounter hemisphere).
+      { label: '🚀 New Horizons — 2015', system: 'pluto', fn: () => {
+        this.setLive(false);
+        this.physics.jumpToSimSeconds(0);
+        this.physics.setTimeIndex(1);
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) this.cam.flyToFeature(this.system.primary.name, preset);
+        this.notify('New Horizons closest approach — July 14, 2015, 11:49 UTC');
+      } },
+      { label: '❤️ The Heart', system: 'pluto', fn: () => {
+        const preset = this.system.primary.navPresets?.[0];
+        if (preset) {
+          this.cam.flyToFeature(this.system.primary.name, preset);
+          this.notify(preset.message || 'Approaching Tombaugh Regio — the nitrogen ice heart');
+        }
+      } },
+      { label: '🌑 Pluto + Charon', system: 'pluto', fn: () => {
+        this.cam.setMode('insertion', this.system.primary.name);
+        this.cam.setInsertion({ altitudeKm: 40000, incDeg: 10 });
+        this.notify('The double world — Charon holds station at 19,600 km, locked face to face');
+      } },
+      { label: '🌙 Blue Haze Crescent', system: 'pluto', fn: () => {
+        // The iconic backlit NH departure shot: camera on the night side
+        // looking back at the lit limb. Cinematic shots are sun-relative
+        // (v8.0.1), so startTheta ≈ π parks the camera anti-solar.
+        this.cam.playSequence([
+          { target: 'Pluto', dist: 4.5, height: 0.35, orbitRate: 0.02, duration: 45, startTheta: Math.PI * 0.88 },
+        ]);
+        this.notify('Backlit crescent — the blue nitrogen haze New Horizons saw looking home');
+      } },
+      { label: '🔴 Mordor Macula', system: 'pluto', fn: () => {
+        this.cam.setMode('insertion', 'Charon');
+        this.cam.setInsertion({ altitudeKm: 3000, incDeg: 70 });
+        this.notify('Charon\'s dark pole — methane from Pluto, burnt red by radiation');
+      } },
     ];
     this.voyagerBtn = null;
     for (const p of curated) {

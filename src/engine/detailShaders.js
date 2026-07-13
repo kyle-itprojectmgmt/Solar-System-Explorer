@@ -36,6 +36,8 @@ import OURANOS_CLOUDS from './shaders/uranus-clouds.glsl?raw';
 import MIRANDA_DETAIL from './shaders/miranda-surface.glsl?raw';
 import POSEIDON_CLOUDS from './shaders/neptune-clouds.glsl?raw';
 import TRITON_DETAIL from './shaders/triton-surface.glsl?raw';
+import PLUTO_DETAIL from './shaders/pluto-surface.glsl?raw';
+import CHARON_DETAIL from './shaders/charon-surface.glsl?raw';
 
 /** Registry of detail styles. Populated per body type below. */
 export const DETAIL_STYLES = {};
@@ -610,6 +612,29 @@ DETAIL_STYLES.triton = {
   apply: /* glsl */ `
     ${DETAIL_PREAMBLE}
     { ${tritonDetail.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+// -- Pluto + Charon (V10) — the dwarf-planet binary --------------------------------
+
+const plutoDetail = splitChunk(PLUTO_DETAIL);
+const charonDetail = splitChunk(CHARON_DETAIL);
+
+DETAIL_STYLES.pluto = {
+  fns: plutoDetail.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${plutoDetail.apply} }
+    ${DETAIL_FINAL}
+  `,
+};
+
+DETAIL_STYLES.charon = {
+  fns: charonDetail.fns,
+  apply: /* glsl */ `
+    ${DETAIL_PREAMBLE}
+    { ${charonDetail.apply} }
     ${DETAIL_FINAL}
   `,
 };

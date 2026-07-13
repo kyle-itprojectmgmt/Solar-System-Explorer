@@ -71,8 +71,54 @@ export default {
     detailFloor: { softKm: 500, hardKm: 50 },
     minInsertionAltKm: 100,
 
-    // Worker 3 fills: detail style, atmosphere (thin blue nitrogen haze),
-    // shaderParams, navPresets, surfaceFeatures, body-card fields.
+    atmosphere: {
+      style: 'plutohaze',           // wired by the orchestrator in renderer.js
+      limbEdge: 0x80b3ff,           // pale Rayleigh blue at the rim
+      limbMid: 0x4a78c8,
+      thickness: 0.03,              // shell ~36 km up — the haze NH imaged reaches ~200 km but reads as a thin rim
+      intensity: 0.5,               // orchestrator calibrates from screenshots (backlit crescent pass)
+    },
+
+    features: { atmosphericGlow: true },
+
+    shaderParams: {
+      dayFadeSoft0: -0.03, dayFadeSoft1: 0.08,
+      grazeFade0: 0.15, grazeFade1: 0.50,  // thin atmosphere = fairly crisp terminator
+    },
+
+    detail: { style: 'pluto', activationKm: 6000, fullKm: 200 },  // mirrors Triton's staging (similar radius)
+
+    navPresets: [
+      {
+        label: '❤️ Tombaugh Regio',
+        altitudeKm: 5000,
+        uv: [0.489, 0.62],
+        message: 'Approaching Pluto\'s iconic heart — a nitrogen ice plain spanning 1,000 km',
+      },
+      {
+        label: '🌑 Cthulhu Macula',
+        altitudeKm: 4000,
+        uv: [0.28, 0.47],
+        message: 'Descending toward the dark tholin-stained whale of Cthulhu Macula',
+      },
+    ],
+
+    surfaceFeatures: [
+      { name: 'Tombaugh Regio', latDeg: 25, lonDeg: 176 },
+      { name: 'Sputnik Planitia', latDeg: 22, lonDeg: 172 },
+      { name: 'Cthulhu Macula', latDeg: -5, lonDeg: 100 },
+      { name: 'Tartarus Dorsa', latDeg: 20, lonDeg: 240 },
+      { name: 'Hillary Montes', latDeg: 5, lonDeg: 155 },
+      { name: 'Norgay Montes', latDeg: 3, lonDeg: 160 },
+      { name: 'Voyager Terra', latDeg: 50, lonDeg: 130 },
+    ],
+
+    moreInfo: {
+      heart: 'Sputnik Planitia is a 1,000-km nitrogen ice glacier slowly convecting across Pluto\'s face',
+      mountains: 'Water-ice mountains reach 3,500 m (Rockies-tall) floating on nitrogen ice',
+      atmosphere: 'Pluto\'s atmosphere freezes and falls as snow onto the surface across its 248-year orbit',
+      charon: 'Pluto and Charon orbit a barycenter between them — a true binary dance across the void',
+    },
 
     notableFeatures: [
       'Tombaugh Regio — the iconic heart-shaped nitrogen ice plain',
@@ -104,7 +150,23 @@ export default {
       type: 'Binary Companion',
       surfaceGravity: 0.288,
       surfaceTempRange: [-220, -220],
-      // Worker 3 fills: detail style, surfaceFeatures, body-card fields.
+      orbitalDistanceKm: { min: 19592, max: 19600 },  // e = 0.0002 — essentially circular
+      detail: { style: 'charon', activationKm: 4000, fullKm: 150 },
+      shaderParams: {
+        dayFadeSoft0: -0.02, dayFadeSoft1: 0.06,
+        grazeFade0: 0.15, grazeFade1: 0.50,  // airless — crisp terminator
+      },
+      surfaceFeatures: [
+        { name: 'Mordor Macula', latDeg: 80, lonDeg: 0 },
+        { name: 'Serenity Chasma', latDeg: 3, lonDeg: 30 },
+        { name: 'Oz Terra', latDeg: 55, lonDeg: 20 },
+        { name: 'Vulcan Planitia', latDeg: -20, lonDeg: 15 },
+      ],
+      moreInfo: {
+        mordor: 'Mordor Macula is methane escaped from Pluto, cold-trapped at the pole and radiation-darkened into tholins',
+        lock: 'The mutual tidal lock means each world hangs frozen in the other\'s sky forever',
+        size: 'At half Pluto\'s diameter, Charon is the largest companion relative to its primary known',
+      },
       notableFeatures: [
         'Half the size of Pluto — the largest moon-to-body ratio known',
         'Mordor Macula: a dark red polar cap of radiation-processed tholins',

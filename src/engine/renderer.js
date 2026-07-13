@@ -15,6 +15,7 @@ import { TEXTURE_BASE_URL, KM_PER_UNIT, AU_KM } from '../config.js';
 import { applyDetailShader, detailBlend } from './detailShaders.js';
 import EARTH_ATMOSPHERE_GLSL from './shaders/earth-atmosphere.glsl?raw';
 import MARS_ATMOSPHERE_GLSL from './shaders/mars-atmosphere.glsl?raw';
+import PLUTO_ATMOSPHERE_GLSL from './shaders/pluto-atmosphere.glsl?raw';
 import SATURN_ATMOSPHERE_GLSL from './shaders/saturn-atmosphere.glsl?raw';
 import TITAN_GLSL from './shaders/titan.glsl?raw';
 import SATURN_RINGS_GLSL from './shaders/saturn-rings.glsl?raw';
@@ -361,6 +362,7 @@ export class SceneRenderer {
         atm.style === 'rayleigh' ? makeRayleighMaterial(atm)
           : atm.style === 'dust' ? makeDustMaterial(atm)
           : atm.style === 'saturn' ? makeShellAtmosphereMaterial(SATURN_ATMOSPHERE_GLSL, atm)
+          : atm.style === 'plutohaze' ? makeShellAtmosphereMaterial(PLUTO_ATMOSPHERE_GLSL, atm)
           : makeLimbScatterMaterial(atm)
       );
       const s = 1 + (atm.thickness || 0.025);
