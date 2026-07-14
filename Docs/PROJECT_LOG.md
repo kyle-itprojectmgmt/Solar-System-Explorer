@@ -1487,6 +1487,18 @@ review clean — a first.
   must inspect request POST bodies, not just URLs, and wait ~10 s.
 - Suites: security 28 (zero CSP violations on all systems WITH GA4 live),
   about 27, smoke 22, presets 60 — all green. npm audit: 0 vulns.
+- Observatory (post-deploy scan, algorithm v5): workers.dev A+ (125) —
+  GA4's only cost is -5 SRI (gtag.js can't be hashed, Google rotates it).
+  app.solarexplorer.co was C (55): HSTS missing from _headers (never
+  there — FIXED, Strict-Transport-Security added → B 75) + no HTTP→HTTPS
+  redirect (zone "Always Use HTTPS" off — bug #63, needs Kyle's dashboard
+  toggle, then A+ 120). GA4 did NOT degrade the CSP test (still passes
+  no-unsafe with the specific external hosts).
+- Live verification (headless, webdriver masked): gtag.js loads, exactly
+  one page_view per system visit (dt=Jupiter/Saturn/Pluto — GA4 sends
+  page_title as the dt= param, NOT ep.page_title; probe assertions must
+  check dt=), zero cookies on live origin, About shows v10.0.2 + new
+  privacy line, only CSP violation is the pre-existing bug #62 beacon.
 
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
@@ -1554,6 +1566,7 @@ review clean — a first.
 | 60 | Thin-atmosphere halos render as thick rings wrapping the night side (hardware-confirmed by Kyle: Earth at ~3,000 km, Io at ~370 km). Cause: soft fresnel pow + wide lit gate on all thin-atmosphere shells, plus Earth's v5b night-scatter alpha floor keeping the halo alive on the night limb. Fixed v7.0.2: per-body fresnelPower/thickness/intensity config, universal tight lit gate (−0.05..0.20), Earth night-scatter term removed, ISS horizon arc opt-in via horizonGlow. Titan/Saturn exempt. Guard: tests/haloshots.mjs (diff-render probe). | Resolved v7.0.2 | — |
 | 61 | tests/stack.mjs stale since v7 — 4 checks assert the pre-v7 world (6 stack buttons vs 9 with ALT/INC/SPD, "camera panel + 7 modes", Saturn "Coming Soon" toast though Saturn is built, Tab cycle count). Share/preset/?view= checks still green and meaningful. Refresh the assertions. | Needs fix (test-only) | — |
 | 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard or allow the host in CSP script-src + connect-src. (v10.0.2 note: the privacy stance is now "anonymous usage stats only" via cookieless GA4 — Cloudflare RUM is redundant with it; disabling still recommended.) workers.dev is unaffected. | Needs decision | — |
+| 63 | app.solarexplorer.co serves plain HTTP without redirecting to HTTPS — "Always Use HTTPS" is OFF on the solarexplorer.co zone. Costs -20 on MDN Observatory (custom domain scores B 75 vs workers.dev A+ 125; the pre-GA4 "A+ 130" memory was the workers.dev host). Wrangler token has zone:read only — Kyle must toggle: dashboard → solarexplorer.co → SSL/TLS → Edge Certificates → Always Use HTTPS. Expected score after: A+ (120; the remaining -5 is SRI on gtag.js, unavoidable — Google rotates its content). HSTS header itself added to public/_headers in v10.0.2. | Needs Kyle (2-click dashboard toggle) | — |
 | 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. ALSO (v8.0.1): Moon wrinkle-ridge patches read as dark spidery squiggles at ~2,500 km (relief shading under normalScale 2.5; knobs: wRegion/wrinkles in moon-detail.glsl LAYER 2). | Needs review | V8_REMAINING_PLANETS.md |
 | 64 | Mercury terminator longitude: the circular ephemeris cannot track e = 0.206 — subsolar longitude oscillates ±23° (equation of center) around the mean-longitude anchor every 88-day year. Zero-mean by construction; fine for lighting. Refine when the ephemeris gains eccentricity (same item as the Mars ±10° note in mars.js). | Data choice — ephemeris eccentricity is a backlog item | — |
 | 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only. | Resolved v10 — full binary system live; barycenter physics NOT needed (Keplerian Charon + equal periods = mutual lock by construction; only Pluto's ~2,110 km wobble is unmodeled) | V10_PLUTO.md |
