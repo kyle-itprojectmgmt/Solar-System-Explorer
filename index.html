@@ -2,6 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Favicon: the .ico + PNGs are the real solar-system brand icons.
+         Declared explicitly so the browser never falls back to its default
+         (a cached Vite/Cloudflare purple bolt). No SVG — the old favicon.svg
+         was the purple Vite default and has been removed. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/favicon-192x192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="A photorealistic, first-person 3D explorer of the Jupiter system. See it as Voyager saw it." />
     <!-- Google Analytics (cookieless, anonymized). Bootstrap lives in
