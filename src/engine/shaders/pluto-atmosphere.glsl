@@ -26,6 +26,7 @@ uniform vec3 uSunW;
 uniform vec3 uCamPos;
 uniform float uAltitude;
 uniform float uIntensity;
+uniform float uThickness;  // shell height as fraction of radius (cfg.atmosphere.thickness)
 uniform float uHorizonGlow;
 
 varying vec3 vWPos;
@@ -44,10 +45,18 @@ void main() {
   float sunDot = dot(n, normalize(uSunW));
   float lit = smoothstep(-0.05, 0.20, sunDot);
 
-  // Haze color: pale blue, shifting deeper at strongest rim.
-  vec3 hazeColorPale = vec3(0.50, 0.70, 1.00);
-  vec3 hazeColorDeep = vec3(0.35, 0.55, 0.95);
-  vec3 hazeColor = mix(hazeColorPale, hazeColorDeep, fresnel * 0.6);
+  // Vertical gradient (v10.0.3): sightline closest-approach height inside
+  // the shell via impact parameter — faint white-blue near the surface,
+  // pale blue mid, deeper blue fading out at the top of the haze.
+  float dv = abs(dot(viewDir, n));
+  float sinv = sqrt(max(0.0, 1.0 - dv * dv));
+  float atmHeight = clamp(((1.0 + uThickness) * sinv - 1.0) / uThickness, 0.0, 1.0);
+  vec3 hazeLow  = vec3(0.80, 0.88, 1.00);
+  vec3 hazeMid  = vec3(0.50, 0.70, 1.00);
+  vec3 hazeHigh = vec3(0.25, 0.45, 0.80);
+  vec3 hazeColor = atmHeight < 0.45
+    ? mix(hazeLow, hazeMid, atmHeight / 0.45)
+    : mix(hazeMid, hazeHigh, (atmHeight - 0.45) / 0.55);
 
   // Layer banding: subtle stratification (20 faint layers) via sine modulation.
   // Multiply alpha by (0.85 + 0.15 * sin(...)) for vertical striping effect.
@@ -70,8 +79,10 @@ void main() {
   hazeColor = mix(hazeColor, backitColor, forwardScatter * 0.4);
 
   // Base alpha from fresnel and lit gate, clamped conservative.
+  // v10.0.3: 0.30 -> 0.38 — the day-side haze reads slightly more visible;
+  // the backlit NH ring below keeps its own calibrated 0.30 gain.
   float alpha = fresnel * lit * layerBand;
-  alpha = clamp(alpha, 0.0, 0.6) * uIntensity * 0.30;
+  alpha = clamp(alpha, 0.0, 0.6) * uIntensity * 0.38;
 
   // Backlit ring: its own WIDER fresnel (pow 2.5 vs the day-side 6.0 — the
   // pow-6 annulus is 2 px and reads as nothing; NH's ring is thin but

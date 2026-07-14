@@ -96,10 +96,11 @@ export default {
     // scatter term is removed; NIGHT terrain visibility still comes from
     // nightAmbient above). horizonGlow keeps the ISS thin-arc pass.
     atmosphere: {
-      limbEdge: 0x3d7eff,     // vivid blue at the very limb (Rayleigh scattering)
-      limbMid: 0xbfe3ff,      // pale cyan mid-falloff
+      // Gradient colors live in earth-atmosphere.glsl (v10.0.3, 3-stop
+      // vertical gradient: white-blue base -> vivid Rayleigh blue -> deep
+      // blue top; fresnel pow 5.0 -> 4.0 there too).
       thickness: 0.010,
-      intensity: 0.5,
+      intensity: 0.65,
       style: 'rayleigh',      // signature blue from nitrogen/oxygen
       horizonGlow: true,      // Earth-only low-altitude horizon line
     },

@@ -85,8 +85,8 @@ export default {
 
     atmosphere: {
       style: 'plutohaze',           // wired by the orchestrator in renderer.js
-      limbEdge: 0x80b3ff,           // pale Rayleigh blue at the rim
-      limbMid: 0x4a78c8,
+      // Gradient colors live in pluto-atmosphere.glsl (v10.0.3, 3-stop
+      // vertical gradient: faint white-blue base -> pale blue -> deeper top).
       thickness: 0.03,              // shell ~36 km up — the haze NH imaged reaches ~200 km but reads as a thin rim
       intensity: 0.5,               // orchestrator calibrates from screenshots (backlit crescent pass)
     },

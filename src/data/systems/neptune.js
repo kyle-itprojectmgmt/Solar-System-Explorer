@@ -61,10 +61,14 @@ export default {
     minInsertionAltKm: 5000,
 
     atmosphere: {
-      limbEdge: 0x4a78e8,    // vivid deep blue at the very limb
-      limbMid: 0x2a4a9a,     // darker blue mid-falloff
+      // 3-stop vertical gradient (v10.0.3): bright blue at the cloud tops,
+      // vivid cobalt mid, deep navy fading out at the top of the haze.
+      colorLow:  [0.40, 0.60, 1.00],
+      colorMid:  [0.15, 0.35, 0.90],
+      colorHigh: [0.05, 0.15, 0.60],
       thickness: 0.015,      // thin methane haze shell
-      intensity: 0.6,
+      fresnelPower: 3.5,
+      opacity: 0.50,
     },
 
     features: { atmosphericGlow: true, equatorialBulge: true },

@@ -98,10 +98,10 @@ export default {
     },
 
     atmosphere: {
-      limbEdge: 0xe8c860,     // warm gold at the very limb
-      limbMid: 0xf5ecd0,      // cream mid-falloff
+      // Gradient colors live in saturn-atmosphere.glsl (v10.0.3, 3-stop
+      // vertical gradient: warm cream base -> golden -> darker gold top).
       thickness: 0.02,        // thinner haze shell than Jupiter's
-      intensity: 0.9,
+      intensity: 1.1,         // shader bakes ×0.5 — effective ≈ 0.39 peak
       style: 'saturn',        // Worker 1's saturn-atmosphere.glsl shell
     },
 

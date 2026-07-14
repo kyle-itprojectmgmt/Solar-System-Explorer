@@ -188,7 +188,12 @@ export class SceneRenderer {
     tex.colorSpace = THREE.SRGBColorSpace;
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(1.8e6, 64, 32),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false })
+      // color multiplies the panorama — ~15% perceived dim (v10.0.3, stars
+      // should recede behind lit planets). Deliberately NOT via
+      // toneMappingExposure, which would dim the planets too.
+      new THREE.MeshBasicMaterial({
+        map: tex, color: 0xd9d9d9, side: THREE.BackSide, depthWrite: false,
+      })
     );
     sky.material.toneMapped = false;
     // Orient the galactic band like the old procedural field (tilted).
@@ -239,7 +244,9 @@ export class SceneRenderer {
             void main() {
               vec2 d = gl_PointCoord - 0.5;
               float a = smoothstep(0.5, 0.15, length(d));
-              gl_FragColor = vec4(vColor, a);
+              // x0.8 (v10.0.3): stars are a backdrop — ~20% dimmer so lit
+              // planets dominate; bright named stars stay clearly visible.
+              gl_FragColor = vec4(vColor * 0.8, a);
             }
           `,
           vertexColors: true,
@@ -299,7 +306,7 @@ export class SceneRenderer {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     const mat = new THREE.PointsMaterial({
       size: 1.6, sizeAttenuation: false, vertexColors: true,
-      transparent: true, opacity: 0.95, depthWrite: false,
+      transparent: true, opacity: 0.80, depthWrite: false, // 0.95 → 0.80 (v10.0.3, backdrop dim)
     });
     this.scene.add(new THREE.Points(geo, mat));
   }
@@ -1345,6 +1352,9 @@ function makeShellAtmosphereMaterial(glslSource, atm) {
       uCamPos: { value: new THREE.Vector3() },
       uAltitude: { value: 1e9 },
       uIntensity: { value: atm.intensity ?? 1.0 },
+      // Shell thickness as a fraction of body radius — the gradient shaders
+      // derive per-sightline height in the shell from it (impact parameter).
+      uThickness: { value: atm.thickness ?? 0.02 },
       // ISS-style low-altitude horizon arc — config opt-in (Earth only).
       uHorizonGlow: { value: atm.horizonGlow ? 1 : 0 },
     },
@@ -1365,9 +1375,19 @@ function makeShellAtmosphereMaterial(glslSource, atm) {
  */
 function makeLimbScatterMaterial(atm) {
   return new THREE.ShaderMaterial({
+    // 3-stop vertical gradient (v10.0.3): opt-in when the config supplies
+    // colorLow/Mid/High — the legacy two-color path is compiled out so the
+    // moon exosphere slivers (atmosphereLimb) are bit-identical.
+    defines: atm.colorLow ? { GRADIENT3: 1 } : {},
     uniforms: {
       uEdgeColor: { value: new THREE.Color(atm.limbEdge ?? 0xc8824a) },
-      uMidColor: { value: new THREE.Color(atm.limbMid ?? 0xe8d4a0) },
+      uMidColor: { value: atm.colorMid
+        ? new THREE.Color(...atm.colorMid)
+        : new THREE.Color(atm.limbMid ?? 0xe8d4a0) },
+      uColorLow: { value: new THREE.Color(...(atm.colorLow ?? [1, 1, 1])) },
+      uColorHigh: { value: new THREE.Color(...(atm.colorHigh ?? [0, 0, 0])) },
+      uThickness: { value: atm.thickness ?? 0.025 },
+      uOpacity: { value: atm.opacity ?? 0.55 },
       uIntensity: { value: atm.intensity ?? 1.0 },
       // Defaults preserve the gas-giant look (Jupiter). Thin-exosphere
       // shells pass sharper values (post-v7 hardware fix).
@@ -1389,6 +1409,10 @@ function makeLimbScatterMaterial(atm) {
     fragmentShader: /* glsl */ `
       uniform vec3 uEdgeColor;
       uniform vec3 uMidColor;
+      uniform vec3 uColorLow;
+      uniform vec3 uColorHigh;
+      uniform float uThickness;
+      uniform float uOpacity;
       uniform float uIntensity;
       uniform float uFresnelPow;
       uniform float uLit0;
@@ -1408,10 +1432,25 @@ function makeLimbScatterMaterial(atm) {
         float lit = smoothstep(uLit0, uLit1, sunDot);
         // Brightest where the atmosphere catches sunlight at the terminator.
         float term = 1.0 + 0.5 * pow(1.0 - abs(sunDot), 4.0);
+      #ifdef GRADIENT3
+        // Height of this sightline's closest approach inside the shell —
+        // impact parameter (house rule: never fragment radius). 0 = cloud
+        // tops at the disc edge, 1 = top of the atmosphere at the outer
+        // limb. Raw fresnel only spans ~0.7-1.0 across the visible annulus,
+        // so a fresnel-derived height would never reach the low band.
+        float dv = dot(viewDir, n);
+        float sinv = sqrt(max(0.0, 1.0 - dv * dv));
+        float atmHeight = clamp(((1.0 + uThickness) * sinv - 1.0) / uThickness, 0.0, 1.0);
+        vec3 col = atmHeight < 0.45
+          ? mix(uColorLow, uMidColor, atmHeight / 0.45)
+          : mix(uMidColor, uColorHigh, (atmHeight - 0.45) / 0.55);
+        float alpha = f * lit * term * uOpacity;
+      #else
         // Warm orange-tan at the limb edge -> pale yellow-white -> nothing.
         float edge = smoothstep(0.35, 0.9, f);
         vec3 col = mix(uMidColor, uEdgeColor, edge);
         float alpha = f * lit * term * mix(0.3, 0.6, edge) * uIntensity;
+      #endif
         gl_FragColor = vec4(col, alpha);
       }
     `,

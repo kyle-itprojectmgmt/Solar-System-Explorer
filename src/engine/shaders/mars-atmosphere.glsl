@@ -18,6 +18,7 @@ uniform vec3 uSunW;
 uniform vec3 uCamPos;
 uniform float uAltitude;
 uniform float uIntensity;
+uniform float uThickness;  // shell height as fraction of radius (cfg.atmosphere.thickness)
 
 varying vec3 vWPos;
 varying vec3 vWNormal;
@@ -34,11 +35,20 @@ void main() {
   float sunDot = dot(n, normalize(uSunW));
   float lit = smoothstep(-0.05, 0.20, sunDot);
 
-  // Mars dust scattering color: deep pink-red at the bright limb,
-  // fading to pale salmon toward the night side.
-  vec3 dustDeep = vec3(0.70, 0.40, 0.30);    // deep pink-red at limb
-  vec3 dustPale = vec3(0.90, 0.62, 0.42);    // pale salmon
-  vec3 dustColor = mix(dustPale, dustDeep, fresnel);
+  // Vertical gradient (v10.0.3): sightline closest-approach height inside
+  // the shell via impact parameter — 0 = surface, 1 = top of the haze.
+  float dv = abs(dot(viewDir, n));
+  float sinv = sqrt(max(0.0, 1.0 - dv * dv));
+  float atmHeight = clamp(((1.0 + uThickness) * sinv - 1.0) / uThickness, 0.0, 1.0);
+
+  // CO2 dust gradient: warm salmon near the surface, pink-red mid,
+  // dark rust fading to black at the top edge.
+  vec3 dustLow  = vec3(0.90, 0.70, 0.55);
+  vec3 dustMid  = vec3(0.70, 0.42, 0.30);
+  vec3 dustHigh = vec3(0.45, 0.22, 0.12);
+  vec3 dustColor = atmHeight < 0.45
+    ? mix(dustLow, dustMid, atmHeight / 0.45)
+    : mix(dustMid, dustHigh, (atmHeight - 0.45) / 0.55);
 
   // Faint warm forward-scatter boost when looking toward the sun (glory-like effect).
   float forwardScatter = smoothstep(-0.2, 0.3, sunDot) * pow(max(0.0, dot(viewDir, normalize(uSunW))), 1.5);

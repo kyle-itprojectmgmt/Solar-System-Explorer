@@ -1500,6 +1500,56 @@ review clean — a first.
   check dt=), zero cookies on live origin, About shows v10.0.2 + new
   privacy line, only CSP violation is the pre-existing bug #62 beacon.
 
+### v10.0.3 — atmosphere gradients + Jupiter preset speeds + star backdrop (2026-07-14)
+- 3-stop vertical atmosphere gradient on every thin-atmosphere primary
+  (Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto — Titan/Venus
+  exempt, dedicated opaque shaders untouched). Gradient axis is the
+  view-ray IMPACT-PARAMETER height in the shell (h = ((1+t)·sin−1)/t,
+  0 = cloud tops, 1 = shell top), NOT a fresnel remap — raw fresnel only
+  spans ~0.7-1.0 across the visible halo annulus, so any fresnel-derived
+  height never reaches the low color band. Jupiter/Uranus/Neptune get it
+  via makeLimbScatterMaterial (config colorLow/Mid/High + opacity, GLSL
+  GRADIENT3 define; legacy 2-color path compiled unchanged for the moon
+  exosphere slivers). Earth/Mars/Saturn/Pluto get it baked into their
+  dedicated .glsl shells + a new shared uThickness uniform. Night-side
+  gate untouched (haloshots: night run 0px on all five disc bodies).
+- Modest halo visibility bumps: Earth intensity 0.5→0.65, fresnel pow
+  5→4; Mars 0.9→1.15 (×0.35 bake → effective 0.40); Saturn 0.9→1.1 +
+  pow 3→3.5; Pluto day-haze scale 0.30→0.38 (backlit NH ring gain
+  untouched). Kyle's spec opacities assume uniform-alpha semantics the
+  additive pipeline doesn't have — applied as relative increases instead.
+- Jupiter curated preset speeds: the REAL bug was presets that never set
+  a time index inheriting the user's stale speed (run Triple Moon Shadow
+  at 1,000×, then Io Volcano Flyby launched at 1,000×). Io Volcano Flyby
+  + GRS Close Pass now set 10×; Triple Moon Shadow 1,000×→100× (spec said
+  50× — TIME_STEPS has no 50, 100× is the closest step; notify text
+  updated); Voyager 1979 1×→100× (moons visibly move during the sweep);
+  Moon Alignment stays a deliberate 10,000× (resonance needs it).
+- Starfield: milkyway.jpg 4000×2000 → 6000×3000 (7.9 MB). MEASURED
+  CEILING: ESO's downloadable original TIFF for eso0932a is itself
+  6000×3000 — the 800-Mpix GigaGalaxy version exists only as zoomify
+  tiles. 8K+ of the SAME photographic pano would need tile stitching;
+  NASA SVS starmap_2020 offers 8K/16K but is a synthetic catalog render
+  (different visual character — not swapped without Kyle's say-so).
+  Bug #59 starfield half improved ~1.5× linear; telephoto blur below
+  ~30° FOV remains inherent.
+- Star backdrop recede (~15-20%): HYG star sprite color ×0.8, panorama
+  sky MeshBasicMaterial color 0xd9d9d9, procedural-fallback opacity
+  0.95→0.80. toneMappingExposure deliberately NOT touched (global — dims
+  planets too). Verified: lit Jupiter clearly dominates, named stars
+  still visible.
+- tests/v1003probe.mjs NEW (preset speeds asserted AGAINST pre-set stale
+  1,000×, + limb gradient inner-brighter-than-outer on all six gradient
+  primaries). Probe lessons re-learned: diff-render with/without
+  renderer.atmosphereMesh in ONE evaluate — analytic silhouette math
+  loses to tilted oblate ellipses (Saturn 26.7°) and renderer.update()
+  re-asserts ring visibility per frame, so hide sky/points/rings AFTER
+  update, before the raw renders. tests/v1003visual.mjs NEW (backdrop +
+  30° FOV shots).
+- Suites: smoke 22, presets 60, v1003probe 18, plutotest 28, earthtest
+  14, marstest 13, saturntest 22, v8test 21, haloshots PASS, limb 4
+  shots + 0 errors — all green.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1559,7 +1609,7 @@ review clean — a first.
 | 56 | Saturn-system shader calibration done from headless screenshots — ring brightness/scatter balance, kronos band strength, hexagon subtlety, Enceladus stripe contrast, Iapetus ridge seam may need real-hardware tuning (joins the #9/#27 eyeball-pass class). Knobs: uOpacityScale + litFace in saturn-rings.glsl, band mix factors in saturn-clouds.glsl, en_stripe/ia_ridge amplitudes. | Needs review | V7_SATURN.md |
 | 57 | Hyperion/Phoebe texture maps — irregular bodies with no fetchable cylindrical maps (same class as #52). Color-only + procedural cratered detail shipped; Hyperion's sponge-pit look would need a dedicated treatment. | Manual follow-up | V7_SATURN.md |
 | 58 | Saturn F ring omitted — the SSS ring strip ends at the A ring outer edge (measured alpha floor), and a procedural F ring on a separate thin annulus wasn't worth the draw call for a barely-visible feature. Revisit if a better Cassini radial profile (Björn Jónsson) is sourced. | Data choice — revisit with better source | V7_SATURN.md |
-| 59 | Telephoto zoom reveals texture resolution limits — at narrow FOV (10°) planet textures and starfield cubemap show magnification blur (same pixels covering more screen area — equivalent to digital zoom on a phone). Planet fix requires quadtree tile streaming (SpaceEngine approach, weeks of work). Starfield could be improved with 8K cubemap swap but doesn't help planets. Decision: accept as known limitation for launch. Zoom is still a major win for Earthrise and Saturn ring views. | Won't fix — known limitation | — |
+| 59 | Telephoto zoom reveals texture resolution limits — at narrow FOV (10°) planet textures and starfield cubemap show magnification blur (same pixels covering more screen area — equivalent to digital zoom on a phone). Planet fix requires quadtree tile streaming (SpaceEngine approach, weeks of work). Starfield could be improved with 8K cubemap swap but doesn't help planets. Decision: accept as known limitation for launch. Zoom is still a major win for Earthrise and Saturn ring views. | Won't fix — known limitation (v10.0.3: starfield half improved with the 6000×3000 ESO original — that IS ESO's max downloadable; 8K+ needs zoomify tile stitching or NASA's synthetic starmap_2020, a visual-character change) | — |
 | 68 | Physics CPU optimization — measured and closed. Architecture: one PhysicsEngine per page load, switchSystem is a full navigation so inactive systems never run physics. Active system cost: 2.0 µs worst case (Jupiter, 4 n-body moons) — already 250× under the 0.5ms target. Fix B (every 6th frame) would cause 4° position jumps at 10,000× speed — visible regression for zero measurable gain. CPU/GPU load lives in the render loop, not physics. Documented in physbench.mjs and tests/README. Won't fix. | Won't fix — measured, no gain | — |
 | 61 | Saturn ring particles removed — snow-globe appearance on real hardware. Geometry ring disc retained (looks excellent). | Resolved v7.0.1 | — |
 | 62 | Saturn cloud bands too flat/drab on real hardware — insufficient contrast between zones and belts. Fixed: per-latitude color palette (cream zones, brown belts, blue-grey polar), band contrast increased from 4% to 11-13%, terminator widened via shaderParams. | Resolved v7.0.1 | — |

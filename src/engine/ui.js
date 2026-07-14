@@ -713,6 +713,10 @@ export class UI {
     // below are never filtered.
     const curated = [
       { label: '🌋 Io Volcano Flyby', system: 'jupiter', fn: () => {
+        // Explicit 10× (v10.0.3): presets that skipped setTimeIndex inherited
+        // whatever the user last set — after Triple Moon Shadow this flyby
+        // launched at 1,000× and the low pass was a blur.
+        this.physics.setTimeIndex(2);
         this.cam.playSequence([
           { target: 'Io', dist: 4, height: 1.0, orbitRate: 0.07, duration: 10, startTheta: 1.0 },
           { target: 'Io', dist: 1.6, height: 0.35, orbitRate: 0.1, duration: 12, startTheta: 2.6 },
@@ -723,10 +727,16 @@ export class UI {
       { label: '🌑 Triple Moon Shadow', system: 'jupiter', fn: () => {
         this.cam.setMode('orbit', this.system.primary.name);
         this.cam.setAltitudeDirect(80000);
-        this.physics.setTimeIndex(4);
-        this.notify('1,000× — watch for moon shadows crossing Jupiter');
+        // 100× (v10.0.3, was 1,000×): shadows still transit within a couple
+        // of minutes but no longer streak across the disc. TIME_STEPS has
+        // no 50× — 100× is the closest step.
+        this.physics.setTimeIndex(3);
+        this.notify('100× — watch for moon shadows crossing Jupiter');
       } },
       { label: '🔴 GRS Close Pass', system: 'jupiter', fn: () => {
+        // Explicit 10× (v10.0.3): same stale-speed inheritance fix as the
+        // Io flyby — a close GRS orbit at 1,000× read as a spin blur.
+        this.physics.setTimeIndex(2);
         const preset = this.system.primary.navPresets?.[0];
         if (preset) {
           this.cam.flyToFeature(this.system.primary.name, preset);

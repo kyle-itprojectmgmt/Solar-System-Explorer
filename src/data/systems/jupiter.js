@@ -51,10 +51,15 @@ export default {
       ],
     },
     atmosphere: {
-      limbEdge: 0xc8824a,     // warm orange-tan at the very limb
-      limbMid: 0xe8d4a0,      // pale yellow-white mid falloff
+      // 3-stop vertical gradient (v10.0.3): impact-parameter height in the
+      // shell — bright warm gold at the cloud tops, amber mid, dark
+      // brown-gold fading to black at the top of the atmosphere.
+      colorLow:  [1.00, 0.85, 0.50],
+      colorMid:  [0.85, 0.65, 0.30],
+      colorHigh: [0.50, 0.35, 0.15],
       thickness: 0.025,       // fraction of radius — thin feathered edge
-      intensity: 1.0,
+      fresnelPower: 3.5,
+      opacity: 0.55,
     },
     features: { greatRedSpot: true, atmosphericGlow: true, equatorialBulge: true },
     // Unified shader convention (V7 1b, surface-base.glsl): terminator and

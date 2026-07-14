@@ -107,7 +107,9 @@ async function boot() {
     // full jump (not a bare simSeconds write) so the n-body moons move too.
     ui.setLive(false);
     physics.jumpToSimSeconds(0);
-    physics.setTimeIndex(1);
+    // 100× (v10.0.3, was 1×): a system-wide flyby where the moons visibly
+    // move during the 52 s scripted sweep — at 1× nothing moved at all.
+    physics.setTimeIndex(3);
     audio.setMode('voyager');
     ui.notify('Voyager 1 flyby — March 5, 1979');
     const primary = system.primary.name;

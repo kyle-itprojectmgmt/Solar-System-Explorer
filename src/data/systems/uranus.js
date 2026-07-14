@@ -74,10 +74,14 @@ export default {
     minInsertionAltKm: 27000,
 
     atmosphere: {
-      limbEdge: 0x9adde0,
-      limbMid: 0x5aa8b8,
+      // 3-stop vertical gradient (v10.0.3): bright pale cyan at the cloud
+      // tops, characteristic cyan mid, deep teal fading out at the top.
+      colorLow:  [0.70, 0.90, 0.95],
+      colorMid:  [0.40, 0.75, 0.82],
+      colorHigh: [0.20, 0.50, 0.65],
       thickness: 0.012,
-      intensity: 0.5,
+      fresnelPower: 4.0,
+      opacity: 0.45,
     },
 
     features: { atmosphericGlow: true, equatorialBulge: true },
