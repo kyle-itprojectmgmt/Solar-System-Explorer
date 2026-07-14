@@ -5,14 +5,17 @@
 # MAINTENANCE NOTES:
 # - img-src must gain the R2 host if TEXTURE_BASE_URL in src/config.js ever
 #   moves off-origin (currently same-origin in both dev and production).
-# - connect-src pre-authorizes api.open-notify.org (ISS Mode, backlog) and
-#   www.google-analytics.com (cookieless GA4, backlog #11). GA4 will ALSO
-#   need script-src https://www.googletagmanager.com when it lands.
+# - connect-src pre-authorizes api.open-notify.org (ISS Mode, backlog).
+# - GA4 (cookieless, v10.0.2): gtag.js loads from www.googletagmanager.com
+#   (script-src). connect-src/img-src use *.google-analytics.com and
+#   *.googletagmanager.com wildcards per Google's CSP guide — EU visitors
+#   are routed to region1.google-analytics.com, which a www-only allowlist
+#   would block (dropped hits + console CSP violations).
 # - frame-src covers the Spotify + YouTube (privacy-enhanced nocookie
 #   domain) audio embeds built in src/engine/ui.js.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.open-notify.org https://www.google-analytics.com; frame-src https://open.spotify.com https://www.youtube-nocookie.com; worker-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com; connect-src 'self' https://api.open-notify.org https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-src https://open.spotify.com https://www.youtube-nocookie.com; worker-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

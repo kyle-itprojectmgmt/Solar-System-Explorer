@@ -13,6 +13,7 @@ import { CameraController } from './engine/camera.js';
 import { createPostFX } from './engine/postfx.js';
 import { AudioEngine } from './engine/audio.js';
 import { UI } from './engine/ui.js';
+import { trackSystemView } from './engine/analytics.js';
 
 // -- Quality tier detection ----------------------------------------------------
 
@@ -63,6 +64,7 @@ function loadingScreen(facts) {
 
 async function boot() {
   const { default: system } = await import(`./data/systems/${SYSTEM_CONFIG}.js`);
+  trackSystemView(SYSTEM_CONFIG);
   const verEl = document.getElementById('loading-version');
   if (verEl) verEl.textContent = `${system.name} — v${__APP_VERSION__}`;
   const quality = detectQuality();

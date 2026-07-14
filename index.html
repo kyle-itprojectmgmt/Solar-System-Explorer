@@ -5,6 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="A photorealistic, first-person 3D explorer of the Jupiter system. See it as Voyager saw it." />
+    <!-- Google Analytics (cookieless, anonymized). Bootstrap lives in
+         public/ga-init.js — the CSP has no 'unsafe-inline' for script-src,
+         so an inline snippet would be blocked. Sync init BEFORE async gtag.js
+         guarantees dataLayer + consent defaults exist when it executes. -->
+    <script src="/ga-init.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9WT0466782"></script>
     <title>Solar System Explorer — Jupiter</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

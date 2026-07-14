@@ -75,7 +75,7 @@ check('About link → https://solarexplorer.co/ in new tab',
   about.link && about.link.href === 'https://solarexplorer.co/' &&
   about.link.target === '_blank' && /noopener/.test(about.link.rel) &&
   /solarexplorer\.co/.test(about.link.text), JSON.stringify(about.link));
-check('privacy line italic', /No tracking/.test(about.privacy) && about.privacyStyle === 'italic');
+check('privacy line italic', /No cookies · Anonymous usage stats only/.test(about.privacy) && about.privacyStyle === 'italic');
 await page.evaluate(() => window.__sse.ui.closeAllPanels());
 
 // -- 3. HUD site link ---------------------------------------------------------

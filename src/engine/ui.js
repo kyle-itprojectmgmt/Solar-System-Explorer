@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { AUDIO_MODES } from './audio.js';
 import { TIME_STEPS, dateToSimSeconds, simSecondsToDate } from './physics.js';
 import { APP_URL, SITE_URL, DONATE_URL, KM_PER_UNIT, SOLAR_SYSTEM, AVAILABLE_SYSTEMS, switchSystem } from '../config.js';
+import { trackPresetLaunch } from './analytics.js';
 
 // Surface mode removed permanently in V7 (was hidden since v4d; the
 // first-person ground experience is a future rebuild, not a revival).
@@ -1067,7 +1068,10 @@ export class UI {
       if (p.system && p.system !== this.system.slug) continue;
       const b = el('button', 'preset-row', c);
       b.textContent = p.label;
-      b.onclick = p.fn;
+      b.onclick = () => {
+        trackPresetLaunch(p.label.replace(/^\S+\s+/, ''), this.system.slug);
+        p.fn();
+      };
       if (p.label.includes('Voyager')) this.voyagerBtn = b;
     }
 
@@ -1422,7 +1426,7 @@ export class UI {
     site.rel = 'noopener noreferrer';
     site.textContent = '🌐 solarexplorer.co';
     el('div', 'help-about-privacy', about).textContent =
-      'No tracking · No cookies · No data collected';
+      'No cookies · Anonymous usage stats only';
   }
 
   _activateMode(m) {

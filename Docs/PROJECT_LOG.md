@@ -1454,9 +1454,39 @@ review clean — a first.
   HEAD via git stash (stale v4c-era selectors: data-audio-mode,
   .presentation-btn, 6-vs-9 stack buttons, Saturn Coming Soon toast).
 
----
-
-## Known Bugs / In Progress
+### v10.0.2 — GA4 cookieless analytics + CSP update + privacy text (2026-07-13)
+- GA4 (G-9WT0466782) added, backlog #11 DONE. Bootstrap is public/ga-init.js
+  (external, NOT inline — script-src has no 'unsafe-inline'; an inline
+  snippet CSP-violated on every load, caught by tests/security.mjs) loaded
+  synchronously before the async gtag.js tag so dataLayer + consent
+  defaults exist first.
+- Cookieless is enforced by consent mode — gtag('consent','default',
+  {analytics_storage:'denied', ad_storage:'denied'}) BEFORE config. The
+  legacy storage/client_storage:'none' fields are kept but GA4 ignores
+  them (they show up as ep.* params in hits). Verified via headless probe:
+  ZERO cookies, no _ga localStorage, gcs=G100 consent flag in every hit.
+- send_page_view:false + custom page_view from boot() (src/engine/
+  analytics.js): switchSystem() is a full page navigation, so every system
+  switch lands in boot() — auto + custom page_view would double-count.
+  page_title = capitalized system slug → per-system breakdown in GA4.
+- preset_launch event wraps the single curated-preset dispatch point
+  (ui.js preset-row onclick): preset_id = label minus emoji, system =
+  slug. User-saved presets NOT tracked (names are user data).
+- Analytics helpers no-op in dev (import.meta.env.DEV) and under
+  automation (navigator.webdriver) — regression suites don't pollute the
+  property. Probes must mask webdriver to observe hits.
+- CSP (public/_headers): script-src + www.googletagmanager.com
+  www.google-analytics.com; connect-src/img-src use *.google-analytics.com
+  *.googletagmanager.com *.analytics.google.com wildcards per Google's CSP
+  guide (EU visitors route to region1.google-analytics.com — www-only
+  allowlist would drop their hits with console CSP errors).
+- HELP About privacy line: "No cookies · Anonymous usage stats only"
+  (was "No tracking · No cookies · No data collected"); tests/about.mjs
+  assertion updated.
+- GA4 flushes events in BATCHED POSTS with multi-second delay — probes
+  must inspect request POST bodies, not just URLs, and wait ~10 s.
+- Suites: security 28 (zero CSP violations on all systems WITH GA4 live),
+  about 27, smoke 22, presets 60 — all green. npm audit: 0 vulns.
 
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
@@ -1523,7 +1553,7 @@ review clean — a first.
 | 62 | Saturn cloud bands too flat/drab on real hardware — insufficient contrast between zones and belts. Fixed: per-latitude color palette (cream zones, brown belts, blue-grey polar), band contrast increased from 4% to 11-13%, terminator widened via shaderParams. | Resolved v7.0.1 | — |
 | 60 | Thin-atmosphere halos render as thick rings wrapping the night side (hardware-confirmed by Kyle: Earth at ~3,000 km, Io at ~370 km). Cause: soft fresnel pow + wide lit gate on all thin-atmosphere shells, plus Earth's v5b night-scatter alpha floor keeping the halo alive on the night limb. Fixed v7.0.2: per-body fresnelPower/thickness/intensity config, universal tight lit gate (−0.05..0.20), Earth night-scatter term removed, ISS horizon arc opt-in via horizonGlow. Titan/Saturn exempt. Guard: tests/haloshots.mjs (diff-render probe). | Resolved v7.0.2 | — |
 | 61 | tests/stack.mjs stale since v7 — 4 checks assert the pre-v7 world (6 stack buttons vs 9 with ALT/INC/SPD, "camera panel + 7 modes", Saturn "Coming Soon" toast though Saturn is built, Tab cycle count). Share/preset/?view= checks still green and meaningful. Refresh the assertions. | Needs fix (test-only) | — |
-| 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard (matches the no-analytics Privacy Policy stance) or allow the host in CSP script-src + connect-src. workers.dev is unaffected. | Needs decision | — |
+| 62 | Cloudflare zone auto-injects Web Analytics beacon (static.cloudflareinsights.com/beacon.min.js) on app.solarexplorer.co — blocked by our CSP script-src 'self' (console error on every load, no functional impact). Kyle to decide: disable RUM injection in the Cloudflare dashboard or allow the host in CSP script-src + connect-src. (v10.0.2 note: the privacy stance is now "anonymous usage stats only" via cookieless GA4 — Cloudflare RUM is redundant with it; disabling still recommended.) workers.dev is unaffected. | Needs decision | — |
 | 63 | V8 shader calibration done from headless screenshots — Miranda corona groove strength, Triton cantaloupe density, Mercury crater speckle, Venus lightning subtlety, Uranus ring visibility, Neptune GDS/companion balance may need real-hardware tuning (joins the #9/#27/#56 eyeball-pass class). Knobs: groove/dimple amplitudes in miranda-surface.glsl / triton-surface.glsl, mc_sparse gates in mercury-surface.glsl, vn_flash duty in venus-clouds.glsl, rings.png alpha values (regenerate strip), np_gds mixes in neptune-clouds.glsl. ALSO (v8.0.1): Moon wrinkle-ridge patches read as dark spidery squiggles at ~2,500 km (relief shading under normalScale 2.5; knobs: wRegion/wrinkles in moon-detail.glsl LAYER 2). | Needs review | V8_REMAINING_PLANETS.md |
 | 64 | Mercury terminator longitude: the circular ephemeris cannot track e = 0.206 — subsolar longitude oscillates ±23° (equation of center) around the mean-longitude anchor every 88-day year. Zero-mean by construction; fine for lighting. Refine when the ephemeris gains eccentricity (same item as the Mars ±10° note in mars.js). | Data choice — ephemeris eccentricity is a backlog item | — |
 | 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only. | Resolved v10 — full binary system live; barycenter physics NOT needed (Keplerian Charon + equal periods = mutual lock by construction; only Pluto's ~2,110 km wobble is unmodeled) | V10_PLUTO.md |
@@ -1546,7 +1576,7 @@ review clean — a first.
 | 8 | System-wide labels | Toggle exists in the Display panel (v4c stub) — implement with the Solar System Orrery view. |
 | 9 | Velocity vectors | Toggle exists in the Display panel (v4c stub) — draw per-moon velocity arrows in System View. |
 | 10 | Steve Albers attribution — confirm before launch | Check renderer.js and config files for any runtime fetches from stevealbers.net (grep -r "stevealbers" src/). If textures downloaded locally, add Steve Albers credit to legal/credits page. His Galilean moon maps are non-commercial use by permission — attribution required. Compiled from NASA/JPL + Björn Jónsson data. |
-| 11 | Google Analytics (cookieless) — add after launch | Add GA4 with anonymized IP and no cookies (consent-free mode). GA4 supports cookieless measurement via gtag config: { anonymize_ip: true, cookie_flags: 'SameSite=None;Secure', storage: 'none' }. Page views, session counts, country breakdown, device type — no PII or cookies — compatible with Privacy Policy. Add to CSP connect-src: www.google-analytics.com. Implement after public launch once privacy policy confirmed. |
+| 11 | Google Analytics (cookieless) — add after launch | DONE v10.0.2 — see Version History. Cookieless via consent-mode denial (not the legacy storage:'none' fields, which GA4 ignores). Per-system page_view + preset_launch events. |
 | 12 | ~~Zoom / Telephoto View (FOV control)~~ | DONE v7 (3c): OPTICS section in VIEW panel (log slider 5–90°), 🔭 tray toggle 48°↔10° (normal is the renderer's 48° — 75° would oval-stretch spheres, v2 lesson), sse-fov persisted, Earthrise preset auto-telephoto, Through-the-Rings at 25°. NOT built: Alt+scroll-wheel FOV (slider + toggle cover the use cases; add on request). |
 | 13 | Ko-fi → Stripe for donations | Create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Fix before public launch. |
 | 14 | Custom domain URL update — app.solarexplorer.co | Update src/config.js APP_URL to https://app.solarexplorer.co. Update wrangler.toml routes. Grep and replace all hardcoded solar-system-explorer.kyle-d06.workers.dev URLs in codebase. Verify share URL generator uses new domain. Landing page (solarexplorer.co) also needs its Launch Explorer links updated to app.solarexplorer.co — coordinate with landing page chat. |
