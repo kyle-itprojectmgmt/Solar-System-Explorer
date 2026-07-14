@@ -51,6 +51,20 @@ if (uDetailBlend > 0.001) {
   float night = smoothstep(0.1, -0.1, dot(vObjPos, uSunObj));
 
   if (night > 0.001) {
+    if (uUseNightMap > 0.5) {
+    // REAL BLACK MARBLE (v10.0.6, SSS 8K night map): geographic truth
+    // replaces the 22-gaussian model. The sampler is sRGB-tagged so this
+    // returns linear. The map carries a faint dark-blue ocean/terrain
+    // cast (~13/255) — subtract a linear black floor BEFORE the contrast
+    // boost, or the Sahara/Congo re-light at ~8% (the exact false-glow
+    // class the v10.0.4 rural gate killed; nightlights.mjs caps dark
+    // land at 13/255).
+    vec3 bm = max(texture2D(uNightMap, dUv).rgb - 0.02, 0.0);
+    bm = pow(bm, vec3(0.8)) * 1.4;
+    gDetailEmissive += bm * night * uDetailBlend;
+    } else {
+    // PROCEDURAL FALLBACK — the v5a..v10.0.4 gaussian model, used until
+    // the night map streams in (and by any future terra body without one).
     // Land mask: lights only where blue does NOT dominate (oceans are blue).
     // Trims region gaussians that spill over coastlines.
     float landMask = step(dBase.b, dBase.r + dBase.g);
@@ -99,6 +113,7 @@ if (uDetailBlend > 0.001) {
     // 0.7: paired with nightAmbient 0x445566 × 0.08 (terrain ~3-5%
     // silhouettes) — lights must clearly dominate the night side.
     gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.7;
+    }
 
     // RARE LIGHTNING: subtle blue-white flashes in storm regions.
     float stormMask = smoothstep(0.4, 0.7, fbmN(vObjPos * 12.0, 3));

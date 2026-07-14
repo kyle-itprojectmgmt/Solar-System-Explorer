@@ -333,7 +333,14 @@ export class SceneRenderer {
     if (p.textures.normal) {
       mat.normalMap = this._prepSurfaceTexture(
         this.texLoader.load(this.texUrl(p.slug, p.textures.normal)));
-      const ns = p.normalScale ?? 1;
+      // Normal maps are LINEAR data — _prepSurfaceTexture's sRGB tag would
+      // make the GPU decode-skew every normal (128 -> 0.22, not 0.5).
+      mat.normalMap.colorSpace = THREE.NoColorSpace;
+      // normalMapScale is separate from normalScale: on detail bodies
+      // normalScale also drives the PROCEDURAL relief (uNormalScale —
+      // Earth's 0.8 is the V5b cloud-lump calibration and must not move
+      // with the terrain map strength).
+      const ns = p.normalMapScale ?? p.normalScale ?? 1;
       mat.normalScale = new THREE.Vector2(ns, ns);
     }
 
@@ -345,6 +352,18 @@ export class SceneRenderer {
     this.pickables.push(this._makePicker(p.name, this.primaryMesh, rEq));
 
     if (p.detail) this._registerDetail(p.name, this.primaryMesh, mat, p.detail, rEq, p.normalScale, p.shaderParams);
+
+    // Real night-lights map (v10.0.6): sampled by the terra lights chunk,
+    // so the sampler lives on the DETAIL uniforms, not the Phong material.
+    // sRGB tag is correct here (photographic map, decoded at sample time).
+    if (p.textures.night && p.detail) {
+      const entry = this.detailEntries.find((e) => e.name === p.name);
+      if (entry?.uniforms.uNightMap) {
+        entry.uniforms.uNightMap.value = this._prepSurfaceTexture(
+          this.texLoader.load(this.texUrl(p.slug, p.textures.night)));
+        entry.uniforms.uUseNightMap.value = 1;
+      }
+    }
 
     // Progressive high-res swap (outside the loading manager on purpose —
     // the app starts on the low-res map and upgrades silently).
@@ -771,7 +790,8 @@ export class SceneRenderer {
       if (cfg.textures?.normal) {
         mat.normalMap = this._prepSurfaceTexture(
           this.texLoader.load(this.texUrl(cfg.slug, cfg.textures.normal)));
-        const ns = cfg.normalScale ?? 1;
+        mat.normalMap.colorSpace = THREE.NoColorSpace; // linear data, not sRGB
+        const ns = cfg.normalMapScale ?? cfg.normalScale ?? 1;
         mat.normalScale = new THREE.Vector2(ns, ns);
       }
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, detail, heightSegs), mat);

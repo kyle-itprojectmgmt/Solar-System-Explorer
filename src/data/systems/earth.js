@@ -70,19 +70,33 @@ export default {
     // upgraded progressively to diffuse_8k.jpg — same NASA July source,
     // Lanczos-downscaled 21600×10800 → 8192×4096 at JPEG q92 (v10.0.5;
     // replaced the stylized SSS daymap, so the silent swap no longer
-    // shifts the palette mid-session). The v5a night/clouds/specular 8K
-    // maps were never wired (all three layers are procedural by design)
-    // and were removed from public/ in v10.0.5 — re-download via the
-    // sources above if ever needed.
+    // shifts the palette mid-session).
+    // normal: SSS 8K earth normal map (v10.0.6, from the .tif — the .jpg
+    // download URL serves an HTML page), TIF → JPEG q95 4:4:4. The source
+    // is DirectX-convention (+G = south, measured on the Himalayan front:
+    // G=131 south-facing) — green channel INVERTED at conversion so the
+    // shipped file is OpenGL/three convention. Re-derive from the TIF if
+    // ever replacing.
+    // night: SSS 8K nightmap (v10.0.6) — REPLACES the procedural
+    // 22-gaussian city lights when loaded (earth-lights.glsl branch;
+    // procedural path remains the pre-load fallback). clouds/specular
+    // stay procedural by design (removed from disk in v10.0.5).
     // Land hue note (V5b, measured): midwest olive-green comes from the
     // SOURCE texture (Wisconsin samples rgb(79,97,49)) — July Blue Marble
     // greens, faithfully rendered. For tan/brown farmland swap a different
     // BMNG monthly variant (e.g. world.topo.bathy.200409 = September).
-    textures: { diffuse: 'diffuse.jpg', diffuseHigh: 'diffuse_8k.jpg' },
-    // On Earth this drives ONLY the procedural cloud relief (no normal map;
-    // ocean/lights/aurora add no height). 2.0 turned cloud-system flanks
-    // into black lumps at grazing sun from 382 km (V5b, measured).
+    textures: {
+      diffuse: 'diffuse.jpg',
+      diffuseHigh: 'diffuse_8k.jpg',
+      normal: 'normal.jpg',
+      night: 'night.jpg',
+    },
+    // normalScale drives ONLY the procedural cloud relief (ocean/lights/
+    // aurora add no height). 2.0 turned cloud-system flanks into black
+    // lumps at grazing sun from 382 km (V5b, measured) — so the terrain
+    // normal MAP gets its own strength knob, normalMapScale.
     normalScale: 0.8,
+    normalMapScale: 1.5, // terrain relief from normal.jpg (v10.0.6)
     // Phong specular OFF (haze fix, diff-render measured): the engine's
     // gas-giant default (0x332211, shininess 8) added a broad warm sheen
     // over land and ocean at EVERY altitude — read as blue-white surface

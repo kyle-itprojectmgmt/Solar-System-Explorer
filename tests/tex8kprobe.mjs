@@ -40,8 +40,12 @@ check('diffuse_8k.jpg loaded (progressive swap fired)', hit('diffuse_8k.jpg')?.s
   JSON.stringify(hit('diffuse_8k.jpg')));
 check('diffuse_8k.jpg is the new 5.8MB file (not the old 4.4MB)',
   (hit('diffuse_8k.jpg')?.len ?? 0) > 5_500_000, `len=${hit('diffuse_8k.jpg')?.len}`);
-check('no dead-texture requests (clouds/night/specular)',
-  !texHits.some((t) => /clouds|night|specular/.test(t.url)));
+check('normal.jpg loaded (v10.0.6 terrain relief)', hit('normal.jpg')?.status === 200,
+  JSON.stringify(hit('normal.jpg')));
+check('night.jpg loaded (v10.0.6 Black Marble lights)', hit('night.jpg')?.status === 200,
+  JSON.stringify(hit('night.jpg')));
+check('no dead-texture requests (clouds/specular)',
+  !texHits.some((t) => /clouds|specular/.test(t.url)));
 const realErrors = errors.filter((e) => !/favicon/i.test(e));
 check('zero console errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '));
 

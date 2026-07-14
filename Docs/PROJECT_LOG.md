@@ -1627,6 +1627,54 @@ review clean — a first.
   earthtest 14, nightlights both passes, haloshots PASS, v1003probe 18,
   smoke 22 — all green.
 
+### v10.0.6 — Earth normal map + Black Marble night texture (2026-07-14)
+- NORMAL MAP wired: SSS 8K earth normal map (the .jpg download URL
+  serves an HTML page — the .tif works; 9.5MB TIF → 3.9MB JPEG q95
+  4:4:4). Source is DIRECTX-convention: measured +G on the SOUTH-facing
+  Himalayan front band (G=131 avg 26.5-28°N) — green channel inverted at
+  conversion so the shipped normal.jpg is OpenGL/three convention
+  (post-flip S-slope G=123.5). Re-derive from the TIF when replacing.
+  Verified in-app: shadowed north faces along the Himalayan front under
+  a low western sun (tests/normalcal.mjs — wired/flipY/off comparison,
+  now a permanent calibration tool).
+- TWO LATENT ENGINE BUGS fixed while wiring: (1) the textures.normal
+  path (never exercised — no body shipped a normal map before) ran
+  normal maps through _prepSurfaceTexture's sRGB tag, which makes the
+  GPU decode-skew every normal (128 → 0.22, not 0.5) — now explicitly
+  NoColorSpace on both the primary and moon paths; (2) normal-map
+  strength shared p.normalScale with the PROCEDURAL relief (uNormalScale
+  — Earth's 0.8 is the V5b cloud-lump calibration), so a terrain-map
+  bump would have doubled cloud relief — new cfg.normalMapScale key
+  (falls back to normalScale); Earth ships normalScale 0.8 +
+  normalMapScale 1.5.
+- NIGHT TEXTURE wired: SSS 8K nightmap (byte-identical to the v5a file
+  deleted in v10.0.5 — now actually WIRED, not dead weight). Terra style
+  gained uNightMap/uUseNightMap; earth-lights.glsl branches: Black
+  Marble texture path replaces the 22-gaussian model when the map is
+  loaded, procedural path remains the pre-load fallback; lightning
+  shared by both. KEY CALIBRATION: the map carries a ~13/255 dark-blue
+  ocean/terrain cast — subtract a 0.02 LINEAR black floor BEFORE the
+  pow(0.8)×1.4 contrast boost or the Sahara/Congo re-light at ~8% (the
+  v10.0.4 false-glow class). Sampler is sRGB-tagged (texture2D returns
+  linear). Measured: London 187 lum (was 113 procedural), Johannesburg
+  184, Cape Town 122, Sahara 2.6 / Congo 0 / Kalahari 1.5 — real Black
+  Marble distribution, dark land still ocean-dark, nightlights passes
+  UNCHANGED thresholds with better margins.
+- Cloud "transparency fix" from the brief: verified NO-OP — the alpha
+  floor it targets doesn't exist (proven by the v10.0.4 diff-render:
+  clear-zone coverage reaches true 0, the veil was Phong specular).
+  The proposed <0.05 hard cutoff would band every cloud edge; skipped.
+- Glint note: glint.mjs core count changed (3390px → 0 over-200 px) —
+  A/B measured NOT the normal map (peak 212 on AND off, over-200 count
+  slightly HIGHER with map on at both 9,000 and 2,113 km); it's the
+  v10.0.5 darker NASA ocean + that probe's pinned sim-time cloud state.
+  Suite still passes its own assertions.
+- tex8kprobe extended: normal.jpg + night.jpg 200s asserted, dead check
+  narrowed to clouds/specular. Suites: earthtest 14, nightlights both
+  passes (no threshold changes), haloshots PASS, smoke 22, glint PASS,
+  hazeprobe day-side byte-identical to v10.0.5 baseline, prodboot 10/10
+  + tex8kprobe on preview AND live — all green.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |

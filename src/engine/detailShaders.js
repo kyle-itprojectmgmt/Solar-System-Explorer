@@ -442,6 +442,13 @@ const terraClouds = splitChunk(TERRA_CLOUDS);
 const terraLights = splitChunk(TERRA_LIGHTS);
 
 DETAIL_STYLES.terra = {
+  // uNightMap (v10.0.6): real Black Marble texture for the lights chunk.
+  // Three binds an empty texture while null, so the sampler is always safe;
+  // uUseNightMap gates the branch (renderer flips it when the map loads).
+  uniforms: () => ({ uNightMap: { value: null }, uUseNightMap: { value: 0 } }),
+  decls: /* glsl */ `
+    uniform sampler2D uNightMap;
+    uniform float uUseNightMap;`,
   fns: terraClouds.fns + terraLights.fns,
   apply: /* glsl */ `
     ${DETAIL_PREAMBLE}
