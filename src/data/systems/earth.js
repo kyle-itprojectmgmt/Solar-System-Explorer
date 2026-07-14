@@ -66,11 +66,14 @@ export default {
     surfaceGravity: 9.81,       // m/s² at sea level
     surfaceTempRange: [-88, 58], // °C, coldest to hottest recorded
     axialTiltDeg: 23.44,
-    // diffuse: NASA Blue Marble (world.topo.bathy 5400×2700), upgraded
-    // progressively to the 8K SSS daymap (CC BY 4.0) after load. Also on
-    // disk, not yet wired: night.jpg (Black Marble 8K — lights stay
-    // procedural for now, see earth-lights.glsl), clouds.jpg (8K layer),
-    // specular.jpg (8K ocean mask, converted from the SSS .tif).
+    // diffuse: NASA Blue Marble (world.topo.bathy.200407 5400×2700),
+    // upgraded progressively to diffuse_8k.jpg — same NASA July source,
+    // Lanczos-downscaled 21600×10800 → 8192×4096 at JPEG q92 (v10.0.5;
+    // replaced the stylized SSS daymap, so the silent swap no longer
+    // shifts the palette mid-session). The v5a night/clouds/specular 8K
+    // maps were never wired (all three layers are procedural by design)
+    // and were removed from public/ in v10.0.5 — re-download via the
+    // sources above if ever needed.
     // Land hue note (V5b, measured): midwest olive-green comes from the
     // SOURCE texture (Wisconsin samples rgb(79,97,49)) — July Blue Marble
     // greens, faithfully rendered. For tan/brown farmland swap a different

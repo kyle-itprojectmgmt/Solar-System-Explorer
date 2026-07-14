@@ -1595,6 +1595,38 @@ review clean — a first.
   0px on all five disc bodies), smoke 22, nightlights both passes —
   all green.
 
+### v10.0.5 — Earth diffuse upgrade + 16.7MB dead assets removed (2026-07-14)
+- diffuse_8k.jpg replaced: was the stylized SSS daymap (4.4MB, soft,
+  oversaturated swirly land texture, flat ocean); now NASA BMNG July
+  world.topo.bathy.200407 — the SAME source series as the 5400×2700 boot
+  map, so the silent progressive swap no longer shifts Earth's palette
+  mid-session. Source: eoimages.gsfc.nasa.gov imagerecord 73751,
+  21600×10800 original (26MB), Lanczos-downscaled to 8192×4096 JPEG q92
+  optimized = 5.9MB. NOTE: Kyle's "15-25MB indicates quality" heuristic
+  assumed a native-8K source; a downsample of a 233MP original encodes
+  far cleaner at q92 — fidelity verified by 1:1 crop comparison
+  (Himalaya/Alps/Baja: current was visibly soft, new resolves ridge
+  detail + bathymetry). Both files Greenwich-centered, no UV retarget
+  needed. Legacy eoimages URL pattern for other months:
+  imagerecords/73000/{73580+25·(month−1)}/world.topo.bathy.2004MM.*.
+- Dead textures deleted from public/textures/earth/: clouds.jpg (12MB),
+  night.jpg (3.0MB), specular.jpg (1.7MB) — downloaded v5a, never wired
+  (all three layers procedural by design), zero code references
+  (comments/docs only; earth.js comment updated). Deploy asset list
+  91→88 files, −16.7MB. Old SSS diffuse_8k recoverable from git history.
+- Quality-gate finding (Phase 1): highResPrimary = tier==='desktop'
+  (main.js detectQuality); tier only demotes on pointer:coarse, so
+  desktop + headless Chrome both get the 8K swap. Verified at the
+  network level, preview AND live: diffuse_8k.jpg 200 / 6,104,167 bytes,
+  swap fires ~after loading screen, no dead-texture requests.
+- tests/tex8kprobe.mjs NEW: production-build probe (no __sse) asserting
+  the progressive swap fires (network response listener), correct byte
+  size, no clouds/night/specular requests, zero console errors.
+- Suites: prodboot 10/10 on preview and live, tex8kprobe preview+live,
+  hazeprobe visual pass (all v10.0.4 fixes hold on the new texture),
+  earthtest 14, nightlights both passes, haloshots PASS, v1003probe 18,
+  smoke 22 — all green.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1622,7 +1654,7 @@ review clean — a first.
 | 24 | Inclination plane change lurched the camera (planet appeared to shift sideways) | Resolved v4d (line-of-nodes anchored at current bearing) | V4d_PROMPT.md |
 | 25 | Polar orbit at 90° reported as not working — could not be reproduced; measured -89.7°..+90° latitude sweep both before and after the v4d change (verify on hardware) | Resolved v4d (verified) | V4d_PROMPT.md |
 | 27 | Earth/Moon shader calibration done from headless screenshots — cloud zone coverage, city-light brightness, moon crater relief may need real-hardware tuning. v5a added the tooling: `__sse.renderer.logShaderState()` in dev builds lists live uniforms + all knob locations. | Needs review | V5_PROMPT.md |
-| 28 | Earth textures: 8K daymap WIRED in v5a (progressive diffuseHigh swap). night.jpg / clouds.jpg / specular.jpg downloaded (8K) but not yet wired into materials — lights are procedural by design (v5a Item 3). NASA CGI Moon Kit still manual (expired TLS cert at svs.gsfc.nasa.gov, URL in earth.js). | Partially resolved v5a | — |
+| 28 | Earth textures: 8K daymap WIRED in v5a (progressive diffuseHigh swap). night.jpg / clouds.jpg / specular.jpg were never wired (procedural by design) and were DELETED in v10.0.5 (−16.7MB deploy weight; re-download via earth.js source URLs if ever needed). diffuse_8k upgraded to NASA BMNG July in v10.0.5. NASA CGI Moon Kit still manual (expired TLS cert at svs.gsfc.nasa.gov, URL in earth.js). | Resolved v10.0.5 | — |
 | 26 | Replace Ko-fi with Stripe for donations — create 3 Stripe Payment Links ($5 Explorer / $10 Supporter / $25 Mission Commander), update KOFI_URL in src/config.js, update donation button to show tier picker popup, update README and landing page references. Optionally keep free Ko-fi page as secondary community presence with Saturn funding goal. | Fix before launch | — |
 | 29 | Multiple panels open simultaneously — overlap and confusion | Resolved v5b (central panel manager — one panel globally, stack + OI + body card + audio flyout) | V5b_PROMPT.md |
 | 30 | Click outside panel to close | Resolved v5b (transparent dismiss overlay below all UI; swipe dismisses on touch; drag works immediately after) | V5b_PROMPT.md |
