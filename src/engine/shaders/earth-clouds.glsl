@@ -3,7 +3,9 @@
 // alternating pattern ITCZ white band -> clear subtropical desert belt ->
 // mid-latitude comma swirls -> polar grey. Coverage is deliberately modest
 // outside the storm tracks so the Sahara and open ocean show through.
-// Activation: uDetailBlend gates on altitude (0 above 50,000 km).
+// Activation: uDetailBlend gates on altitude (earth.js detail block —
+// full through 100,000 km, easing off toward 2,000,000 km: the Blue
+// Marble reads by its cloud systems, so they must survive high altitude).
 // Injected into the 'terra' detail style; the style provides the preamble
 // (dBase/detail) and the final mix. Extra uniforms: uSunObj.
 

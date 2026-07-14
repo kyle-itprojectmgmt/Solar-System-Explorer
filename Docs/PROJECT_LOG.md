@@ -1550,6 +1550,51 @@ review clean — a first.
   14, marstest 13, saturntest 22, v8test 21, haloshots PASS, limb 4
   shots + 0 errors — all green.
 
+### v10.0.4 — Earth surface haze + cloud fade + false Africa lights (2026-07-14)
+- Surface haze ROOT CAUSE (bug #74, diff-render measured with the new
+  tests/hazeprobe.mjs): NOT the atmosphere shell (hiding it is
+  pixel-identical over the disc at 500/5k/40k/100k km — the shell has no
+  logdepthbuf chunks so it always loses the depth test inside the
+  silhouette; only the halo annulus survives) and NOT a cloud alpha
+  floor (coverage genuinely reaches 0 in clear zones — fbmN is signed).
+  It was _buildPrimary's hardcoded Jupiter "ammonia ice" Phong specular
+  (0x332211, shininess 8) — a broad warm lobe washing land AND ocean at
+  EVERY altitude (+~[20,8,2] RGB at disc center, measured). Now
+  config-driven (cfg.specular/cfg.shininess, gas-giant default
+  unchanged); Earth sets specular 0x000000 — ocean reflection comes from
+  the procedural glint, land is Lambertian. Kyle's proposed atmosphere
+  fixes (altitude opacity fade, dimmer colorLow) deliberately NOT
+  applied — probe shows the shell contributes zero over the disc, so
+  they'd only dim the calibrated v10.0.3 halo.
+- Cloud fade (bug #75): the knob is detail.activationKm (drives
+  uDetailBlend), NOT detailFloor (texture-res floor). 50,000/500 gave
+  blend 0.11 at 40,000 km (milky cloud ghost) and 0 at 100,000 km (no
+  clouds at all — no Blue Marble). Now 2,000,000/100,000: blend 1.0
+  through 100,000 km, easing off only toward system-framing distances.
+  Terra detail (clouds/lights/glint/aurora) now effectively always-on
+  for Earth — fine, dtlFreqFade guards handle distance aliasing and the
+  disc is small when far.
+- False Africa night lights (bug #76): the ungated RURAL term in
+  earth-lights.glsl (fbm^1.5 × 0.06 on ALL land) lit the Sahara, Congo
+  basin, and Kalahari. There is no density floor in this shader — Kyle's
+  prompt's max(density, 0.02) doesn't exist. Rural now gated by
+  smoothstep(0.05, 0.30, region) — dim sprawl survives around real metro
+  regions, wilderness is ocean-dark. Also added the missing South Africa
+  entries (Gauteng 0.55, Cape Town 0.35 — the verify list expected them).
+- nightlights.mjs extended: Congo dark sample + DARK_CAP 13/255 (5%)
+  assertion, plus a whole second southern-Africa pass (Johannesburg
+  darkest-hour aim; Jo'burg > 1.8× dark refs, > 30 lum, darks ≤ cap).
+  Measured after fix: Sahara 3.6, Congo 0.5, Kalahari 2, ocean 1 —
+  dark land IS ocean-dark; Jo'burg 73, Cape Town 29; Europe unchanged
+  (London 113, Paris 110).
+- tests/hazeprobe.mjs NEW: 4 altitudes × {full, noatmo, nodetail,
+  nospec} screenshot matrix with persistent toggles (survives the RAF
+  loop's per-frame renderer.update — detail killed via entry
+  activationKm, not the uniform, which update() rewrites every frame).
+- Suites: earthtest 14, glint PASS, haloshots PASS (night halo still
+  0px on all five disc bodies), smoke 22, nightlights both passes —
+  all green.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1622,6 +1667,15 @@ review clean — a first.
 | 65 | Pluto/Charon not built — the V8 prompt scoped Mercury/Venus/Uranus/Neptune only. | Resolved v10 — full binary system live; barycenter physics NOT needed (Keplerian Charon + equal periods = mutual lock by construction; only Pluto's ~2,110 km wobble is unmodeled) | V10_PLUTO.md |
 | 66 | V9 Sun shader calibration done from headless screenshots — granulation cell scale/contrast, corona streamer balance vs polar plumes, chromosphere rim strength, prominence subtlety, flare frequency/brightness may need real-hardware tuning (joins the #9/#27/#56/#63 eyeball-pass class). Knobs: uGranScale/limbDarkeningCoeff/supergranulationAmp in sun.js photosphere block, dtlFreqFade freqs + 1.35 gain in sun-photosphere.glsl, baseOpacity/activityScale in the corona block, prominence opacity/tubeR in renderer._buildProminences, flare probability constant 0.0025 in _updateSolarFlares. | Needs review | V9_SUN.md |
 | 67 | V10 Pluto/Charon shader calibration done from headless screenshots — Sputnik tone-mosaic strength (0.04 in pluto-surface.glsl LAYER 1), mountain/bladed relief amplitudes, haze ring gain (4.0 + pow 2.5 in pluto-atmosphere.glsl) vs day-side rim (intensity 0.5 in pluto.js), Mordor mottling, Serenity Chasma depth, plutoshine 0.035 may need real-hardware tuning (joins the eyeball-pass class). Screenshot tool: tests/plutoshots.mjs (6 views incl. the backlit crescent). | Needs review | V10_PLUTO.md |
+| 68 | Physics CPU optimization — measured and closed. Architecture: one PhysicsEngine per page load, switchSystem is a full navigation so inactive systems never run physics. Active system cost: 2.0 µs worst case (Jupiter, 4 n-body moons) — already 250× under 0.5ms target. Fix B (every 6th frame) would cause 4° position jumps at 10,000× speed — visible regression for zero measurable gain. CPU/GPU load lives in the render loop, not physics. Documented in physbench.mjs. | Won't fix — measured, no gain | — |
+| 69 | 3 stale test suites — tray/tooltip/stack fail identically on clean HEAD (asserting Saturn shows "Coming Soon" toast, 6 stack buttons vs today's 9, etc.) — v4c-era selectors. Not regressions. | Fix when convenient — selector refresh | — |
+| 70 | Atmosphere gradients — all planet halos were flat uniform bands. Fixed v10.0.3: 3-stop gradient (colorLow/colorMid/colorHigh) on all thin-atmosphere bodies using view-ray impact-parameter height axis (not fresnel which only spans 0.7-1.0 across visible halo). Earth fresnel 5→4, opacity 0.5→0.65. Mars effective opacity +25%, Saturn +22%, Pluto day haze +25%. Titan/Venus exempt. | Resolved 8501dce | — |
+| 71 | Jupiter preset speeds — Io Volcano Flyby and GRS Close Pass inherited stale 1000× speed. Fixed: both now 10×, Triple Moon Shadow 100× (no 50× step), Voyager 100×. | Resolved 8501dce | — |
+| 72 | Starfield cubemap too low resolution — was 4000×2000. Upgraded to ESO original 6000×3000 (7.9MB, 1.5× linear sharper). ESO's downloadable ceiling is 6000×3000 — the 800Mpix GigaGalaxy version exists as zoomify tiles only. True 8K+ requires tile stitching or switching to NASA synthetic starmap (changes visual character). See bug #59. | Partially resolved 8501dce — at ESO ceiling | — |
+| 73 | Stars too bright relative to lit planets. Fixed v10.0.3: HYG star sprites ×0.8, panorama sky 0xd9d9d9 (~15% perceived), procedural fallback 0.95→0.80. toneMappingExposure (1.1, global) deliberately not touched — would dim planets. | Resolved 8501dce | — |
+| 74 | Earth surface details look hazy at certain distances/angles. ROOT CAUSE (diff-render measured): hardcoded gas-giant Phong specular (0x332211, shininess 8) washing land+ocean at every altitude. NOT the atmosphere shell, NOT a cloud alpha floor. Earth now sets cfg.specular 0x000000. | Resolved v10.0.4 | — |
+| 75 | Earth clouds fade out above ~40,000 km (blend 0.11) and vanish at 50,000+ — no Blue Marble from high altitude. detail.activationKm 50,000→2,000,000, fullKm 500→100,000. | Resolved v10.0.4 | — |
+| 76 | False city-light glow over dark Africa (Sahara/Congo/Kalahari) — ungated rural term in earth-lights.glsl. Gated by region density; South Africa (Gauteng/Cape Town) population entries added. nightlights.mjs now asserts dark land ≤ 5%. | Resolved v10.0.4 | — |
 
 ---
 
@@ -1645,7 +1699,9 @@ review clean — a first.
 | 14 | Custom domain URL update — app.solarexplorer.co | Update src/config.js APP_URL to https://app.solarexplorer.co. Update wrangler.toml routes. Grep and replace all hardcoded solar-system-explorer.kyle-d06.workers.dev URLs in codebase. Verify share URL generator uses new domain. Landing page (solarexplorer.co) also needs its Launch Explorer links updated to app.solarexplorer.co — coordinate with landing page chat. |
 | 15 | instructions.md location wrong | .claude/instructions.md says PROJECT_LOG.md is at repo root but it actually lives in Docs/. Update instructions.md path reference. Also update any other path references that may be wrong. |
 | 16 | Callisto + Jupiter horizon curated preset | The Callisto/Jupiter telephoto shot (Callisto surface in foreground, Jupiter above horizon, Milky Way background) is one of the best views in the simulator. Add as a curated preset in jupiter.js. Position: low orbit over Callisto, Alt+drag tilted to show Jupiter above the horizon, telephoto FOV ~10°. |
-| 17 | Disable Cloudflare RUM beacon (bug #62) | Cloudflare dashboard → Speed → Optimization → Real User Monitoring → Disable. 2-click fix, no code change. Eliminates CSP console error on app.solarexplorer.co for all users. Aligned with no-analytics Privacy Policy. |
+| 17 | Disable Cloudflare RUM beacon (bug #62) | Cloudflare dashboard → Speed → Optimization → Real User Monitoring → Disable. Now redundant with GA4. Also flip "Always Use HTTPS" in SSL/TLS → Edge Certificates to restore Observatory A+ on app.solarexplorer.co. |
+| 18 | Planetshine — reflected parent planet light on moon night sides | Additive ambient pass on moon surface shaders. uPlanetshineColor + uPlanetshineIntensity uniforms in surface-base.glsl. Per-body config. Intensities: Jupiter moons 3-8% blue-white, Saturn moons 4-10% pale gold, Uranus moons 2-3% cyan, Triton 2-3% deep blue, Phobos/Deimos 2-3% reddish. Moon earthshine exempt. ~30 min, next polish build. |
+| 19 | ~~Physics CPU optimization~~ | MEASURED AND CLOSED — see bug #68. |
 
 Completed in v4c (removed from backlog): ghost time display, date
 picker + LIVE toggle, icon-stack Mission Control redesign (Camera /

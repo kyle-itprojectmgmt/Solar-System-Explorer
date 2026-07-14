@@ -320,11 +320,14 @@ export class SceneRenderer {
 
     const geo = new THREE.SphereGeometry(1, 128, 96);
     // Subtle warm specular: ammonia ice crystals in the upper atmosphere
-    // catch sunlight — a soft highlight, never plastic.
+    // catch sunlight — a soft highlight, never plastic. Gas-giant default;
+    // bodies override via cfg.specular (measured: on Earth the broad
+    // shininess-8 lobe washed land AND ocean with a permanent sheen at
+    // every altitude — the v10.0.3 "surface haze").
     const mat = new THREE.MeshPhongMaterial({
       map: this.texLoader.load(this.texUrl(p.slug, p.textures.diffuse)),
-      shininess: 8,
-      specular: new THREE.Color(0x332211),
+      shininess: p.shininess ?? 8,
+      specular: new THREE.Color(p.specular ?? 0x332211),
     });
     this._prepSurfaceTexture(mat.map);
     if (p.textures.normal) {

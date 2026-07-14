@@ -68,7 +68,7 @@ const pts = await page.evaluate(() => {
   const targets = {
     London: [51.5, -0.1], Paris: [48.9, 2.3], Milan: [45.5, 9.2],
     Cairo: [30.1, 31.3], Sahara: [23.0, 10.0], Atlantic: [45.0, -28.0],
-    Kalahari: [-24.0, 21.0], Moscow: [55.8, 37.6],
+    Kalahari: [-24.0, 21.0], Congo: [-1.0, 23.0], Moscow: [55.8, 37.6],
   };
   const out = { __hour: chosen };
   const camDir = cam.position.clone().sub(center()).normalize();
@@ -116,12 +116,108 @@ const samples = await page.evaluate(async (b64, pts) => {
 console.log(JSON.stringify(samples, null, 1));
 const lum = (s) => (typeof s === 'string' ? -1 : 0.299 * s.r + 0.587 * s.g + 0.114 * s.b);
 const cities = ['London', 'Paris', 'Milan', 'Cairo', 'Moscow'].map((c) => lum(samples[c]));
-const darks = ['Sahara', 'Atlantic', 'Kalahari'].map((c) => lum(samples[c])).filter((v) => v >= 0);
+const darks = ['Sahara', 'Atlantic', 'Kalahari', 'Congo'].map((c) => lum(samples[c])).filter((v) => v >= 0);
 const city = Math.max(...cities);
 const dark = Math.max(...darks, 0);
-// V5b: the night side is deliberately no longer pure black (nightAmbient
-// keeps terrain at ~10%), so the dark references sit near 25-30 luminance.
-// Cities must clearly outshine that floor, not a black screen.
-console.log(`brightest city ${city.toFixed(0)}  vs  brightest dark ref ${dark.toFixed(0)}  (want city > 1.8x dark, city > 45)`);
+// Rural-gate fix: unpopulated land must be as dark as ocean — only the
+// nightAmbient terrain silhouette (~3-5%) remains, so dark references must
+// sit at or below ~13/255 (5%). Cities must clearly outshine that floor.
+const DARK_CAP = 13;
+console.log(`brightest city ${city.toFixed(0)}  vs  brightest dark ref ${dark.toFixed(0)}  (want city > 1.8x dark, city > 45, dark <= ${DARK_CAP})`);
+const pass1 = city > dark * 1.8 && city > 45 && dark <= DARK_CAP;
+
+// PASS 2 — southern Africa: Gauteng + Cape Town must glow (they exist in
+// el_population), Kalahari / Congo interior must stay ocean-dark.
+const pts2 = await page.evaluate(() => {
+  const { cameraCtl, physics, renderer, THREE } = window.__sse;
+  const toLocal = (lat, lon) => {
+    const la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+    return new THREE.Vector3(
+      Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo));
+  };
+  const mesh = renderer.primaryMesh;
+  const r = mesh.geometry.boundingSphere?.radius ?? 1;
+  const center = () => mesh.getWorldPosition(new THREE.Vector3());
+  const worldNormal = (lat, lon) =>
+    mesh.localToWorld(toLocal(lat, lon).multiplyScalar(r)).sub(center()).normalize();
+  const sunW = renderer.sunDir.clone().applyQuaternion(renderer.root.quaternion).normalize();
+
+  // Darkest sim hour for Johannesburg.
+  let chosen = 0, best = 1;
+  for (let h = 0; h < 24; h += 1) {
+    physics.jumpToSimSeconds(h * 3600);
+    renderer.update(physics, 0.016, 1);
+    mesh.updateWorldMatrix(true, false);
+    const dot = worldNormal(-26.2, 28.0).dot(sunW);
+    if (dot < best) { best = dot; chosen = h; }
+  }
+  physics.jumpToSimSeconds(chosen * 3600);
+  renderer.update(physics, 0.016, 1);
+  mesh.updateWorldMatrix(true, false);
+
+  const N = worldNormal(-26.2, 28.0);
+  cameraCtl.orbTheta = Math.atan2(N.z, N.x);
+  cameraCtl.orbPhi = Math.acos(Math.max(-1, Math.min(1, N.y)));
+  for (let i = 0; i < 40; i++) cameraCtl.update(0.05);
+  renderer.update(physics, 0.016, 1);
+  renderer.renderer.render(renderer.scene, renderer.camera);
+
+  const cam = renderer.camera;
+  cam.updateMatrixWorld(true);
+  cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+  const targets = {
+    Johannesburg: [-26.2, 28.0], CapeTown: [-33.9, 18.5],
+    Kalahari: [-24.0, 21.0], Congo: [-1.0, 23.0], SAtlantic: [-30.0, -10.0],
+  };
+  const out = { __hour: chosen };
+  const camDir = cam.position.clone().sub(center()).normalize();
+  for (const [name, [lat, lon]] of Object.entries(targets)) {
+    const n = worldNormal(lat, lon);
+    const world = center().add(n.clone().multiplyScalar(r * mesh.getWorldScale(new THREE.Vector3()).x));
+    const facing = n.dot(camDir) > 0.35;
+    const night = n.dot(sunW) < -0.05;
+    const ndc = world.project(cam);
+    out[name] = {
+      facing, night,
+      x: Math.round((ndc.x * 0.5 + 0.5) * innerWidth),
+      y: Math.round((-ndc.y * 0.5 + 0.5) * innerHeight),
+    };
+  }
+  return out;
+});
+
+console.log('africa night hour found:', pts2.__hour);
+await new Promise((r) => setTimeout(r, 1500));
+await page.screenshot({ path: `${OUT}night-africa.png` });
+
+const b642 = readFileSync(`${OUT}night-africa.png`).toString('base64');
+const samples2 = await page.evaluate(async (b64, pts) => {
+  const img = new Image();
+  img.src = 'data:image/png;base64,' + b64;
+  await img.decode();
+  const cv = document.createElement('canvas');
+  cv.width = img.width; cv.height = img.height;
+  const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const out = {};
+  for (const [name, p] of Object.entries(pts)) {
+    if (name === '__hour') continue;
+    if (!p.facing || !p.night) { out[name] = `skip (facing=${p.facing} night=${p.night})`; continue; }
+    const d = cx.getImageData(p.x - 2, p.y - 2, 5, 5).data;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4;
+    out[name] = { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+  }
+  return out;
+}, b642, pts2);
+
+console.log(JSON.stringify(samples2, null, 1));
+const joburg = lum(samples2.Johannesburg);
+const darks2 = ['Kalahari', 'Congo', 'SAtlantic'].map((c) => lum(samples2[c])).filter((v) => v >= 0);
+const dark2 = Math.max(...darks2, 0);
+console.log(`Johannesburg ${joburg.toFixed(0)}  vs  brightest dark ref ${dark2.toFixed(0)}  (want joburg > 1.8x dark, joburg > 30, dark <= ${DARK_CAP})`);
+const pass2 = joburg > dark2 * 1.8 && joburg > 30 && dark2 <= DARK_CAP;
+
 await browser.close();
-process.exit(city > dark * 1.8 && city > 45 ? 0 : 1);
+process.exit(pass1 && pass2 ? 0 : 1);

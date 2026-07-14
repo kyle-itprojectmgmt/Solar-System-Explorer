@@ -80,6 +80,12 @@ export default {
     // ocean/lights/aurora add no height). 2.0 turned cloud-system flanks
     // into black lumps at grazing sun from 382 km (V5b, measured).
     normalScale: 0.8,
+    // Phong specular OFF (haze fix, diff-render measured): the engine's
+    // gas-giant default (0x332211, shininess 8) added a broad warm sheen
+    // over land and ocean at EVERY altitude — read as blue-white surface
+    // haze. Ocean reflection comes from the procedural sun glint in
+    // earth-ocean.glsl; land is Lambertian.
+    specular: 0x000000,
     detailFloor: { softKm: 400, hardKm: 200 }, // ISS altitude experience — 408 km reference
     // Van Allen belts + reentry band (V5b) — unlike Jupiter, most of
     // Earth's orbital space is benign; warn only inside real zones.
@@ -112,10 +118,15 @@ export default {
       dayFadeSoft0: -0.30, dayFadeSoft1: 0.10,
       grazeFade0: 0.10, grazeFade1: 0.45,
     },
+    // Blue Marble rule (cloud-fade fix): Earth's identity from high
+    // altitude IS its cloud systems, so the terra detail (clouds, lights,
+    // glint) stays at full strength through 100,000 km and only eases off
+    // toward system-framing distances. (The old 50,000/500 killed clouds
+    // above 50,000 km and left an 11%-blend milky ghost at 40,000 km.)
     detail: {
       style: 'terra',
-      activationKm: 50000,
-      fullKm: 500,
+      activationKm: 2000000,
+      fullKm: 100000,
     },
     // UI navigation shortcuts to texture-anchored surface features.
     navPresets: [{

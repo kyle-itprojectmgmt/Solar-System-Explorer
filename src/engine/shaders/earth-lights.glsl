@@ -39,6 +39,8 @@ float el_population(vec3 p) {
   pop += el_pop(p, -34.6,  -58.5,  4.0, 0.50);  // Rio de la Plata
   pop += el_pop(p,  19.4,  -99.1,  4.0, 0.50);  // Mexico City
   pop += el_pop(p,   6.5,    3.5,  4.0, 0.40);  // Lagos / Gulf of Guinea
+  pop += el_pop(p, -26.2,   28.0,  3.5, 0.55);  // Gauteng (Johannesburg–Pretoria)
+  pop += el_pop(p, -33.9,   18.5,  2.0, 0.35);  // Cape Town
   pop += el_pop(p,  55.8,   37.6,  3.0, 0.45);  // Moscow
   return pop;
 }
@@ -76,9 +78,12 @@ if (uDetailBlend > 0.001) {
     float cityMask = dtlAAstep(0.55, 0.95, citySpeckle) * dtlFreqFade(vObjPos, 250.0)
                    * (0.35 + 0.65 * (snoise(vObjPos * 91.0 + 3.1) * 0.5 + 0.5));
 
-    // FAINT RURAL BACKGROUND: sparse dim glow on other land, so continents
-    // aren't pitch black — but far below any region.
-    float rural = pow(abs(fbmN(vObjPos * 4.0, 3)), 1.5) * 0.06;
+    // FAINT RURAL BACKGROUND: sparse dim glow around the metro regions.
+    // Gated by region density — ungated, this term lit every landmass and
+    // read as false light pollution over the Sahara, the Congo basin, and
+    // the Kalahari (Black Marble shows those as dark as open ocean).
+    float rural = pow(abs(fbmN(vObjPos * 4.0, 3)), 1.5) * 0.06
+                * smoothstep(0.05, 0.30, region);
 
     float popDensity = region * (0.30 + 0.70 * clusterIntensity)
                      + region * cityMask * 0.5
