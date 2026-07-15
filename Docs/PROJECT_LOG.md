@@ -1720,6 +1720,35 @@ review clean — a first.
   haloshots PASS (night halo 0px), smoke 22, prodboot 10/10 live +
   tex8kprobe live — all green.
 
+### v10.0.8 — Earth terrain normal map disabled (2026-07-14)
+- Targeted revert of the v10.0.6 normal MAP only (bug #77): universal
+  horizontal cloud banding across the disc on real hardware, all
+  browsers (Kyle confirmed; the initial clean desktop check was a stale
+  cache). Headless SwiftShader does NOT reproduce it — hazeprobe pixels
+  were byte-identical with the map on/off at all four altitudes, so
+  this joins the #9/#27/#56 hardware-eyeball class and headless can't
+  gate the revisit.
+- Disable is CONFIG-driven, not an engine edit (the brief said
+  "renderer.js only", but the textures.normal path is generic and
+  data-driven by design — hard-disabling it in the engine would also
+  block future moon normal maps): `normal:` removed from earth.js
+  textures, so nothing loads and material.normalMap is null (verified
+  by normalcal). normalMapScale 1.5 stays in config, unused, for the
+  revisit. The corrected OpenGL-convention file (green pre-inverted
+  from the DirectX SSS .tif — do NOT lose this derivation) moved
+  UNDEPLOYED to textures-src/earth/normal_gl_8k.jpg; dist assets 90→89.
+- Black Marble night texture + v10.0.7 cloud occlusion UNTOUCHED and
+  re-verified: nightlights both passes (same values), cloudocclude
+  [60.7..128.1].
+- normalcal.mjs now also asserts the map is OFF (EXPECT_NORMAL_MAP
+  flag — flip to true when revisiting); tex8kprobe asserts normal.jpg
+  is NOT requested (flip back to a 200 assertion after the fix).
+- Suites: normalcal, earthtest 14, hazeprobe (day-side identical to
+  v10.0.5 baseline), nightlights ×2, haloshots, smoke 22, cloudocclude,
+  prodboot 10/10 + tex8kprobe on preview AND live — all green.
+- NOTE: the brief was titled v10.0.7, but 10.0.7 had already shipped
+  (cloud occlusion, f8e70c7) — this is 10.0.8.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1801,6 +1830,7 @@ review clean — a first.
 | 74 | Earth surface details look hazy at certain distances/angles. ROOT CAUSE (diff-render measured): hardcoded gas-giant Phong specular (0x332211, shininess 8) washing land+ocean at every altitude. NOT the atmosphere shell, NOT a cloud alpha floor. Earth now sets cfg.specular 0x000000. | Resolved v10.0.4 | — |
 | 75 | Earth clouds fade out above ~40,000 km (blend 0.11) and vanish at 50,000+ — no Blue Marble from high altitude. detail.activationKm 50,000→2,000,000, fullKm 500→100,000. | Resolved v10.0.4 | — |
 | 76 | False city-light glow over dark Africa (Sahara/Congo/Kalahari) — ungated rural term in earth-lights.glsl. Gated by region density; South Africa (Gauteng/Cape Town) population entries added. nightlights.mjs now asserts dark land ≤ 5%. | Resolved v10.0.4 | — |
+| 77 | Earth terrain normal map disabled in v10.0.8 — caused universal cloud banding (horizontal stripe artifacts across disc) on real hardware, all browsers; headless SwiftShader does not reproduce. Root cause undiagnosed. To revisit: restore textures-src/earth/normal_gl_8k.jpg → public/textures/earth/normal.jpg, re-add `normal:` to earth.js, start with normalMapScale 0.1 and measure disc appearance before increasing. Suspect interaction between terrain ridge normals and the cloud relief shader path (dtlPerturbNormal stacks on the map-perturbed normal); also candidate: JPEG q95 row artifacts amplified ×1.5. normalcal.mjs is the calibration tool (flip EXPECT_NORMAL_MAP); tex8kprobe normal.jpg assertion must flip back to 200. | Open — hardware eyeball pass needed | — |
 
 ---
 

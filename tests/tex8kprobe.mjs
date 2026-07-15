@@ -40,10 +40,12 @@ check('diffuse_8k.jpg loaded (progressive swap fired)', hit('diffuse_8k.jpg')?.s
   JSON.stringify(hit('diffuse_8k.jpg')));
 check('diffuse_8k.jpg is the new 5.8MB file (not the old 4.4MB)',
   (hit('diffuse_8k.jpg')?.len ?? 0) > 5_500_000, `len=${hit('diffuse_8k.jpg')?.len}`);
-check('normal.jpg loaded (v10.0.6 terrain relief)', hit('normal.jpg')?.status === 200,
-  JSON.stringify(hit('normal.jpg')));
 check('night.jpg loaded (v10.0.6 Black Marble lights)', hit('night.jpg')?.status === 200,
   JSON.stringify(hit('night.jpg')));
+// Bug #77 (v10.0.8): the terrain normal map is DISABLED — it must NOT be
+// requested. Flip back to a 200 assertion when the banding is solved.
+check('normal.jpg NOT requested (bug #77 disable)', !hit('normal.jpg'),
+  JSON.stringify(hit('normal.jpg')));
 check('no dead-texture requests (clouds/specular)',
   !texHits.some((t) => /clouds|specular/.test(t.url)));
 const realErrors = errors.filter((e) => !/favicon/i.test(e));

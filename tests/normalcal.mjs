@@ -2,6 +2,11 @@
 // shading is invisible at high noon), three configs — wired (+Y), flipped
 // (-Y, DirectX convention), and no normal map — to pick the convention and
 // judge strength. Screenshots to tests/shots/normalcal/.
+// v10.0.8 (bug #77): the Earth normal map is DISABLED — universal cloud
+// banding on real hardware. This probe now ALSO asserts the map is off
+// (exit 1 if a normalMap is wired). When revisiting the bug, flip
+// EXPECT_NORMAL_MAP to true and use the three shots to recalibrate.
+const EXPECT_NORMAL_MAP = false;
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -87,3 +92,8 @@ await page.evaluate(() => {
 });
 await browser.close();
 console.log('DONE — eyeball the three shots: ridges must be LIT on the sun side.');
+if (info.hasNormalMap !== EXPECT_NORMAL_MAP) {
+  console.log(`FAIL: normalMap wired=${info.hasNormalMap}, expected ${EXPECT_NORMAL_MAP} (bug #77 disable)`);
+  process.exit(1);
+}
+console.log(`  ok  normalMap wired=${info.hasNormalMap} (expected while bug #77 open)`);

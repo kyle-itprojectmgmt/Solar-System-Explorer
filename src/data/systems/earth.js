@@ -71,12 +71,15 @@ export default {
     // Lanczos-downscaled 21600×10800 → 8192×4096 at JPEG q92 (v10.0.5;
     // replaced the stylized SSS daymap, so the silent swap no longer
     // shifts the palette mid-session).
-    // normal: SSS 8K earth normal map (v10.0.6, from the .tif — the .jpg
-    // download URL serves an HTML page), TIF → JPEG q95 4:4:4. The source
-    // is DirectX-convention (+G = south, measured on the Himalayan front:
-    // G=131 south-facing) — green channel INVERTED at conversion so the
-    // shipped file is OpenGL/three convention. Re-derive from the TIF if
-    // ever replacing.
+    // normal map DISABLED (v10.0.8, bug #77): universal horizontal cloud
+    // banding on real hardware across browsers (headless SwiftShader does
+    // NOT reproduce it — eyeball-pass class). The corrected OpenGL-
+    // convention file (green channel pre-inverted from the DirectX SSS
+    // .tif, measured on the Himalayan front) is preserved UNDEPLOYED at
+    // textures-src/earth/normal_gl_8k.jpg — to revisit, move it back to
+    // public/textures/earth/normal.jpg, re-add `normal: 'normal.jpg'`
+    // below, start at normalMapScale 0.1, and calibrate with
+    // tests/normalcal.mjs.
     // night: SSS 8K nightmap (v10.0.6) — REPLACES the procedural
     // 22-gaussian city lights when loaded (earth-lights.glsl branch;
     // procedural path remains the pre-load fallback). clouds/specular
@@ -88,7 +91,6 @@ export default {
     textures: {
       diffuse: 'diffuse.jpg',
       diffuseHigh: 'diffuse_8k.jpg',
-      normal: 'normal.jpg',
       night: 'night.jpg',
     },
     // normalScale drives ONLY the procedural cloud relief (ocean/lights/
@@ -96,7 +98,9 @@ export default {
     // lumps at grazing sun from 382 km (V5b, measured) — so the terrain
     // normal MAP gets its own strength knob, normalMapScale.
     normalScale: 0.8,
-    normalMapScale: 1.5, // terrain relief from normal.jpg (v10.0.6)
+    // Kept for the bug #77 revisit but NOT applied — nothing reads it
+    // while textures.normal is absent. Restart at 0.1 when re-enabling.
+    normalMapScale: 1.5,
     // Phong specular OFF (haze fix, diff-render measured): the engine's
     // gas-giant default (0x332211, shininess 8) added a broad warm sheen
     // over land and ocean at EVERY altitude — read as blue-white surface
