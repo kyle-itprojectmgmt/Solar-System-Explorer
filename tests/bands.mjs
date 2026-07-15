@@ -35,7 +35,8 @@ const r = await page.evaluate(() => {
   out.q2_atan2 = +Math.atan2(-camLocal.z, camLocal.x).toFixed(3);
 
   // Press I.
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyI', bubbles: true }));
+  // v10.0.13: Orbit Simulation (was Orbit Insertion) rebound I → O.
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyO', bubbles: true }));
   out.q3_insPhase = +cameraCtl.ins.phase.toFixed(3);
   for (let i = 0; i < 40; i++) cameraCtl.update(0.05);
   const posRel = cameraCtl.camera.position.clone().sub(center);

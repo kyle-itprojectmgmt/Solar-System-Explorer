@@ -56,7 +56,8 @@ const r = await page.evaluate(() => {
   incSlider.value = 90;
   incSlider.dispatchEvent(new Event('input'));
   out.incReadout = [...document.querySelectorAll('.alt-readout')].map((e) => e.textContent).find((t) => /polar|°/.test(t));
-  out.incSwitched = cameraCtl.mode === 'insertion' && cameraCtl.ins.incDeg === 90;
+  // v8.0.1: INC from ORBIT mode adjusts the current orbit — no mode switch.
+  out.incSwitched = cameraCtl.mode === 'orbit' && cameraCtl.ins.incDeg === 90;
 
   // SPD panel
   open('spd');
@@ -91,7 +92,7 @@ check('no sliders inside CAM panel', r.noAltInCam);
 check('ALT panel slider + readout', /ALT: 5,0\d\d km/.test(r.altReadout), r.altReadout);
 check('ALT description present', r.altDesc);
 check('INC readout short form (90° polar)', /90° polar/.test(r.incReadout), r.incReadout);
-check('INC drag auto-switched to insertion @90', r.incSwitched);
+check('INC drag adjusts current orbit @90 (no switch, v8.0.1)', r.incSwitched);
 check('SPD slider applies 2.50x', r.spdApplied);
 check('SPD description present', r.spdDesc);
 check('S key inert', r.sInert);

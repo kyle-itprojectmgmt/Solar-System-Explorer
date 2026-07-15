@@ -61,7 +61,7 @@ const hint = await page.evaluate(() => {
   const sl = S.ui.spdSlider;
   sl.value = '2'; sl.dispatchEvent(new Event('input'));
   const notes = [...document.querySelectorAll('.notification')].map((n) => n.textContent);
-  return notes.some((t) => /Orbit Speed applies to Orbit mode/.test(t));
+  return notes.some((t) => /Orbit Speed applies to Cinematic Orbit mode/.test(t));
 });
 check('dragging SPD in insertion mode explains itself (one-shot notify)', hint);
 

@@ -1977,6 +1977,48 @@ review clean — a first.
   nightclouds PASS, cloudocclude PASS, hazeprobe PASS, hurricane PASS
   (6.6, still organic), glint PASS, presets PASS, haloshots PASS.
 
+### v10.0.13 — preset insertion 1× funnel, camera mode renames + key rebinding (2026-07-15)
+- MEASURE-FIRST RESULTS (brief's hypotheses A/B/C all ruled out):
+  - Preset insertion speed — presets do NOT land in orbit mode (measured
+    mode 'insertion', HUD "ORBIT INSERTION"), call order was already
+    setMode-first everywhere, and no cinematic bleed exists. Real cause:
+    the 21 curated insertion presets inherited the AMBIENT time
+    multiplier — fired at 500× the physical orbit sweeps 500× fast
+    (reads as the cosmetic 60-s rev), fired paused it freezes. The
+    ⬤ Enter Orbit button already funnels through userSetTimeIndex(1);
+    presets never did. FIX: _presetInsertion(body, params) helper
+    (setMode → setInsertion → userSetTimeIndex(1)) replaces all 21
+    curated call sites. Post-fix measured: timeIndex 1 after firing at
+    500× and paused, unpauses, phase rate = sqrt(GM/r^3) ratio 1.000.
+    Saved presets untouched by design — they restore their own captured
+    timeMultiplier.
+- Camera mode renames (labels + keys ONLY, slugs frozen):
+  Cinematic→Tour (C→T), Orbit→Cinematic Orbit (O→C), Orbit
+  Insertion→Orbit Simulation (I→O); Free Fly/Chase/System View
+  unchanged. HUD + CAM panel render from CAMERA_MODES so they followed
+  automatically; HELP table, INC toast/note, SPD explainer/tooltip/desc,
+  cinematic tooltip, README updated. KeyO routes through _activateMode
+  so the OI panel reopens when setMode short-circuits (panel closed via
+  Enter Orbit). instructions.md gained a camera-modes table (brief
+  assumed one existed; it did not). NOTE: keys live in ui.js _bindKeys —
+  camera.js has no mode key listeners (brief assumed otherwise).
+- Guard NEW: tests/v10013probe.mjs (T/C/O/F/H/G → slug + HUD + OI panel
+  opens on O, CAM rows, HELP table) and tests/presetspeed.mjs (preset at
+  500×/paused → timeIndex 1, insertion phase rate vs sqrt(GM/r^3) ±5%).
+- Tests updated for the rebinding: bands.mjs + v5b.mjs KeyI→KeyO,
+  v801.mjs + v10012probe.mjs toast strings.
+- STALE SUITE REPAIRS (all three verified failing at clean HEAD 6cab1cd
+  — pre-existing, not regressions): v801 pause asserts expected the
+  icon to show STATE (v10.0.10 flipped it to show the ACTION: paused →
+  ▶) and called index 3 "100x" (50× on the current ladder); about.mjs
+  Io-prograde check demanded >900 sim-s from index 4 labelled "1000x"
+  (500× since v10.0.10 — measured dSim exactly 500); v4d expected INC
+  drag from ORBIT mode to auto-switch to insertion (v8.0.1 deliberately
+  removed that — INC adjusts the current orbit).
+- Suites (all PASS): smoke, orbitdir, bands, v5b, presets, toast,
+  v10010probe, v10011probe, v10012probe, v10013probe NEW, presetspeed
+  NEW, v801 18/18, v4d 13/13, about 27/27.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |

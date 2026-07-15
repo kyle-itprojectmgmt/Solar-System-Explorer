@@ -110,13 +110,13 @@ const phys = await page.evaluate(() => {
   const io = physics.getBody('Io');
   const a0 = Math.atan2(-io.pos.z, io.pos.x);
   const s0 = physics.simSeconds;
-  physics.setTimeIndex(4); // 1000x
+  physics.setTimeIndex(4); // 500x (top of the v10.0.10 ladder)
   for (let i = 0; i < 60; i++) physics.update(1 / 60);
   physics.setTimeIndex(1);
   const a1 = Math.atan2(-io.pos.z, io.pos.x);
   return { dSim: physics.simSeconds - s0, dAng: Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0)) };
 });
-check('Io advances prograde at 1000x', phys.dSim > 900 && phys.dAng > 1e-4, JSON.stringify(phys));
+check('Io advances prograde at 500x', phys.dSim > 450 && phys.dAng > 1e-4, JSON.stringify(phys));
 
 const ver = await page.$eval('#loading-version', (e) => e.textContent);
 check(`loading screen shows v${VERSION}`, ver.includes(`v${VERSION}`), ver);

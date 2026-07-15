@@ -9,7 +9,7 @@ A photorealistic, first-person 3D explorer of the solar system — **four system
 - **Four planetary systems** — travel between Jupiter (Galilean moons, GRS), Earth (city lights, auroras, Apollo sites), Mars (Olympus Mons, dust storms, polar caps), and Saturn (the full ring system) from the NAV panel
 - **N-body physics** — velocity-Verlet integration with mutual perturbations (the 1:2:4 Laplace resonance emerges naturally); smaller moons ride inclined Keplerian orbits — Phoebe genuinely orbits Saturn backwards, Hyperion tumbles chaotically
 - **Saturn's rings** — Cassini-derived radial color/opacity with the Cassini Division and Encke gap, ring shadows cast both ways (rings on cloud tops, Saturn on rings), and a fly-through ice-particle layer when you dip into the ring plane
-- **Six camera modes** — Cinematic (`C`), Free Fly (`F`, WASD + mouse), Orbit (`O` + click), Chase (`H` + click), Orbit Insertion (`I`, physically accurate orbits incl. GeoSync), System View (`G`)
+- **Six camera modes** — Tour (`T`), Free Fly (`F`, WASD + mouse), Cinematic Orbit (`C` + click), Chase (`H` + click), Orbit Simulation (`O`, physically accurate orbits incl. GeoSync), System View (`G`)
 - **Telephoto optics** — 🔭 toggle and a 5–90° FOV slider; Earthrise finally looks like Apollo 8
 - **Procedural surface detail** — per-body GLSL layers that stage in with altitude: volcanic Io, cracked Europa, Titan's opaque orange haze, Enceladus tiger stripes + geysers, Iapetus's two-tone ridge line
 - **Time control** — pause to 10,000× (`Space`, `,`, `.`), date picker (1950–2050), 🔴 LIVE mode tracking the real clock

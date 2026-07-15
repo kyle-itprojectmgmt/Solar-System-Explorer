@@ -55,7 +55,7 @@ await page.click(stackBtn('bodies'));
 check('NAV closes audio flyout', (await visiblePanels()).join() === 'stack');
 
 // Insertion mode opens OI and closes NAV.
-await page.keyboard.press('KeyI');
+await page.keyboard.press('KeyO');
 await new Promise((r) => setTimeout(r, 300));
 check('I opens OI, closes NAV (one panel rule)', (await visiblePanels()).join() === 'oi', (await visiblePanels()).join());
 
@@ -71,7 +71,7 @@ check(`OI ✕ closes panel and returns to previous mode (${pre})`,
   !afterClose.oiVisible && afterClose.mode === pre, JSON.stringify(afterClose));
 
 // Re-open cleanly via I after ✕.
-await page.keyboard.press('KeyI');
+await page.keyboard.press('KeyO');
 await new Promise((r) => setTimeout(r, 300));
 check('I re-opens OI cleanly after ✕', (await visiblePanels()).join() === 'oi');
 

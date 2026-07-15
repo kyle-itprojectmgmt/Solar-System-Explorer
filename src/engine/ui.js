@@ -15,12 +15,15 @@ import { trackPresetLaunch } from './analytics.js';
 
 // Surface mode removed permanently in V7 (was hidden since v4d; the
 // first-person ground experience is a future rebuild, not a revival).
+// v10.0.13 renames: Cinematic→Tour (T), Orbit→Cinematic Orbit (C),
+// Orbit Insertion→Orbit Simulation (O). Only labels and keys changed —
+// the id slugs are frozen (presets, probes, and preModeOI all key on them).
 const CAMERA_MODES = [
-  { id: 'cinematic', label: 'Cinematic', key: 'C', targeted: false },
+  { id: 'cinematic', label: 'Tour', key: 'T', targeted: false },
   { id: 'free', label: 'Free Fly', key: 'F', targeted: false },
-  { id: 'orbit', label: 'Orbit', key: 'O', targeted: true },
+  { id: 'orbit', label: 'Cinematic Orbit', key: 'C', targeted: true },
   { id: 'chase', label: 'Chase', key: 'H', targeted: true },
-  { id: 'insertion', label: 'Orbit Insertion', key: 'I', targeted: false },
+  { id: 'insertion', label: 'Orbit Simulation', key: 'O', targeted: false },
   { id: 'system', label: 'System View', key: 'G', targeted: false },
 ];
 const modeById = (id) => CAMERA_MODES.find((m) => m.id === id);
@@ -593,7 +596,7 @@ export class UI {
         // plane (a stale stored inclination could snap toward the pole).
         this.cam.ins.incDeg = incDeg;
         this.cam.setMode('insertion', target);
-        this.notify('Switched to Orbit Insertion for inclination');
+        this.notify('Switched to Orbit Simulation for inclination');
         this.cam.setInsertion({ incDeg });
       }
       this.mcIncLabel.textContent = incShort(incDeg);
@@ -602,7 +605,7 @@ export class UI {
     mcIncScale.innerHTML = '<span>-90° retro</span><span>0° equatorial</span><span>90° polar</span>';
     this.mcIncLabel.textContent = incShort(this.cam.ins.incDeg);
     this.incNote = el('p', 'panel-desc', this.incSecMC);
-    this.incNote.textContent = 'Orbital plane tilt — adjusts the current orbit (switches to Orbit Insertion from other modes)';
+    this.incNote.textContent = 'Orbital plane tilt — adjusts the current orbit (switches to Orbit Simulation from other modes)';
   }
 
   _buildSpdPanel(c) {
@@ -625,7 +628,7 @@ export class UI {
       // of silently doing nothing.
       if (this.cam.mode === 'insertion' && !this._spdModeNoted) {
         this._spdModeNoted = true;
-        this.notify('Orbit Speed applies to Orbit mode — insertion orbits follow real physics');
+        this.notify('Orbit Speed applies to Cinematic Orbit mode — simulated orbits follow real physics');
       } else if (this.physics.paused && !this._spdPauseNoted) {
         this._spdPauseNoted = true;
         this.notify('Simulation is paused — camera orbit resumes with time');
@@ -633,7 +636,7 @@ export class UI {
     };
     syncOrb();
     el('p', 'panel-desc', this.orbSec).textContent =
-      'Camera orbit speed in Orbit mode — scales with simulation speed, never changes it';
+      'Camera orbit speed in Cinematic Orbit mode — scales with simulation speed, never changes it';
     this.spdSlider = orbSlider;
     this._syncSpdSlider = syncOrb;
   }
@@ -739,6 +742,18 @@ export class UI {
   }
 
   // -- 6d Presets panel — curated + saved views ------------------------------------------
+
+  /** Curated-preset funnel into a physical orbit — the same entry contract
+   *  as the ⬤ Enter Orbit button: setMode FIRST (entry re-derives altitude
+   *  from camera distance — house rule), preset parameters second, then 1×
+   *  real time. Without the time step the preset inherits the ambient
+   *  multiplier (v10.0.13): frozen while paused, a ~minutes-per-rev blur at
+   *  500× that reads as the cosmetic orbit sweep. */
+  _presetInsertion(body, params) {
+    this.cam.setMode('insertion', body);
+    this.cam.setInsertion({ body, ...params });
+    this.userSetTimeIndex(1);
+  }
 
   _buildPresetsPanel(c) {
     el('h3', 'side-heading', c).textContent = 'CURATED';
@@ -882,10 +897,7 @@ export class UI {
         }
       } },
       { label: '🔴 Mars Global View', system: 'mars', fn: () => {
-        // Enter the mode FIRST — insertion entry re-derives altitude from
-        // the camera's current distance and would clobber the preset.
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 15000, incDeg: 30 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 15000, incDeg: 30 });
         this.notify('Global view — 15,000 km, 30° inclined orbit');
       } },
       { label: '🛸 Chase Phobos', system: 'mars', fn: () => {
@@ -893,20 +905,17 @@ export class UI {
         this.notify('Chasing Phobos — the moon that outruns Mars\'s spin');
       } },
       { label: '❄️ North Polar Cap', system: 'mars', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 2000, incDeg: 85 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 2000, incDeg: 85 });
         this.notify('Polar orbit — water-ice cap and spiral troughs');
       } },
-      // — Saturn (V7). Insertion presets: setMode FIRST, then setInsertion
-      // (entry re-derives altitude from camera distance — house rule).
+      // — Saturn (V7). Insertion presets go through _presetInsertion
+      // (mode-first house rule + 1× entry — v10.0.13).
       { label: '💍 Ring Plane View', system: 'saturn', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 150000, incDeg: 30 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 150000, incDeg: 30 });
         this.notify('Ring plane view — 30° above the rings at 150,000 km');
       } },
       { label: '➖ Ring Edge-On', system: 'saturn', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 80000, incDeg: 0 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 80000, incDeg: 0 });
         this.notify('Edge-on — the rings collapse to a razor-thin line');
       } },
       { label: '✨ Through the Rings', system: 'saturn', fn: () => {
@@ -921,13 +930,11 @@ export class UI {
         this.notify('Inside the ring plane — ice particles all around');
       } },
       { label: '🟠 Titan Close Pass', system: 'saturn', fn: () => {
-        this.cam.setMode('insertion', 'Titan');
-        this.cam.setInsertion({ altitudeKm: 500, incDeg: 20 });
+        this._presetInsertion('Titan', { altitudeKm: 500, incDeg: 20 });
         this.notify('Skimming Titan\'s orange haze at 500 km');
       } },
       { label: '💨 Enceladus Geysers', system: 'saturn', fn: () => {
-        this.cam.setMode('insertion', 'Enceladus');
-        this.cam.setInsertion({ altitudeKm: 200, incDeg: 80 });
+        this._presetInsertion('Enceladus', { altitudeKm: 200, incDeg: 80 });
         this.notify('Polar pass — geyser plumes over the tiger stripes');
       } },
       { label: '⚫⚪ Iapetus Boundary', system: 'saturn', fn: () => {
@@ -949,8 +956,8 @@ export class UI {
         this._flyToLatLon(dark[0], dark[1], 4500, 'Auroral oval — curtains shimmer above 1,000 km');
       } },
       // — V8: Mercury / Venus / Uranus / Neptune. Epoch presets follow the
-      // Voyager/Apollo/Viking house pattern; insertion presets setMode
-      // FIRST then setInsertion (entry re-derives altitude — house rule).
+      // Voyager/Apollo/Viking house pattern; insertion presets go
+      // through the _presetInsertion funnel.
       { label: '🛰️ MESSENGER — 2011', system: 'mercury', fn: () => {
         this.setLive(false);
         this.physics.jumpToSimSeconds(0);
@@ -972,8 +979,7 @@ export class UI {
         }
       } },
       { label: '🌍 Global Mercury', system: 'mercury', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 8000, incDeg: 30 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 8000, incDeg: 30 });
         this.notify('Global view — the most cratered planet');
       } },
       { label: '🛰️ Magellan — 1990', system: 'venus', fn: () => {
@@ -983,8 +989,7 @@ export class UI {
         this.notify('Magellan orbit insertion — August 10, 1990');
       } },
       { label: '☁️ Cloud Ocean', system: 'venus', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 12000, incDeg: 20 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 12000, incDeg: 20 });
         this.notify('The endless sulfuric acid cloud deck');
       } },
       { label: '🌀 Polar Vortex', system: 'venus', fn: () => {
@@ -995,8 +1000,7 @@ export class UI {
         }
       } },
       { label: '🌒 Crescent Venus', system: 'venus', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 50000, incDeg: 0 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 50000, incDeg: 0 });
         this.notify('Crescent Venus — brighter than any star from Earth');
       } },
       { label: '🛰️ Voyager 2 — 1986', system: 'uranus', fn: () => {
@@ -1008,18 +1012,15 @@ export class UI {
       { label: '🌀 Polar Sun View', system: 'uranus', fn: () => {
         // LIVE-era signature: the sun stands near the north pole until the
         // ~2028 solstice — a polar orbit shows the bullseye lighting.
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 45000, incDeg: 90 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 45000, incDeg: 90 });
         this.notify('Polar orbit — sunlight straight down the pole, like no other planet');
       } },
       { label: '💍 Narrow Rings', system: 'uranus', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 35000, incDeg: 15 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 35000, incDeg: 15 });
         this.notify('Nine charcoal threads — nothing like Saturn\'s bright ice');
       } },
       { label: '🏔️ Verona Rupes', system: 'uranus', fn: () => {
-        this.cam.setMode('insertion', 'Miranda');
-        this.cam.setInsertion({ altitudeKm: 400, incDeg: 30 });
+        this._presetInsertion('Miranda', { altitudeKm: 400, incDeg: 30 });
         this.notify('Miranda — the 20 km cliff, tallest in the solar system');
       } },
       { label: '🛰️ Voyager 2 — 1989', system: 'neptune', fn: () => {
@@ -1029,8 +1030,7 @@ export class UI {
         this.notify('Voyager 2 at Neptune — August 25, 1989, the last flyby');
       } },
       { label: '🔵 Deep Blue Neptune', system: 'neptune', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 40000, incDeg: 20 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 40000, incDeg: 20 });
         this.notify('The most vivid blue in the solar system');
       } },
       { label: '🌀 Great Dark Spot', system: 'neptune', fn: () => {
@@ -1041,35 +1041,28 @@ export class UI {
         }
       } },
       { label: '💨 Triton Geysers', system: 'neptune', fn: () => {
-        this.cam.setMode('insertion', 'Triton');
-        this.cam.setInsertion({ altitudeKm: 300, incDeg: 80 });
+        this._presetInsertion('Triton', { altitudeKm: 300, incDeg: 80 });
         this.notify('South polar pass — nitrogen geysers on the coldest surface known');
       } },
       { label: '🍈 Cantaloupe Terrain', system: 'neptune', fn: () => {
-        this.cam.setMode('insertion', 'Triton');
-        this.cam.setInsertion({ altitudeKm: 500, incDeg: 20 });
+        this._presetInsertion('Triton', { altitudeKm: 500, incDeg: 20 });
         this.notify('Terrain found nowhere else in the solar system');
       } },
-      // V9 Sun presets. House rule: setMode FIRST, then setInsertion —
-      // entry re-derives altitude from camera distance otherwise.
+      // V9 Sun presets — _presetInsertion funnel like every other system.
       { label: '☀️ Corona View', system: 'sun', fn: () => {
-        this.cam.setMode('insertion', 'Sun');
-        this.cam.setInsertion({ altitudeKm: 500000, incDeg: 20 });
+        this._presetInsertion('Sun', { altitudeKm: 500000, incDeg: 20 });
         this.notify('The million-degree corona — hotter than the surface below it');
       } },
       { label: '🌞 Photosphere Close-Up', system: 'sun', fn: () => {
-        this.cam.setMode('insertion', 'Sun');
-        this.cam.setInsertion({ altitudeKm: 100000, incDeg: 0 });
+        this._presetInsertion('Sun', { altitudeKm: 100000, incDeg: 0 });
         this.notify('Granulation cells — each bright island is rising plasma the size of Texas');
       } },
       { label: '🌀 Polar Plumes', system: 'sun', fn: () => {
-        this.cam.setMode('insertion', 'Sun');
-        this.cam.setInsertion({ altitudeKm: 300000, incDeg: 80 });
+        this._presetInsertion('Sun', { altitudeKm: 300000, incDeg: 80 });
         this.notify('Polar pass — plumes fan out here near solar minimum (try the VIEW slider)');
       } },
       { label: '🔆 Solar Limb', system: 'sun', fn: () => {
-        this.cam.setMode('insertion', 'Sun');
-        this.cam.setInsertion({ altitudeKm: 1200000, incDeg: 0 });
+        this._presetInsertion('Sun', { altitudeKm: 1200000, incDeg: 0 });
         this.notify('The full disc — chromosphere ring and prominence arcs at the limb');
       } },
       // V10 Pluto presets. Epoch preset follows the house pattern; the
@@ -1090,8 +1083,7 @@ export class UI {
         }
       } },
       { label: '🌑 Pluto + Charon', system: 'pluto', fn: () => {
-        this.cam.setMode('insertion', this.system.primary.name);
-        this.cam.setInsertion({ altitudeKm: 40000, incDeg: 10 });
+        this._presetInsertion(this.system.primary.name, { altitudeKm: 40000, incDeg: 10 });
         this.notify('The double world — Charon holds station at 19,600 km, locked face to face');
       } },
       { label: '🌙 Blue Haze Crescent', system: 'pluto', fn: () => {
@@ -1105,8 +1097,7 @@ export class UI {
         this.notify('Backlit crescent — the blue nitrogen haze New Horizons saw looking home');
       } },
       { label: '🔴 Mordor Macula', system: 'pluto', fn: () => {
-        this.cam.setMode('insertion', 'Charon');
-        this.cam.setInsertion({ altitudeKm: 3000, incDeg: 70 });
+        this._presetInsertion('Charon', { altitudeKm: 3000, incDeg: 70 });
         this.notify('Charon\'s dark pole — methane from Pluto, burnt red by radiation');
       } },
     ];
@@ -1439,8 +1430,8 @@ export class UI {
       }
     };
     sec('KEYBOARD SHORTCUTS', [
-      ['C', 'Cinematic (auto)'], ['F', 'Free Fly'], ['O', 'Orbit'],
-      ['H', 'Chase'], ['G', 'System View'], ['I', 'Orbit Insertion'],
+      ['T', 'Tour (auto)'], ['F', 'Free Fly'], ['C', 'Cinematic Orbit'],
+      ['H', 'Chase'], ['G', 'System View'], ['O', 'Orbit Simulation'],
       ['W A S D', 'Move (Free Fly)'], ['Shift', 'Speed boost 5×'],
       ['Alt (hold)', 'Free look while orbiting'],
       [',  .', 'Time slower / faster'], ['Space', 'Pause / Resume'],
@@ -2061,11 +2052,14 @@ export class UI {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === '?') { this.togglePanel('help'); return; }
       switch (e.code) {
-        case 'KeyC': this.cam.setMode('cinematic'); break;
+        // v10.0.13 key map: T=Tour, C=Cinematic Orbit, O=Orbit Simulation.
+        // Insertion goes through _activateMode so the OI panel reopens even
+        // when setMode short-circuits (already in the mode, panel closed).
+        case 'KeyT': this.cam.setMode('cinematic'); break;
         case 'KeyF': this.cam.setMode('free'); break;
-        case 'KeyO': this._activateMode(modeById('orbit')); break;
+        case 'KeyC': this._activateMode(modeById('orbit')); break;
         case 'KeyH': this._activateMode(modeById('chase')); break;
-        case 'KeyI': this.cam.setMode('insertion'); break;
+        case 'KeyO': this._activateMode(modeById('insertion')); break;
         case 'KeyG': this.cam.setMode('system'); break;
         case 'Space': e.preventDefault();
           this.userSetTimeIndex(this.physics.paused ? this.physics.pausedIndex : 0); break;
@@ -2104,7 +2098,7 @@ export class UI {
 
     // Camera modes
     const camTips = {
-      cinematic: 'Auto-scripted cinematic pans — press any key to take control',
+      cinematic: 'Auto-scripted tour pans — press any key to take control',
       free: 'Full 6DOF flight — WASD to move, mouse to look, Shift for boost',
       orbit: 'Orbit around a body — click any body to target it',
       chase: 'Follow a moon from behind — see its surface and Jupiter ahead',
@@ -2136,7 +2130,7 @@ export class UI {
     // Mission Control sliders
     t.attach(this.mcAltSlider, 'Camera altitude above the surface — drag to fly closer or further');
     t.attach(this.mcIncSlider, 'Orbital tilt — 0° equatorial, 90° polar, negative values = retrograde orbit');
-    t.attach(this.spdSlider, 'Orbit Speed — how fast the camera circles the target in Orbit mode; never changes simulation time');
+    t.attach(this.spdSlider, 'Orbit Speed — how fast the camera circles the target in Cinematic Orbit mode; never changes simulation time');
     t.attach(this.chaseSec.querySelector('input.slider'), 'Camera height above the chased moon — from surface-skim to wide overview');
 
     // Orbit Insertion panel

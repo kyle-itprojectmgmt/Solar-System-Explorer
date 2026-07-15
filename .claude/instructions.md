@@ -326,6 +326,19 @@ Do not attempt WebGPU migration — backlog item, pending library support.
 Camera orbital angle and body texture rotation must reference the
 same time accumulator for GeoSync. Never separate these update paths.
 
+**Camera modes (v10.0.13 display names + keys):**
+| Display name     | Key | Internal slug |
+|------------------|-----|---------------|
+| Tour             | T   | cinematic     |
+| Free Fly         | F   | free          |
+| Cinematic Orbit  | C   | orbit         |
+| Chase            | H   | chase         |
+| Orbit Simulation | O   | insertion     |
+| System View      | G   | system        |
+The slugs are frozen API — presets, saved views, probes, and preModeOI
+all reference the slug, never the display name or key. Renames touch
+only CAMERA_MODES labels/keys in ui.js plus HELP/tooltip/toast text.
+
 **Vite build:**
 vite.config.js must always include manualChunks splitting three and
 postprocessing. Without this, build produces 21 modules and source

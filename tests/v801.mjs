@@ -62,7 +62,7 @@ async function boot(system) {
     cameraCtl.setMode('free');
     ui.mcIncSlider.value = 20; ui.mcIncSlider.oninput();
     out.freeMode = cameraCtl.mode;
-    out.freeToast = toasts.filter((t) => t.includes('Switched to Orbit Insertion')).length;
+    out.freeToast = toasts.filter((t) => t.includes('Switched to Orbit Simulation')).length;
     ui.notify = orig;
     return out;
   });
@@ -92,7 +92,7 @@ async function boot(system) {
       && kids.indexOf('presentation') === kids.indexOf('pause') + 1;
 
     // Click pauses; icon + HUD reflect it; resume restores prior speed.
-    physics.setTimeIndex(3); // 100x
+    physics.setTimeIndex(3); // 50x (index 3 on the v10.0.10 ladder)
     ui.pauseBtn.click(); ui.update(0.016);
     out.pausedAfterClick = physics.paused;
     out.iconPaused = ui.pauseBtn.textContent;
@@ -121,11 +121,12 @@ async function boot(system) {
     return out;
   });
   check('pause button exists between 📷 and 👁', s.btnExists && s.between, s.order);
-  check('click pauses: icon ⏸, HUD PAUSED',
-    s.pausedAfterClick && s.iconPaused === '⏸' && s.hudPaused === 'PAUSED',
+  // v10.0.10: icon shows the ACTION — paused → ▶ (click resumes).
+  check('click pauses: icon ▶ (action), HUD PAUSED',
+    s.pausedAfterClick && s.iconPaused === '▶' && s.hudPaused === 'PAUSED',
     `icon=${s.iconPaused} hud=${s.hudPaused}`);
-  check('resume restores prior speed (100x) with icon ▶',
-    s.resumedIndex === 3 && s.iconPlaying === '▶', `idx=${s.resumedIndex}`);
+  check('resume restores prior speed (50x) with icon ⏸ (action)',
+    s.resumedIndex === 3 && s.iconPlaying === '⏸', `idx=${s.resumedIndex}`);
   check('Space pauses and resumes at prior speed', s.spacePaused && s.spaceResumed);
   check('LIVE: pause sticks (sync suspended), resume re-syncs to now',
     s.livePauseSticks && s.liveResyncs);
