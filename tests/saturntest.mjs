@@ -56,8 +56,8 @@ const orbits = await page.evaluate(() => {
   const ang = (b) => Math.atan2(-b.pos.z, b.pos.x);
   const before = {};
   for (const b of physics.bodies) before[b.name] = { ang: ang(b), y: b.pos.y };
-  physics.setTimeIndex(5); // 10,000x
-  for (let i = 0; i < 40; i++) physics.update(0.05);
+  physics.setTimeIndex(4); // 500x top step (v10.0.10) — 800 iters keeps the
+  for (let i = 0; i < 800; i++) physics.update(0.05); // old 20,000 sim-s window
   physics.setTimeIndex(0);
   const out = {};
   for (const b of physics.bodies) {

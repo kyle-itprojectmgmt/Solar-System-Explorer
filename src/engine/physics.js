@@ -11,7 +11,12 @@
 import { G } from '../config.js';
 import { sunDirectionAt } from './ephemeris.js';
 
-export const TIME_STEPS = [0, 1, 10, 100, 1000, 10000];
+// v10.0.10 (Kyle's spec): non-zero steps halved, 10,000× removed — the old
+// top speed turned close flybys into spin blurs and the halved ladder keeps
+// each step visually distinct. Button labels are GENERATED from these
+// values, so they read 5×/50×/500× now. NOTE: curated presets and several
+// suites address speeds by INDEX — grep setTimeIndex( before touching this.
+export const TIME_STEPS = [0, 1, 5, 50, 500];
 
 // -- Date <-> simulation-seconds utility --------------------------------------
 // ALL conversions between calendar dates and simSeconds (presets, the date

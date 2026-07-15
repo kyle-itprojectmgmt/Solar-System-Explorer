@@ -524,6 +524,21 @@ html, body {
   flex-direction: column;
   gap: 7px;
 }
+/* Target-body dropdown (v10.0.10) — themed like the panel buttons. */
+.ins-body-select {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: rgba(10, 20, 35, 0.9);
+  color: var(--blue-light);
+  border: 1px solid rgba(102, 178, 255, 0.35);
+  border-radius: 6px;
+  font-family: var(--font-head);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+.ins-body-select:focus { outline: none; border-color: var(--blue-light); }
+
 .ins-label {
   font-family: var(--font-head);
   font-size: 0.68rem;

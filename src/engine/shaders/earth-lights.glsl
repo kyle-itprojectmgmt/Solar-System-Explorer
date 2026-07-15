@@ -57,7 +57,13 @@ if (uDetailBlend > 0.001) {
     // faint diffuse warm glow, matching how storm decks read from orbit.
     // Lightning below is exempt: it illuminates the cloud tops from
     // WITHIN the deck.
-    float el_atten = mix(1.0, 0.10, clamp(gCloudCover / 0.92, 0.0, 1.0));
+    // v10.0.10 curve shaping: the linear ramp let THIN scattered cloud
+    // (t < ~0.2) dim the Black Marble field noticeably, which striped the
+    // city glow along the cloud-zone latitude seams. smoothstep(0.18, ...)
+    // passes thin cloud untouched; heavy overcast still bottoms out at the
+    // same ~10% diffuse transmission.
+    float el_t = clamp(gCloudCover / 0.92, 0.0, 1.0);
+    float el_atten = mix(1.0, 0.10, smoothstep(0.18, 0.95, el_t));
 
     if (uUseNightMap > 0.5) {
     // REAL BLACK MARBLE (v10.0.6, SSS 8K night map): geographic truth

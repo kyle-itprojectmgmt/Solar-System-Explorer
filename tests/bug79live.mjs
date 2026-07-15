@@ -7,7 +7,8 @@
 // Headless never saw it because LIVE defaults OFF under webdriver.
 // FIX: ui.userSetTimeIndex — any explicit non-1× speed choice drops LIVE.
 // This guard asserts: pausing while LIVE turns LIVE off, and a subsequent
-// 10× preset click STICKS (no forced revert to 1×, no clock lurch).
+// speed-preset click (index 2 = 5× on the v10.0.10 ladder) STICKS
+// (no forced revert to 1×, no clock lurch).
 import puppeteer from 'puppeteer-core';
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -56,13 +57,13 @@ const t2 = await page.evaluate(() => ({
   live: window.__sse.ui.liveMode,
 }));
 const jump = t2.simSeconds - t1.before;
-console.log('clicked 10x:', JSON.stringify(t1));
+console.log('clicked index 2 (5x):', JSON.stringify(t1));
 console.log('1.2 s later :', JSON.stringify(t2));
 console.log(`sim advance after preset click: ${jump.toFixed(1)} s; ` +
-  `timeIndex ${t2.timeIndex} (want 2 = 10x, sticking); live ${t2.live} (want false)`);
-// Post-fix: pausing dropped LIVE, so 10x sticks and only legit 10x
-// advancement occurs (~12 sim-s in 1.2 wall-s; a regression shows either
-// timeIndex reverting to 1 or live still true).
+  `timeIndex ${t2.timeIndex} (want 2 = 5x, sticking); live ${t2.live} (want false)`);
+// Post-fix: pausing dropped LIVE, so the chosen speed sticks and only its
+// legit advancement occurs (~6 sim-s in 1.2 wall-s at 5x; a regression
+// shows either timeIndex reverting to 1 or live still true).
 const pass = t0.live === false && t2.timeIndex === 2 && t2.live === false;
 console.log(pass ? 'PASS' : 'FAIL: LIVE lurch regression (bug #79)');
 await browser.close();

@@ -1789,6 +1789,69 @@ review clean — a first.
   v5b 18, orbitdir PASS, nightlights both passes, haloshots PASS,
   prodboot 10/10 preview + live — all green.
 
+### v10.0.10 — insertion dropdown, time ladder, pause/support icons, night clouds (2026-07-14)
+- ORBIT INSERTION (Item 1): body button grid → "Target Body" <select>
+  over the primary + ALL moons (BODIES-panel source; the old grid only
+  offered n-body moons, hiding Saturn's Kepler family from insertion).
+  New full-width "⬤ Enter Orbit" button (btn-primary #0077CC) above the
+  telemetry: setMode('insertion', body) FIRST, then setInsertion with
+  the panel's current altitude/inc/geosync (v6 house rule — entry
+  re-derives altitude), then userSetTimeIndex(1) (1×, drops LIVE via the
+  bug #79 funnel). onInsertionChange now syncs the select. Themed
+  .ins-body-select CSS added.
+- TIME LADDER (Item 2): TIME_STEPS [0,1,10,100,1000,10000] →
+  [0,1,5,50,500]. Labels are GENERATED from values, so buttons now read
+  5×/50×/500× — Kyle's "labels stay the same" cannot literally hold
+  with halved values; displayed labels stay HONEST instead. Tooltip
+  copy de-Jupiterized ("…how fast moons orbit and planets rotate") and
+  per-step tips rewritten (5 entries). Ripples fixed: curated presets
+  (Io/GRS index 2 = 5×, Triple Shadow index 3 = 50× — notify text
+  updated; Moon Alignment index 5→4 = 500×, notify updated), saved-
+  preset restore already guards indexOf() < 0. TRADE-OFF flagged: Moon
+  Alignment at 500× shows resonance pulses in ~10 min wall instead of
+  ~30 s at the old 10,000× — if that hurts, the preset needs a
+  jump-to-next-conjunction instead of raw speed (backlog candidate).
+- Suites re-anchored to the new ladder: smoke + saturntest hotspot/orbit
+  loops 40→800 iters (same 20,000 sim-s window at 500×), resonance
+  4,000→80,000 steps (same ~23-day search), toast.mjs rewritten to
+  hourly jumpToSimSeconds bursts (500× can't make events imminent in
+  wall time), physbench top-step index, tooltip.mjs time-tip line,
+  v1003probe preset speeds (5×/5×/50×/50×/500×), bug79live wording
+  (assertion index unchanged — Kyle's flag pre-empted).
+- PAUSE ICON (Item 3): now shows the ACTION (⏸ while playing = click to
+  pause; ▶ while paused = click to resume) — flip of the v10.0.1 spec,
+  updated at both writers (initial render + update() sync; the tray
+  onclick routes through userSetTimeIndex).
+- SUPPORT ICON (Item 4): ☕ → ♥, .kofi-btn class + tooltip unchanged.
+- NIGHT CLOUDS (Item 5, parallel worker): faint earthshine cloud
+  silhouettes on the night side — COLOR-ONLY gDetailEmissive add
+  (vec3(0.55,0.62,0.75) × 0.085 × gCloudCover × (1−nightFade)); the
+  diffuse path renders to 0/255 under the night ambient and any height
+  term would resurrect the #48/#55 relief streaks. Gain ACES-calibrated
+  (the tonemap toe crushes ~6× vs linear estimates: 0.02 → 1.5/255):
+  0.085 → dense decks 5-11/255, UNDER the nightlights DARK_CAP 13, clear
+  gaps stay 0.0; (1−nightFade) is exactly 0 on the day side — hazeprobe
+  day pixels byte-identical. City-light occlusion curve softened:
+  el_atten now mix(1.0, 0.10, smoothstep(0.18, 0.95, cover/0.92)) — thin
+  scattered cloud no longer stripes the Black Marble field along the
+  cloud-zone latitude seams (occluded cities up ~7-10 lum); full
+  overcast still transmits ~10%. Kyle's "day-side banding from
+  gCloudCover": NOT reproducible headless AND architecturally impossible
+  (el_atten lives inside the night>0.001 gate; day pixels unchanged
+  since v10.0.5) — any hardware day-side banding is a different
+  phenomenon (bug #77 eyeball class), report with screenshot+altitude.
+  Guard NEW: tests/nightclouds.mjs (before/after night-ocean patch grid;
+  asserts faint band 1.5-13, max ≤ cap). Shots:
+  tests/shots/nightclouds-{ocean,europe}-{before,after}.png.
+  cloudocclude margin note: softened curve thins worst-night dimming to
+  ~42% — guard factor relaxed 0.6→0.65 (asserts occlusion EXISTS, not
+  curve depth); if it ever flakes, deepen mid-curve to
+  smoothstep(0.15, 0.90, t).
+- Guard NEW: tests/v10010probe.mjs (11 checks: ladder values, 5 buttons,
+  icon action-semantics through pause/resume, ♥, dropdown contents on
+  Earth/Jupiter/Saturn incl. Kepler moons, Enter Orbit → insertion mode
+  on Moon at 1×).
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |

@@ -63,8 +63,8 @@ const plumeTrack = await page.evaluate(() => {
     return Math.atan2(-w.z, w.x);
   };
   const before = { rot: io.mesh.rotation.y, ang: rel() };
-  physics.setTimeIndex(5); // 10,000x
-  for (let i = 0; i < 40; i++) physics.update(0.05);
+  physics.setTimeIndex(4); // 500x top step (v10.0.10) — 800 iters keeps the
+  for (let i = 0; i < 800; i++) physics.update(0.05); // old 20,000 sim-s window
   renderer.update(physics, 0.05, 1);
   physics.setTimeIndex(1);
   const after = { rot: io.mesh.rotation.y, ang: rel() };

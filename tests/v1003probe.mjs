@@ -41,12 +41,13 @@ async function load(system) {
     return physics.timeMultiplier;
   }, { label, preTimeIndex });
 
-  // Pre-set 1000x before each click: presets must OVERRIDE stale speed.
-  check('Io Volcano Flyby -> 10x', await speedAfter('Io Volcano Flyby', 4) === 10);
-  check('GRS Close Pass -> 10x', await speedAfter('GRS Close Pass', 4) === 10);
-  check('Triple Moon Shadow -> 100x', await speedAfter('Triple Moon Shadow', 4) === 100);
-  check('Voyager 1979 -> 100x', await speedAfter('Voyager 1979', 4) === 100);
-  check('Moon Alignment -> 10,000x (deliberate)', await speedAfter('Moon Alignment', 1) === 10000);
+  // Pre-set 500x (top step) before each click: presets must OVERRIDE stale
+  // speed. v10.0.10 ladder: [0, 1, 5, 50, 500].
+  check('Io Volcano Flyby -> 5x', await speedAfter('Io Volcano Flyby', 4) === 5);
+  check('GRS Close Pass -> 5x', await speedAfter('GRS Close Pass', 4) === 5);
+  check('Triple Moon Shadow -> 50x', await speedAfter('Triple Moon Shadow', 4) === 50);
+  check('Voyager 1979 -> 50x', await speedAfter('Voyager 1979', 4) === 50);
+  check('Moon Alignment -> 500x (top step)', await speedAfter('Moon Alignment', 1) === 500);
   check('jupiter: zero page errors', errors.length === 0, errors[0]);
   await page.close();
 }

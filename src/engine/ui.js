@@ -726,9 +726,8 @@ export class UI {
     // below are never filtered.
     const curated = [
       { label: '🌋 Io Volcano Flyby', system: 'jupiter', fn: () => {
-        // Explicit 10× (v10.0.3): presets that skipped setTimeIndex inherited
-        // whatever the user last set — after Triple Moon Shadow this flyby
-        // launched at 1,000× and the low pass was a blur.
+        // Explicit slow speed (v10.0.3 stale-inheritance fix; index 2 = 5×
+        // on the v10.0.10 ladder): a close flyby at high speed is a blur.
         this.physics.setTimeIndex(2);
         this.cam.playSequence([
           { target: 'Io', dist: 4, height: 1.0, orbitRate: 0.07, duration: 10, startTheta: 1.0 },
@@ -740,15 +739,15 @@ export class UI {
       { label: '🌑 Triple Moon Shadow', system: 'jupiter', fn: () => {
         this.cam.setMode('orbit', this.system.primary.name);
         this.cam.setAltitudeDirect(80000);
-        // 100× (v10.0.3, was 1,000×): shadows still transit within a couple
-        // of minutes but no longer streak across the disc. TIME_STEPS has
-        // no 50× — 100× is the closest step.
+        // Index 3 = 50× on the v10.0.10 ladder (v10.0.3 wanted exactly this
+        // speed but the old ladder had no 50× step): shadows transit within
+        // a few minutes without streaking across the disc.
         this.physics.setTimeIndex(3);
-        this.notify('100× — watch for moon shadows crossing Jupiter');
+        this.notify('50× — watch for moon shadows crossing Jupiter');
       } },
       { label: '🔴 GRS Close Pass', system: 'jupiter', fn: () => {
-        // Explicit 10× (v10.0.3): same stale-speed inheritance fix as the
-        // Io flyby — a close GRS orbit at 1,000× read as a spin blur.
+        // Explicit slow speed (index 2 = 5×): same stale-speed inheritance
+        // fix as the Io flyby — a close GRS orbit at high speed spin-blurs.
         this.physics.setTimeIndex(2);
         const preset = this.system.primary.navPresets?.[0];
         if (preset) {
@@ -763,8 +762,11 @@ export class UI {
           this.resonanceToggle.checked = true;
           this.resonanceToggle.onchange();
         }
-        this.physics.setTimeIndex(5);
-        this.notify('10,000× — resonance lines pulse when moons align');
+        // v10.0.10: top step is now 500× (index 4) — alignments take
+        // minutes instead of seconds; flagged in PROJECT_LOG (the removed
+        // 10,000× was this preset's whole point per v10.0.3).
+        this.physics.setTimeIndex(4);
+        this.notify('500× — resonance lines pulse when moons align');
       } },
       { label: '🛰️ ISS Orbit View', system: 'earth', fn: () => {
         const preset = this.system.primary.navPresets?.[0];
@@ -1481,16 +1483,20 @@ export class UI {
     closeBtn.textContent = '✕';
     closeBtn.onclick = () => this.closeAllPanels();
 
-    // Parent body selector: primary + major moons.
-    const bodyRow = el('div', 'btn-grid', p);
-    const bodies = [this.system.primary.name,
-      ...this.system.bodies.filter((b) => b.physics === 'nbody').map((b) => b.name)];
-    this.insBodyBtns = bodies.map((n) => {
-      const b = el('button', 'btn btn-small', bodyRow);
-      b.textContent = n;
-      b.onclick = () => this.cam.setInsertion({ body: n });
-      return b;
-    });
+    // Target body selector (v10.0.10): dropdown over ALL navigable bodies
+    // — primary + every moon, same source as the BODIES panel (the old
+    // button grid only offered n-body moons, hiding Kepler moons like
+    // Saturn's outer family from insertion).
+    el('div', 'ins-label', p).textContent = 'Target Body';
+    this.insBodySelect = el('select', 'ins-body-select', p);
+    for (const n of [this.system.primary.name, ...this.system.bodies.map((b) => b.name)]) {
+      const o = el('option', '', this.insBodySelect);
+      o.value = n;
+      o.textContent = n;
+    }
+    this.insBodySelect.value = this.system.primary.name;
+    this.insBodySelect.onchange = () =>
+      this.cam.setInsertion({ body: this.insBodySelect.value });
 
     const altLabel = el('div', 'ins-label', p);
     const altSlider = el('input', 'slider', p);
@@ -1526,6 +1532,27 @@ export class UI {
       return b;
     });
 
+    // ⬤ Enter Orbit (v10.0.10): commit the panel's current settings on the
+    // selected target. setMode FIRST, then setInsertion — mode entry
+    // re-derives altitude and would clobber the values (v6 house rule).
+    const enterBtn = el('button', 'btn btn-primary ins-enter-btn', p);
+    enterBtn.style.width = '100%';
+    enterBtn.style.marginTop = '8px';
+    enterBtn.textContent = '⬤ Enter Orbit';
+    enterBtn.onclick = () => {
+      const body = this.insBodySelect.value;
+      this.cam.setMode('insertion', body);
+      this.cam.setInsertion({
+        body,
+        altitudeKm: tToAlt(+altSlider.value),
+        incDeg: +incSlider.value,
+        locked: lockToggle.checked,
+      });
+      // 1× real time; drops LIVE if active (bug #79 funnel).
+      this.userSetTimeIndex(1);
+      this.notify(`Orbital insertion — ${body}`);
+    };
+
     this.insInfo = el('div', 'ins-info', p);
 
     // Keep controls in sync when scroll-zoom or presets change parameters.
@@ -1549,7 +1576,7 @@ export class UI {
       } else if (!ringMin || ins.altitudeKm > ringMin * 1.2) {
         this._ringNoteShown = false;
       }
-      this.insBodyBtns.forEach((b) => b.classList.toggle('active', b.textContent === ins.body));
+      if (this.insBodySelect.value !== ins.body) this.insBodySelect.value = ins.body;
       this.insNavBtns.forEach((b) => {
         b.style.display = ins.body === this.system.primary.name ? '' : 'none';
       });
@@ -1697,7 +1724,10 @@ export class UI {
     // physics.pausedIndex. Kept in sync with Space / the TIME panel by
     // update(). Under LIVE, pausing suspends the LIVE sync (see update()).
     this.pauseBtn = el('button', 'tray-btn', tray);
-    this.pauseBtn.textContent = '▶';
+    // Icon shows the ACTION, not the state (v10.0.10 flip of the v10.0.1
+    // spec): playing → ⏸ (click pauses), paused → ▶ (click resumes).
+    // Boot state is 1× playing, so start on ⏸; update() keeps it synced.
+    this.pauseBtn.textContent = '⏸';
     this.pauseBtn.dataset.tray = 'pause';
     this.pauseBtn.onclick = () =>
       this.userSetTimeIndex(this.physics.paused ? this.physics.pausedIndex : 0);
@@ -1718,7 +1748,7 @@ export class UI {
     kofi.href = DONATE_URL;
     kofi.target = '_blank';
     kofi.rel = 'noopener';
-    kofi.textContent = '☕';
+    kofi.textContent = '♥'; // v10.0.10 (was ☕); .kofi-btn class kept — suites select on it
   }
 
   // -- Audio flyout (V4c Group 4) -----------------------------------------------------
@@ -2047,13 +2077,12 @@ export class UI {
     const timeTips = [
       'Pause simulation — freeze all orbital motion',
       'Real time — 1 second of simulation per second',
-      '10× faster — see moons drift visibly',
-      '100× faster — moon orbits become apparent',
-      '1,000× faster — watch eclipses and resonances',
-      '10,000× faster — full orbital cycles in minutes',
+      '5× faster — see moons drift visibly',
+      '50× faster — moon orbits become apparent',
+      '500× faster — watch eclipses, resonances, full orbits',
     ];
     this.rootEl.querySelectorAll('[data-time-index]').forEach((b) => t.attach(b, timeTips[+b.dataset.timeIndex]));
-    t.attach(this.timeSlider, 'Controls simulation speed — how fast moons orbit and Jupiter rotates');
+    t.attach(this.timeSlider, 'Controls simulation speed — how fast moons orbit and planets rotate');
 
     // Display checkboxes
     t.attach(this.orbitToggle.parentElement, 'Show orbital path lines for all moons');
@@ -2140,9 +2169,10 @@ export class UI {
     const iso = simSecondsToDate(this.physics.simSeconds, this.physics.epochMs);
     this.dateEl.textContent = `${iso.slice(0, 10)}  ${iso.slice(11, 19)} UTC`;
     this.multEl.textContent = this.physics.paused ? 'PAUSED' : `${this.physics.timeMultiplier.toLocaleString()}×`;
-    // Pause tray button mirrors the state (▶ playing / ⏸ paused) no matter
-    // which control changed it (Space, TIME panel, tray click).
-    if (this.pauseBtn) this.pauseBtn.textContent = this.physics.paused ? '⏸' : '▶';
+    // Pause tray button shows the ACTION (v10.0.10: ▶ when paused = click
+    // to resume, ⏸ when playing = click to pause) no matter which control
+    // changed the state (Space, TIME panel, tray click).
+    if (this.pauseBtn) this.pauseBtn.textContent = this.physics.paused ? '▶' : '⏸';
     this.timeSlider.value = this.physics.timeIndex;
     this.rootEl.querySelectorAll('[data-time-index]').forEach((b) => {
       b.classList.toggle('active', +b.dataset.timeIndex === this.physics.timeIndex);

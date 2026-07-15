@@ -43,7 +43,7 @@ async function hoverCheck(selector, expectRe, label) {
 
 await hoverCheck('[data-cam-mode="orbit"]', /Orbit around a body/, 'camera mode tooltip');
 await hoverCheck('[data-audio-mode="voyager"]', /plasma wave/, 'audio mode tooltip');
-await hoverCheck('[data-time-index="5"]', /10,000× faster/, 'time button tooltip');
+await hoverCheck('[data-time-index="4"]', /500× faster/, 'time button tooltip');
 await hoverCheck('.brand-spotify', /Spotify playlist/, 'spotify tooltip');
 await hoverCheck('.fs-btn', /fullscreen/i, 'fullscreen tooltip');
 await hoverCheck('.presentation-btn', /Hide all UI/, 'presentation tooltip');

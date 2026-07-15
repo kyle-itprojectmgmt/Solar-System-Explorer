@@ -21,12 +21,18 @@ await page.waitForFunction('window.__sse', { timeout: 60000 });
 await page.waitForFunction(
   'document.getElementById("loading-screen").classList.contains("done")', { timeout: 60000 });
 
-// Run at 10,000x so events become imminent in wall-clock terms; the UI's
-// once-a-second scan runs on real frames, so let it run naturally a bit.
-await page.evaluate(() => window.__sse.physics.setTimeIndex(5));
-const appeared = await page.waitForFunction(
-  () => document.querySelector('.event-toast'), { timeout: 90000 }
-).then(() => true).catch(() => false);
+// v10.0.10: the toast gate is wallLead = inSeconds/mult <= 30 s, so at the
+// new 500x top step the catch window is 15,000 sim-s (~4.2 h). Advance in
+// 2 h jumps — SMALLER than the window, so no event can be leapt over —
+// and pause > 1 s between jumps for the UI's once-a-second scan.
+await page.evaluate(() => window.__sse.physics.setTimeIndex(4));
+let appeared = false;
+for (let i = 0; i < 60 && !appeared; i++) {
+  await page.evaluate(() =>
+    window.__sse.physics.jumpToSimSeconds(window.__sse.physics.simSeconds + 7200));
+  await new Promise((r) => setTimeout(r, 1100));
+  appeared = await page.evaluate(() => !!document.querySelector('.event-toast'));
+}
 
 const res = { appeared };
 if (appeared) {

@@ -110,6 +110,10 @@ for (let day = 0; day < 14; day++) {
 }
 console.log('london night luminance across 14 nights:', JSON.stringify(lums));
 const max = Math.max(...lums), min = Math.min(...lums);
-console.log(`max ${max} (clear-sky) / min ${min} (occluded) — want max > 45, min < 0.6*max`);
+// 0.65 factor (v10.0.10, was 0.6): the softened attenuation curve
+// deliberately passes thin cloud untouched, so worst-14-night dimming
+// shrank to ~42% (min 0.578 of max). The guard asserts occlusion EXISTS —
+// ≥35% dimming on the cloudiest night — not a specific curve depth.
+console.log(`max ${max} (clear-sky) / min ${min} (occluded) — want max > 45, min < 0.65*max`);
 await browser.close();
-process.exit(max > 45 && min < 0.6 * max ? 0 : 1);
+process.exit(max > 45 && min < 0.65 * max ? 0 : 1);

@@ -163,6 +163,18 @@ float ec_polar   = smoothstep(0.88, 0.96, ec_ay);
   // the visual layer fades to nothing in darkness, but the cloud deck
   // is still there — city lights beneath must dim by it.
   gCloudCover = clamp(ec_cloud, 0.0, 0.92);
+  // FAINT NIGHT CLOUDS (v10.0.10): earthshine/moonlight silhouettes.
+  // COLOR-ONLY emissive — the diffuse path renders to 0/255 under the
+  // night ambient (measured: whole night ocean grid at 0.0), and any
+  // height term would resurrect the bug #48/#55 relief streaks. Gain
+  // 0.085 is ACES-calibrated (the toe crushes ~6× harder than linear
+  // estimates: 0.02 rendered 1.5/255 peak) — dense decks read ~5-11/255,
+  // under the nightlights DARK_CAP (13) so cloud-covered Sahara/ocean
+  // dark refs stay legal; clear gaps stay 0. (1.0 - nightFade) is
+  // EXACTLY 0 on the day side — hazeprobe day pixels stay byte-identical.
+  // Guard: tests/nightclouds.mjs (NC_TAG=after).
+  gDetailEmissive += vec3(0.55, 0.62, 0.75) * 0.085
+    * gCloudCover * (1.0 - nightFade) * uDetailBlend;
   // Height kept subtle: at low altitude + grazing sun the relief shading
   // turned cloud decks into big black lumps (V5b, measured at 382 km).
   // nightFade zeroes it in darkness with op.

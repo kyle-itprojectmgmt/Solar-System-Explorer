@@ -29,7 +29,7 @@ for (const slug of SYSTEMS) {
       return (performance.now() - t0) / N * 1000; // µs per call
     };
     const us1x = run(1);
-    const us10k = run(5);
+    const us10k = run(4); // top step (500x since v10.0.10)
     physics.setTimeIndex(1);
     return {
       bodies: physics.bodies.length,

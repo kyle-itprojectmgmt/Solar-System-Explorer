@@ -36,11 +36,13 @@ const res = await page.evaluate(() => {
   const visible = renderer.resonance.visible;
   const startPct = renderer.resonanceInfo.pct;
 
-  // Drive sim time at 10,000x until an Io–Europa pair conjunction pulses.
-  physics.setTimeIndex(5);
+  // Drive sim time at 500x (v10.0.10 top step) until an Io–Europa pair
+  // conjunction pulses — 20x more steps than the 10,000x-era 4,000 keeps
+  // the same ~23-day sim search window.
+  physics.setTimeIndex(4);
   let pulsed = false, steps = 0, elapsed = 1;
   const pulseColors = [];
-  while (steps < 4000 && !pulsed) {
+  while (steps < 80000 && !pulsed) {
     physics.update(0.05);
     elapsed += 0.05;
     if (steps % 5 === 0) {
