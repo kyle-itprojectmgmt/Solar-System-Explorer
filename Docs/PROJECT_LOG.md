@@ -181,6 +181,20 @@ Verify headers are active via browser DevTools → Network →
 response headers, or run Mozilla Observatory after deploy.
 Current Observatory score: A+ (130, 10/10 tests) — maintain this.
 
+
+### Normal Map Conventions — CRITICAL (v10.0.6 discovery)
+Three.js expects OpenGL convention: +G = north (up). Many downloaded
+normal maps use DirectX convention: +G = south (down). Symptom: north-
+facing mountain slopes are lit instead of south-facing slopes at low
+sun angles. Fix: invert green channel at source before wiring.
+Always verify with normalcal.mjs (low sun, shadowed north face check).
+Also: never sRGB-tag normal maps — use THREE.NoColorSpace explicitly
+or the GPU will decode-skew every normal. The textures.normal path
+must set normalMap.colorSpace = THREE.NoColorSpace.
+Also: normalMapScale must be separate from normalScale (the procedural
+cloud relief key) — sharing them doubles cloud relief and regresses
+the V5b black-lumps fix. Use normalMapScale for texture normals.
+
 ### Per-System Lazy Loading (add before multi-system build)
 Currently all system configs (jupiter.js, saturn.js) are bundled at
 build time. Before adding Earth/Mars/Saturn, update vite.config.js
@@ -1675,6 +1689,37 @@ review clean — a first.
   hazeprobe day-side byte-identical to v10.0.5 baseline, prodboot 10/10
   + tex8kprobe on preview AND live — all green.
 
+### v10.0.7 — clouds occlude city lights (2026-07-14)
+- The lights chunk now reads the ACTUAL per-fragment cloud coverage —
+  no recomputed approximation, no uniform. Kyle's Option A (simplified
+  fbm re-derivation) would visibly mismatch the real cloud field at the
+  terminator (his own verify item) and Option B (scalar uniform) can't
+  express per-fragment cover; the clean route exists because both
+  chunks run in the SAME injected fragment shader: a shared global
+  `gCloudCover` (declared in the terra apply alongside gDetailEmissive)
+  is written by the clouds chunk and read by the lights chunk. ZERO new
+  noise calls.
+- Physics subtlety: the export is the PRE-nightFade geometric coverage
+  (clamp(ec_cloud, 0, 0.92)) — the visual cloud layer fades to nothing
+  in deep night (V5.1.2), but the deck is still opaque and must occlude
+  the lights below. Attenuation mix(1.0, 0.10, cover/0.92): clear = full
+  lights, full overcast = 10% diffuse warm glow. Applies to BOTH the
+  Black Marble and the procedural fallback paths; lightning exempt (it
+  illuminates the deck from within). Aurora unaffected (emits above).
+- tests/cloudocclude.mjs NEW: the Black Marble map is static, so any
+  night-to-night variance in a city's luminance IS the occlusion —
+  samples London at its darkest hour across 14 consecutive days.
+  Measured [60.7..128.2] (was time-invariant before): clear nights full
+  brightness, stormy nights ~47%. Asserts max > 45 and min < 0.6×max.
+- nightlights.mjs passes UNCHANGED — and now shows the weather: London
+  94 lum (cloud bank over Britain at the test hour), Milan 155, Jo'burg
+  183 (clear). If a future run fails city-brightness marginally, check
+  the weather at the test hour before suspecting the lights (the suite
+  takes max over 5 cities, so all-clouded is vanishingly unlikely).
+- Suites: cloudocclude PASS, nightlights both passes, earthtest 14,
+  haloshots PASS (night halo 0px), smoke 22, prodboot 10/10 live +
+  tex8kprobe live — all green.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1781,7 +1826,8 @@ review clean — a first.
 | 16 | Callisto + Jupiter horizon curated preset | The Callisto/Jupiter telephoto shot (Callisto surface in foreground, Jupiter above horizon, Milky Way background) is one of the best views in the simulator. Add as a curated preset in jupiter.js. Position: low orbit over Callisto, Alt+drag tilted to show Jupiter above the horizon, telephoto FOV ~10°. |
 | 17 | Disable Cloudflare RUM beacon (bug #62) | Cloudflare dashboard → Speed → Optimization → Real User Monitoring → Disable. Now redundant with GA4. Also flip "Always Use HTTPS" in SSL/TLS → Edge Certificates to restore Observatory A+ on app.solarexplorer.co. |
 | 18 | Planetshine — reflected parent planet light on moon night sides | Additive ambient pass on moon surface shaders. uPlanetshineColor + uPlanetshineIntensity uniforms in surface-base.glsl. Per-body config. Intensities: Jupiter moons 3-8% blue-white, Saturn moons 4-10% pale gold, Uranus moons 2-3% cyan, Triton 2-3% deep blue, Phobos/Deimos 2-3% reddish. Moon earthshine exempt. ~30 min, next polish build. |
-| 19 | ~~Physics CPU optimization~~ | MEASURED AND CLOSED — see bug #68. |
+| 19 | ~~Physics CPU optimization~~ | MEASURED AND CLOSED — see bug #68. One PhysicsEngine per page, switchSystem is full navigation, active system costs 2µs worst case. |
+| 20 | Wire SSS night texture for Earth city lights | DONE v10.0.6 — Black Marble replaces 22-gaussian procedural model. night.jpg (byte-identical to the file deleted in v10.0.5 as dead weight — now actually wired). London 187 luminance (was 113), Sahara 2.6/Congo 0. |
 
 Completed in v4c (removed from backlog): ghost time display, date
 picker + LIVE toggle, icon-stack Mission Control redesign (Camera /

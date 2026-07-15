@@ -452,6 +452,12 @@ DETAIL_STYLES.terra = {
   fns: terraClouds.fns + terraLights.fns,
   apply: /* glsl */ `
     ${DETAIL_PREAMBLE}
+    // Shared cloud coverage (v10.0.7): the clouds chunk writes its
+    // GEOMETRIC coverage here (pre-night-fade — unlit clouds are
+    // invisible but still opaque); the lights chunk reads it to occlude
+    // city glow under weather. Chunks share outer-scope globals exactly
+    // like gDetailEmissive/gDetailHeight.
+    float gCloudCover = 0.0;
     { ${terraClouds.apply} }
     { ${TERRA_OCEAN} }
     { ${terraLights.apply} }

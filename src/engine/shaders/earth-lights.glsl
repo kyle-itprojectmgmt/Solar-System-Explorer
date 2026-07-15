@@ -51,6 +51,14 @@ if (uDetailBlend > 0.001) {
   float night = smoothstep(0.1, -0.1, dot(vObjPos, uSunObj));
 
   if (night > 0.001) {
+    // CLOUD OCCLUSION (v10.0.7): dim city glow under the SAME cloud
+    // field the clouds chunk just computed (gCloudCover, pre-night-fade
+    // geometric coverage, 0..0.92). Full overcast transmits ~10% — a
+    // faint diffuse warm glow, matching how storm decks read from orbit.
+    // Lightning below is exempt: it illuminates the cloud tops from
+    // WITHIN the deck.
+    float el_atten = mix(1.0, 0.10, clamp(gCloudCover / 0.92, 0.0, 1.0));
+
     if (uUseNightMap > 0.5) {
     // REAL BLACK MARBLE (v10.0.6, SSS 8K night map): geographic truth
     // replaces the 22-gaussian model. The sampler is sRGB-tagged so this
@@ -61,7 +69,7 @@ if (uDetailBlend > 0.001) {
     // land at 13/255).
     vec3 bm = max(texture2D(uNightMap, dUv).rgb - 0.02, 0.0);
     bm = pow(bm, vec3(0.8)) * 1.4;
-    gDetailEmissive += bm * night * uDetailBlend;
+    gDetailEmissive += bm * night * uDetailBlend * el_atten;
     } else {
     // PROCEDURAL FALLBACK — the v5a..v10.0.4 gaussian model, used until
     // the night map streams in (and by any future terra body without one).
@@ -112,7 +120,7 @@ if (uDetailBlend > 0.001) {
 
     // 0.7: paired with nightAmbient 0x445566 × 0.08 (terrain ~3-5%
     // silhouettes) — lights must clearly dominate the night side.
-    gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.7;
+    gDetailEmissive += lightColor * popDensity * night * uDetailBlend * 0.7 * el_atten;
     }
 
     // RARE LIGHTNING: subtle blue-white flashes in storm regions.

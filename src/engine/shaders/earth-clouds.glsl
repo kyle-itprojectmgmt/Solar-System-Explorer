@@ -159,6 +159,10 @@ float ec_polar   = smoothstep(0.88, 0.96, ec_ay);
   vec3 cloudCol = mix(vec3(0.973, 0.973, 1.0), vec3(0.80, 0.82, 0.86), ec_grey) * lit;
   float op = clamp(ec_cloud, 0.0, 0.92) * nightFade;
   detail = mix(detail, cloudCol, op);
+  // Export the PRE-nightFade coverage for the lights chunk (v10.0.7):
+  // the visual layer fades to nothing in darkness, but the cloud deck
+  // is still there — city lights beneath must dim by it.
+  gCloudCover = clamp(ec_cloud, 0.0, 0.92);
   // Height kept subtle: at low altitude + grazing sun the relief shading
   // turned cloud decks into big black lumps (V5b, measured at 382 km).
   // nightFade zeroes it in darkness with op.
