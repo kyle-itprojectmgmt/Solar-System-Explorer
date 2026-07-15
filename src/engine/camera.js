@@ -93,7 +93,20 @@ export class CameraController {
       this.orbDist = mode === 'system'
         ? this._systemViewDistance()
         : Math.max(bodyR * 4, 3);
-      this.orbTheta = 0.5; this.orbPhi = 1.25;
+      // Enter at the camera's CURRENT bearing (bug #89): the old fixed
+      // 0.5/1.25 reset made the transition blend sweep the camera sideways
+      // to an arbitrary point — from insertion that read as a retrograde
+      // orbit ("reverse after I→O"; a second O press short-circuits above,
+      // which is why it seemed to fix it). Deriving theta/phi from the
+      // position keeps the pull-back radial; advance stays prograde (-=).
+      const c = this.r.bodyWorldPos(name, this._v);
+      const d = this.camera.position.clone().sub(c);
+      if (d.lengthSq() > 1e-8) {
+        d.normalize();
+        this.orbTheta = Math.atan2(d.z, d.x);
+        this.orbPhi = THREE.MathUtils.clamp(
+          Math.acos(THREE.MathUtils.clamp(d.y, -1, 1)), 0.05, Math.PI - 0.05);
+      } else { this.orbTheta = 0.5; this.orbPhi = 1.25; }
     }
     if (mode === 'chase' && target) {
       this.chasePos.copy(this.camera.position);

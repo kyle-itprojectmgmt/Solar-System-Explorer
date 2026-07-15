@@ -31,7 +31,18 @@ float ec_spiral(vec2 pos, float rate, float rot, float d, float t) {
 vec3 ec_zonal(vec3 p, float t) {
   float ay = abs(p.y);
   float speed = mix(-0.7, 1.6, smoothstep(0.28, 0.62, ay));
-  float ang = t * speed;
+  // Bounded shear (v10.0.12, bug #90): ang = t*speed accumulated
+  // UNBOUNDED differential rotation — by late wrap (uTime→1e6, t→24)
+  // adjacent latitudes had rotated apart by dozens of radians and the
+  // noise field sheared into pencil-thin zonal streaks along the
+  // subtropical transition belts (reported as "cloud streaks after
+  // time changes": a date jump lands anywhere in the 0..1e6 wrap).
+  // Split the motion: the RIGID mean rotation may grow freely (rotating
+  // the sampling frame never distorts the pattern); the DIFFERENTIAL
+  // part oscillates, capped at ±1.15/0.8 rad — the clean early-wrap
+  // look at every uTime. sin(0.8t)/0.8 ≈ t for small t, so the launch
+  // state and all early-wrap rendering are unchanged.
+  float ang = t * 0.45 + (speed - 0.45) * sin(t * 0.8) / 0.8;
   float c = cos(ang), s = sin(ang);
   return vec3(p.x * c - p.z * s, p.y, p.x * s + p.z * c);
 }

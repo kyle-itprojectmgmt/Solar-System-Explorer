@@ -612,12 +612,30 @@ export class UI {
     const orbLabel = el('div', 'alt-readout', this.orbSec);
     const orbSlider = el('input', 'slider', this.orbSec);
     Object.assign(orbSlider, { type: 'range', min: 0, max: 4, step: 0.05, value: this.cam.orbSpeedMult });
-    const syncOrb = () => { orbLabel.textContent = `${this.cam.orbSpeedMult.toFixed(2)}×`; };
-    orbSlider.oninput = () => { this.cam.orbSpeedMult = +orbSlider.value; syncOrb(); };
+    const syncOrb = () => {
+      orbSlider.value = this.cam.orbSpeedMult;
+      orbLabel.textContent = `${this.cam.orbSpeedMult.toFixed(2)}×`;
+    };
+    orbSlider.oninput = () => {
+      this.cam.orbSpeedMult = +orbSlider.value;
+      orbLabel.textContent = `${this.cam.orbSpeedMult.toFixed(2)}×`;
+      // The slider only drives Orbit/System mode (measured working —
+      // v10.0.12 bug report): insertion orbits move at the real
+      // sqrt(GM/r) rate and pause freezes _simDelta. Say so once instead
+      // of silently doing nothing.
+      if (this.cam.mode === 'insertion' && !this._spdModeNoted) {
+        this._spdModeNoted = true;
+        this.notify('Orbit Speed applies to Orbit mode — insertion orbits follow real physics');
+      } else if (this.physics.paused && !this._spdPauseNoted) {
+        this._spdPauseNoted = true;
+        this.notify('Simulation is paused — camera orbit resumes with time');
+      }
+    };
     syncOrb();
     el('p', 'panel-desc', this.orbSec).textContent =
-      'Camera orbit speed — independent of simulation time';
+      'Camera orbit speed in Orbit mode — scales with simulation speed, never changes it';
     this.spdSlider = orbSlider;
+    this._syncSpdSlider = syncOrb;
   }
 
   _buildChaseSlider(parent) {
@@ -1987,6 +2005,7 @@ export class UI {
       const dir = moonPos.clone().sub(jupPos).normalize();
       this.cam.setMode('orbit', evt.body);
       this.cam.orbSpeedMult = Math.min(this.cam.orbSpeedMult, 0.2);
+      this._syncSpdSlider?.(); // keep the SPD slider honest after the clamp
       this.cam.orbTheta = Math.atan2(dir.z, dir.x);
       this.cam.orbPhi = Math.PI / 2 - 0.12;
       this.cam.orbDist = this.r.bodyRadius(evt.body) * 14;
@@ -1997,6 +2016,7 @@ export class UI {
       const d = this.r.sunDir;
       this.cam.setMode('orbit', primary);
       this.cam.orbSpeedMult = Math.min(this.cam.orbSpeedMult, 0.2);
+      this._syncSpdSlider?.(); // keep the SPD slider honest after the clamp
       this.cam.orbTheta = Math.atan2(d.z, d.x);
       this.cam.orbPhi = Math.PI / 2 - 0.1;
       this.cam.orbDist = this.r.bodyRadius(primary) * 3.5;
@@ -2116,7 +2136,7 @@ export class UI {
     // Mission Control sliders
     t.attach(this.mcAltSlider, 'Camera altitude above the surface — drag to fly closer or further');
     t.attach(this.mcIncSlider, 'Orbital tilt — 0° equatorial, 90° polar, negative values = retrograde orbit');
-    t.attach(this.spdSlider, 'Orbit Speed — how fast the camera orbits the target, independent of simulation time');
+    t.attach(this.spdSlider, 'Orbit Speed — how fast the camera circles the target in Orbit mode; never changes simulation time');
     t.attach(this.chaseSec.querySelector('input.slider'), 'Camera height above the chased moon — from surface-skim to wide overview');
 
     // Orbit Insertion panel

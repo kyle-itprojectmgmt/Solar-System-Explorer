@@ -1913,6 +1913,70 @@ review clean — a first.
   nightlights both passes, nightclouds PASS, cloudocclude PASS (factor
   0.70), orbitdir PASS, haloshots PASS.
 
+### v10.0.12 — insertion→orbit bearing, bounded cloud shear, SPD affordances (2026-07-15)
+- MEASURE-FIRST RESULTS:
+  - SPD slider — MECHANISM WORKS (measured: slider input → orbSpeedMult
+    1→4, orbit advance rate scales exactly 4× and 1× = 2π/60 rad/s to
+    4 decimals). The likely hardware repro is dragging SPD while in
+    INSERTION mode — much more common since v10.0.11 keeps users in
+    insertion — where the camera rate is the real sqrt(GM/r) by design,
+    or while paused (_simDelta = 0 freezes the sweep). Shipped
+    affordances, not a mechanism change: one-shot notify when SPD is
+    dragged in insertion ("applies to Orbit mode…") or while paused;
+    watch-event 0.2 clamps now re-sync the slider UI (they silently
+    desynced it); tooltip + panel copy corrected ("independent of
+    simulation time" was wrong — it SCALES with sim speed and freezes
+    on pause; it never CHANGES sim time).
+  - Bug #89 (REAL, fixed): "orbit reverses after insertion→orbit". NOT
+    a sign/convention bug — the advance is always theta -= (prograde,
+    orbitdir-verified) and ins.phase never feeds orbTheta. Measured
+    root cause: setMode('orbit') hard-reset orbTheta/orbPhi to 0.5/1.25,
+    so the transition blend swept the camera SIDEWAYS to that arbitrary
+    bearing — from insertion, a measured −104.9° westward lurch during
+    the 0.9 s blend (reads as retrograde), then normal +22.6° east. A
+    second O press short-circuits setMode (same mode+target), no new
+    sweep — which is why it "fixed it". FIX: orbit/system entry derives
+    orbTheta/orbPhi from the camera's current bearing (same math as
+    flyToFeature; phi clamped 0.05..π−0.05, degenerate fallback
+    0.5/1.25). Post-fix: theta error 0.000 rad, +10.2° east during the
+    blend, +40.9° after. The pull-back to 4-radii framing stays radial.
+  - Bug #90 (REAL, fixed — this is Kyle's "cloud streaks on time
+    change"): REPRODUCED headless at uTime ≈ 1e6 — dayside clouds shear
+    into pencil-thin zonal dashed filaments along the subtropical belts
+    (lat 16–38°, exactly ec_zonal's speed-transition band). NOT float32
+    precision (ec_t ≤ 30 has ~1e-7 relative error) and NOT the brief's
+    "large dt into the noise in one frame" (the shader is a pure
+    function of uTime; a jump is a single-frame snap — measured
+    post-jump frames identical to film grain, 73–249 px). Root cause:
+    ec_zonal's differential rotation ang = t·speed(lat) accumulates
+    UNBOUNDED shear across the 0..1e6 uTime wrap — clean early, sheared
+    to filaments by late wrap. Time changes "cause" it because a date
+    jump relocates uTime anywhere in the wrap and high multipliers
+    traverse it quickly (500× crosses the full wrap in ~33 wall-min).
+    FIX: split the motion — rigid mean rotation (t·0.45) may grow freely
+    (rotating the sampling frame never distorts), the differential part
+    oscillates bounded: (speed−0.45)·sin(0.8t)/0.8 ≈ t·speed for small
+    t, so launch/early-wrap rendering is unchanged. Filament detector:
+    983 (pre-fix) → 215 (post-fix) at uTime 999,900; threshold 500 in
+    the guard. NOTE: the pre-existing 1e6 wrap pop (full weather change
+    every 11.6 sim-days) is untouched.
+  - PROBE TRAP (cost an hour): canvas.toDataURL between rAF ticks on the
+    non-preserveDrawingBuffer WebGL canvas returns garbage frames (pure
+    white/black) — the house double-RAW-render-in-one-evaluate rule
+    applies to ALL pixel grabs, not just diff-renders.
+  - STALE SERVER TRAP: the v10.0.11 session's vite (port 5175) survived
+    its TaskStop — kill the PID holding the port, or version-string
+    checks fail against the stale __APP_VERSION__ bake.
+- Guard NEW: tests/v10012probe.mjs (7 checks: SPD reaches
+  orbSpeedMult, rate scales 4×, insertion-mode SPD notify, orbit-entry
+  theta = camera bearing, no westward transition sweep, prograde after,
+  ≤500 streak filaments at uTime 999,900).
+- Suites: v10012probe 7/7 NEW, orbitdir PASS (all four conventions
+  re-verified post-#89), smoke 22, earthtest 14, v5b 18, v10011probe
+  5/5, v10010probe 11/11, bug79live PASS, nightlights both passes,
+  nightclouds PASS, cloudocclude PASS, hazeprobe PASS, hurricane PASS
+  (6.6, still organic), glint PASS, presets PASS, haloshots PASS.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -2001,7 +2065,10 @@ review clean — a first.
 | 85 | Time multipliers "~92× too fast; ISS orbit in ~1 wall-minute at 1×". NOT A BUG — measured 1.0014 sim-s/wall-s at 1× and 92.7 wall-min per insertion orbit at 400 km (periodS 5,545 s, v 7.67 km/s). The sighting was the orbit/cinematic-mode COSMETIC camera rev (60 sim-s per rev by design) after bug #86 silently kicked the camera out of insertion. Ladder unchanged; tooltip copy updated. | Not a bug — measured; explained by #86 | — |
 | 86 | Orbit Insertion panel close fired the preModeOI camera restore on EVERY close path — opening TIME/NAV (panel manager), click-away, Escape, swipe all reverted the camera out of insertion. Now the restore fires ONLY on explicit ✕; Enter Orbit closes the panel and stays in the committed orbit; re-selecting the insertion mode button reopens the panel. Guard: v10011probe.mjs; v5b outside-click check re-anchored. | Resolved v10.0.11 | — |
 | 87 | Black Marble night lights a uniform bright wash — pow(0.8)×1.4 boost lifted faint inter-city sprawl. Now pow(1.2)×1.2: sprawl down ~3×, city cores keep ~2/3 brightness; nightlights.mjs green on existing thresholds; cloudocclude factor 0.65→0.70 (ACES pixel-ratio shift at dimmer gain, el_atten unchanged). Hardware eyeball pass welcome (joins #9/#27 class). | Resolved v10.0.11 | — |
-| 88 | Night-side banding after date jump — #84 was not reproducible and produced no code change, so nothing was fixed by it; no banding in any headless grid (nightlights/nightclouds/cloudocclude). Joins the bug #77 hardware-eyeball class: needs screenshot + altitude. | Not reproduced headless — #77 class | — |
+| 88 | Night-side banding after date jump — #84 was not reproducible and produced no code change, so nothing was fixed by it; no banding in any headless grid (nightlights/nightclouds/cloudocclude). Joins the bug #77 hardware-eyeball class: needs screenshot + altitude. (v10.0.12 note: if the sighting was DAYSIDE-adjacent cloud streaking, bug #90's unbounded ec_zonal shear is the likely culprit — now fixed.) | Not reproduced headless — #77 class; possibly #90 | — |
+| 89 | Orbit direction "reverses" after insertion→orbit (O after I), second O press fixes it. Measured: not a sign bug — setMode('orbit') hard-reset orbTheta to 0.5 and the transition blend swept the camera −104.9° west to get there (reads retrograde); second press short-circuits. Fixed: orbit/system entry derives theta/phi from the camera's current bearing. Guard: v10012probe. | Resolved v10.0.12 | — |
+| 90 | Earth cloud streaks after time changes (hardware + reproduced headless at uTime→1e6): ec_zonal differential rotation t·speed(lat) accumulated unbounded shear across the 1e6-s uTime wrap, drawing pencil-thin zonal filaments at the subtropical belts. Date jumps relocate uTime in the wrap (streaks appear "randomly"); 500× traverses the wrap in ~33 wall-min. Fixed: rigid mean rotation + bounded oscillating differential (sin(0.8t)/0.8). Filaments 983→215; guard threshold 500 (v10012probe). | Resolved v10.0.12 | — |
+| 91 | SPD slider "not working" — mechanism measured intact (rate scales exactly, 1× = 2π/60). Real-world confusion: SPD has no effect in insertion mode (physics-locked rate, by design) or while paused; users now stay in insertion far more since v10.0.11. Shipped one-shot explainer notifies + watch-event clamp slider re-sync + corrected copy. | Resolved v10.0.12 (affordances; mechanism was never broken) | — |
 
 ---
 
