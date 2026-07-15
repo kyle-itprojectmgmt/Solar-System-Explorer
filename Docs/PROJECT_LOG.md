@@ -1852,6 +1852,67 @@ review clean — a first.
   Earth/Jupiter/Saturn incl. Kepler moons, Enter Orbit → insertion mode
   on Moon at 1×).
 
+### v10.0.11 — insertion panel close behavior, night-lights gain; #84/#85 measured not-bugs (2026-07-15)
+- MEASURE-FIRST RESULTS (all four claims probed headless before touching code):
+  - Bug #84 "orbit lines accumulate on date jump" — NOT REPRODUCIBLE.
+    isLine count constant (4) across 10 date jumps (30-day and 365-day,
+    with and without rendered frames between). Structurally impossible:
+    _buildOrbitLines() runs exactly once, in the renderer constructor
+    (renderer.js:84); no rebuild path exists anywhere, so there is
+    nothing to dispose. No code change. If the hardware sighting
+    persists, it needs a screenshot + repro steps — it is not line
+    accumulation.
+  - Bug #85 "time multipliers ~92× too fast" — NOT A BUG. Measured
+    1.0014 sim-s/wall-s at timeIndex 1; insertion at 400 km computes
+    periodS 5,545 s (92.4 min) and a MEASURED 92.7 wall-min per orbit at
+    1×. G, velKmS (7.67 km/s), and simDt application all correct. The
+    "ISS orbit in ~1 wall-minute" sighting is explained by bug #86:
+    opening the TIME panel silently kicked the camera OUT of insertion
+    back into orbit/cinematic mode — whose camera revolution is a
+    COSMETIC 60 sim-s per rev by design (camera.js _poseOrbit, Orbit
+    Speed slider) — so what was timed was the orbit-mode camera sweep,
+    not the insertion orbit. Ladder [0,1,5,50,500] UNCHANGED (it was
+    recalibrated deliberately in v10.0.10; bug79live assertions stand).
+    Time-slider tooltip updated to Kyle's copy ("At 1× time runs in real
+    time — one orbit takes as long as it really would").
+- Bug #86 (REAL, fixed): the OI panel's close handler fired the
+  preModeOI camera restore on EVERY close path — including the panel
+  manager closing it because TIME/NAV/any other panel took the slot, and
+  the click-away/Escape/swipe dismiss. Now the restore fires ONLY on an
+  explicit ✕ click (transient _insExplicitClose flag set by the ✕
+  handler around closeAllPanels; no persistent state needed — the close
+  handler only needs to know "was this the ✕?"). Enter Orbit now also
+  CLOSES the panel on commit and stays in the new orbit. Reopen path
+  added: re-selecting the insertion mode button while already in
+  insertion reopens the panel (setMode short-circuits on same
+  mode+target, so _activateMode handles it) — sliders reflect live state
+  via the existing onInsertionChange sync. Suite re-anchor: v5b's
+  "outside click closes OI + returns camera mode" asserted the old-spec
+  behavior — updated to "camera stays in insertion" (18/18).
+  Guard NEW: tests/v10011probe.mjs (5 checks: ✕ reverts, Enter Orbit
+  commits+closes, mode button reopens, TIME open keeps orbit+altitude,
+  overlay dismiss keeps orbit).
+- Bug #87 (fixed): Black Marble night lights read as a uniform bright
+  wash — the pow(0.8) ×1.4 contrast boost LIFTED the faint inter-city
+  sprawl. Now pow(1.2) ×1.2: faint sprawl pushed down ~3× (at 0.05
+  linear) while city cores keep ~2/3 brightness. nightlights.mjs both
+  passes green on EXISTING thresholds (cities 91–156 vs dark ≤7, caps
+  untouched): London 91, Paris 131, Milan 134, Cairo 100, Moscow 71,
+  Johannesburg 156; Sahara/Congo/Atlantic 0–7. cloudocclude guard factor
+  0.65→0.70 (measured: el_atten unchanged in-shader, but the ACES toe
+  compresses the occluded/clear PIXEL ratio at the dimmer city level —
+  min/max 0.653 vs 0.62 at the old gain; the guard asserts occlusion
+  exists, not curve depth).
+- Bug #88 (night-side banding after date jump): #84 produced no code
+  change, so there is nothing it could have fixed. No banding observed
+  headless (nightlights/nightclouds/cloudocclude grids all clean) —
+  joins the bug #77 hardware-eyeball class; needs a screenshot +
+  altitude if it persists on hardware.
+- Suites: v10011probe 5/5 NEW, bug79live PASS, bug79probe PASS,
+  v10010probe 11/11, smoke 22, earthtest 14, v5b 18 (1 re-anchored),
+  nightlights both passes, nightclouds PASS, cloudocclude PASS (factor
+  0.70), orbitdir PASS, haloshots PASS.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1936,6 +1997,11 @@ review clean — a first.
 | 77 | Earth terrain normal map disabled in v10.0.8 — caused universal cloud banding (horizontal stripe artifacts across disc) on real hardware, all browsers; headless SwiftShader does not reproduce. Root cause undiagnosed. To revisit: restore textures-src/earth/normal_gl_8k.jpg → public/textures/earth/normal.jpg, re-add `normal:` to earth.js, start with normalMapScale 0.1 and measure disc appearance before increasing. Suspect interaction between terrain ridge normals and the cloud relief shader path (dtlPerturbNormal stacks on the map-perturbed normal); also candidate: JPEG q95 row artifacts amplified ×1.5. normalcal.mjs is the calibration tool (flip EXPECT_NORMAL_MAP); tex8kprobe normal.jpg assertion must flip back to 200. | Open — hardware eyeball pass needed | — |
 | 78 | Orbit lines "visible through globe". NOT a depth-test failure — far arc correctly occluded (bug78far.mjs, zero pixels inside disc with camera exactly in the orbit plane). Near arc crossing IN FRONT of the disc is correct geometry. Shipped depthWrite:false hygiene on orbit line material. If the hardware sighting persists, capture screenshot + altitude. | Resolved v10.0.9 (measured; hygiene only) | — |
 | 79 | TIME panel "pointer capture" — speed slider "pans camera", presets "jump time". NOT pointer events (panel event flow measured clean). Root cause: LIVE mode forced 1× every frame + paused-skip resync drift-snapped the clock forward by the pause duration on the first speed interaction. Fix: ui.userSetTimeIndex() drops LIVE before any non-1× speed change; TIME panel, tray ⏸, Space/Comma/Period all routed through it. Guard: bug79live.mjs. | Resolved v10.0.9 | — |
+| 84 | Orbit lines "accumulate duplicates on date jump". NOT REPRODUCED — isLine count constant (4) across 10 date jumps; _buildOrbitLines runs once in the renderer constructor, no rebuild path exists, nothing to dispose. Needs screenshot + repro if the hardware sighting persists. | Not reproducible — measured, no code change | — |
+| 85 | Time multipliers "~92× too fast; ISS orbit in ~1 wall-minute at 1×". NOT A BUG — measured 1.0014 sim-s/wall-s at 1× and 92.7 wall-min per insertion orbit at 400 km (periodS 5,545 s, v 7.67 km/s). The sighting was the orbit/cinematic-mode COSMETIC camera rev (60 sim-s per rev by design) after bug #86 silently kicked the camera out of insertion. Ladder unchanged; tooltip copy updated. | Not a bug — measured; explained by #86 | — |
+| 86 | Orbit Insertion panel close fired the preModeOI camera restore on EVERY close path — opening TIME/NAV (panel manager), click-away, Escape, swipe all reverted the camera out of insertion. Now the restore fires ONLY on explicit ✕; Enter Orbit closes the panel and stays in the committed orbit; re-selecting the insertion mode button reopens the panel. Guard: v10011probe.mjs; v5b outside-click check re-anchored. | Resolved v10.0.11 | — |
+| 87 | Black Marble night lights a uniform bright wash — pow(0.8)×1.4 boost lifted faint inter-city sprawl. Now pow(1.2)×1.2: sprawl down ~3×, city cores keep ~2/3 brightness; nightlights.mjs green on existing thresholds; cloudocclude factor 0.65→0.70 (ACES pixel-ratio shift at dimmer gain, el_atten unchanged). Hardware eyeball pass welcome (joins #9/#27 class). | Resolved v10.0.11 | — |
+| 88 | Night-side banding after date jump — #84 was not reproducible and produced no code change, so nothing was fixed by it; no banding in any headless grid (nightlights/nightclouds/cloudocclude). Joins the bug #77 hardware-eyeball class: needs screenshot + altitude. | Not reproduced headless — #77 class | — |
 
 ---
 

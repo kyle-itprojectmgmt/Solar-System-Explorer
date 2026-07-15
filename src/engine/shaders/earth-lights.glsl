@@ -74,7 +74,12 @@ if (uDetailBlend > 0.001) {
     // class the v10.0.4 rural gate killed; nightlights.mjs caps dark
     // land at 13/255).
     vec3 bm = max(texture2D(uNightMap, dUv).rgb - 0.02, 0.0);
-    bm = pow(bm, vec3(0.8)) * 1.4;
+    // v10.0.11 (bug #87): pow 0.8 ×1.4 LIFTED the faint sprawl between
+    // cities into a uniform bright wash on hardware. Exponent >1 pushes
+    // the dim inter-city field back down (~3× at 0.05 linear) while city
+    // cores keep ~2/3 of their brightness — clusters read as distinct
+    // points again. Calibrated against nightlights.mjs both passes.
+    bm = pow(bm, vec3(1.2)) * 1.2;
     gDetailEmissive += bm * night * uDetailBlend * el_atten;
     } else {
     // PROCEDURAL FALLBACK — the v5a..v10.0.4 gaussian model, used until

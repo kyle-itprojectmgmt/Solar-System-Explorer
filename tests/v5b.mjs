@@ -84,8 +84,11 @@ const afterOutside = await page.evaluate(() => ({
   panels: document.querySelector('.insertion-panel').style.display !== 'none',
   overlay: document.getElementById('dismiss-overlay').style.display,
 }));
-check('outside click closes OI + returns camera mode + hides overlay',
-  !afterOutside.panels && afterOutside.mode !== 'insertion' && afterOutside.overlay === 'none',
+// v10.0.11 (bug #86): only the explicit ✕ restores the pre-insertion
+// camera mode — click-away now closes the PANEL but keeps the camera in
+// its insertion orbit (the user was mid-configuration, not cancelling).
+check('outside click closes OI + camera stays in insertion + hides overlay',
+  !afterOutside.panels && afterOutside.mode === 'insertion' && afterOutside.overlay === 'none',
   JSON.stringify(afterOutside));
 
 // Camera drag works immediately after dismissing (no dead zone).

@@ -437,10 +437,14 @@ export class UI {
       open: () => { this.insPanel.style.display = ''; },
       close: () => {
         this.insPanel.style.display = 'none';
-        // Dismissing the panel leaves the mode too (item 3b): back to the
-        // mode the camera was in before insertion. Guarded so mode changes
-        // that closed the panel themselves don't re-enter setMode.
-        if (this.cam.mode === 'insertion') {
+        // Leaving the MODE on dismiss (item 3b) now happens ONLY on an
+        // explicit ✕ click (bug #86). Every other way the panel closes —
+        // Enter Orbit, another panel taking the slot (TIME/NAV/…), the
+        // dismiss overlay — keeps the camera in its current insertion
+        // orbit: the user was configuring or committing, not cancelling.
+        // Guarded so mode changes that closed the panel themselves don't
+        // re-enter setMode.
+        if (this._insExplicitClose && this.cam.mode === 'insertion') {
           const prev = (this.cam.preModeOI && this.cam.preModeOI !== 'insertion')
             ? this.cam.preModeOI : 'free';
           const needsTarget = ['orbit', 'chase'].includes(prev);
@@ -1464,6 +1468,14 @@ export class UI {
     } else {
       this.cam.setMode(m.id);
     }
+    // Re-selecting insertion while already in it: setMode short-circuits
+    // (same mode + target), but the panel may have been closed by Enter
+    // Orbit or by another panel taking the slot — reopen it so the sliders
+    // (which track live state via onInsertionChange) are reachable again.
+    if (m.id === 'insertion' && this.cam.mode === 'insertion'
+        && this._activePanel !== 'orbital-insertion') {
+      this.openPanel('orbital-insertion');
+    }
   }
 
   // -- Orbit insertion panel --------------------------------------------------------
@@ -1481,7 +1493,12 @@ export class UI {
     const closeBtn = el('button', 'panel-close-btn', head);
     closeBtn.id = 'oi-close';
     closeBtn.textContent = '✕';
-    closeBtn.onclick = () => this.closeAllPanels();
+    // ✕ is the one cancel gesture: flag the close as explicit so the panel
+    // close handler restores the pre-insertion camera mode (bug #86).
+    closeBtn.onclick = () => {
+      this._insExplicitClose = true;
+      try { this.closeAllPanels(); } finally { this._insExplicitClose = false; }
+    };
 
     // Target body selector (v10.0.10): dropdown over ALL navigable bodies
     // — primary + every moon, same source as the BODIES panel (the old
@@ -1550,6 +1567,9 @@ export class UI {
       });
       // 1× real time; drops LIVE if active (bug #79 funnel).
       this.userSetTimeIndex(1);
+      // Committing closes the panel; not an explicit ✕, so the camera
+      // stays in the freshly committed orbit (bug #86).
+      this.closeAllPanels();
       this.notify(`Orbital insertion — ${body}`);
     };
 
@@ -2082,7 +2102,7 @@ export class UI {
       '500× faster — watch eclipses, resonances, full orbits',
     ];
     this.rootEl.querySelectorAll('[data-time-index]').forEach((b) => t.attach(b, timeTips[+b.dataset.timeIndex]));
-    t.attach(this.timeSlider, 'Controls simulation speed — how fast moons orbit and planets rotate');
+    t.attach(this.timeSlider, 'Controls simulation speed. At 1× time runs in real time — one orbit takes as long as it really would.');
 
     // Display checkboxes
     t.attach(this.orbitToggle.parentElement, 'Show orbital path lines for all moons');
