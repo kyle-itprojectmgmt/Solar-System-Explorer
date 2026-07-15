@@ -279,6 +279,19 @@ export class UI {
   }
 
   /** 🔴 LIVE: track the real-world UTC clock at 1x. */
+  /** All user speed controls route here (TIME panel, tray ⏸, keyboard).
+   *  Choosing any speed other than real-time 1× is a departure from LIVE —
+   *  drop it BEFORE applying, or the live sync forces 1× back next frame
+   *  and, if the sim was paused, drift-snaps the clock forward by the
+   *  whole pause on resume (bug #79, measured: 10× click while paused+LIVE
+   *  lurched simSeconds by the pause length and reverted to 1×; the lurch
+   *  is what read as "camera pans" during slider drags). Choosing 1× while
+   *  LIVE keeps LIVE — it is real-time. */
+  userSetTimeIndex(i) {
+    if (i !== 1 && this.liveMode) this.setLive(false);
+    this.physics.setTimeIndex(i);
+  }
+
   setLive(v, silent = false) {
     this.liveMode = v;
     localStorage.setItem('sse-live-mode', v ? '1' : '0');
@@ -627,11 +640,11 @@ export class UI {
       const b = el('button', 'btn btn-small', timeRow);
       b.textContent = TIME_STEPS[i] === 0 ? '⏸' : `${TIME_STEPS[i].toLocaleString()}×`;
       b.dataset.timeIndex = i;
-      b.onclick = () => this.physics.setTimeIndex(i);
+      b.onclick = () => this.userSetTimeIndex(i);
     }
     this.timeSlider = el('input', 'slider', c);
     Object.assign(this.timeSlider, { type: 'range', min: 0, max: TIME_STEPS.length - 1, step: 1, value: this.physics.timeIndex });
-    this.timeSlider.oninput = () => this.physics.setTimeIndex(+this.timeSlider.value);
+    this.timeSlider.oninput = () => this.userSetTimeIndex(+this.timeSlider.value);
 
     // Date row — same picker and LIVE toggle as the HUD (synchronized:
     // both routes read/write the one physics clock through the utility).
@@ -1686,7 +1699,8 @@ export class UI {
     this.pauseBtn = el('button', 'tray-btn', tray);
     this.pauseBtn.textContent = '▶';
     this.pauseBtn.dataset.tray = 'pause';
-    this.pauseBtn.onclick = () => this.physics.togglePause();
+    this.pauseBtn.onclick = () =>
+      this.userSetTimeIndex(this.physics.paused ? this.physics.pausedIndex : 0);
 
     this.presBtn = el('button', 'tray-btn', tray);
     this.presBtn.textContent = '👁';
@@ -1983,9 +1997,10 @@ export class UI {
         case 'KeyH': this._activateMode(modeById('chase')); break;
         case 'KeyI': this.cam.setMode('insertion'); break;
         case 'KeyG': this.cam.setMode('system'); break;
-        case 'Space': e.preventDefault(); this.physics.togglePause(); break;
-        case 'Comma': this.physics.slower(); break;
-        case 'Period': this.physics.faster(); break;
+        case 'Space': e.preventDefault();
+          this.userSetTimeIndex(this.physics.paused ? this.physics.pausedIndex : 0); break;
+        case 'Comma': this.userSetTimeIndex(this.physics.timeIndex - 1); break;
+        case 'Period': this.userSetTimeIndex(this.physics.timeIndex + 1); break;
         case 'Tab': e.preventDefault(); this._cyclePanel(); break;
         case 'KeyP': this.setPresentation(!this.presentationMode); break;
         case 'F11': e.preventDefault(); this.toggleFullscreen(); break;

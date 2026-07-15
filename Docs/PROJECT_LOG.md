@@ -1749,6 +1749,46 @@ review clean — a first.
 - NOTE: the brief was titled v10.0.7, but 10.0.7 had already shipped
   (cloud occlusion, f8e70c7) — this is 10.0.8.
 
+### v10.0.9 — LIVE+pause time lurch fix; orbit-line reports measured (2026-07-14)
+- Bug #79 "time panel pointer capture" — NOT a pointer issue (measured:
+  instrumented probe shows slider drag fires slider:input, timeIndex
+  changes, camera theta frozen, panel stays open; the camera's canvas
+  handler already guards e.target !== dom, so panel events physically
+  cannot pan it). REAL root cause, reproduced headless by forcing LIVE
+  on (webdriver keeps it off — that's why suites never saw it): with
+  LIVE active, ui.update() forces timeIndex back to 1× every frame, and
+  because the live resync skips while paused, the first speed
+  interaction after a pause drift-snapped the clock forward by the
+  whole pause duration (measured: 10× click after 5 s pause → 6.2 s
+  lurch + silent revert to 1×). The lurching globe is what read as
+  "camera pans" during slider drags; the snap is the "preset jumps time
+  forward". FIX: ui.userSetTimeIndex() — any explicit non-1× speed
+  choice drops LIVE first (1× keeps LIVE; it IS real time). All user
+  speed paths routed through it: TIME panel presets + slider, tray ⏸,
+  Space/Comma/Period keys. Presets/datepicker already did setLive(false)
+  — this closes the last paths.
+- Bug #78 "orbit lines through globe" — NOT REPRODUCED, and the
+  prescribed state was already true (depthTest true, renderOrder 0,
+  built-in LineBasicMaterial carries the logdepth chunks).
+  tests/bug78far.mjs proves it: camera exactly in the moon-orbit plane
+  (camY frac 0), far-arc-only test ring renders 2,724 px with ZERO
+  inside the 86 px disc. What reads as "through the globe" is the NEAR
+  arc legitimately crossing in FRONT of the disc — correct geometry.
+  Shipped: depthWrite:false on orbit lines (transparent-object hygiene
+  only, per the brief). If the hardware sighting persists, it needs a
+  screenshot + altitude to chase further.
+- PROBE LESSON (cost half this session): radiusUnits is ALREADY
+  world-units — multiplying by getWorldScale again (mesh.scale IS the
+  radius) inflated the silhouette 6,500× and made two probes report
+  false bleed-through inside a disc that wasn't there. nightlights'
+  boundingSphere.radius × worldScale is the correct pattern.
+- Guards NEW: bug79live.mjs (LIVE+pause+preset must stick at 10×, live
+  drops, no lurch), bug79probe.mjs (panel event integrity + camera
+  frozen), bug78far.mjs (far-arc occlusion, exact orbit-plane framing).
+- Suites: bug79live, bug79probe, bug78far, smoke 22, earthtest 14,
+  v5b 18, orbitdir PASS, nightlights both passes, haloshots PASS,
+  prodboot 10/10 preview + live — all green.
+
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|
 | 1 | Jupiter limb halo looks like solid ring, not atmospheric scatter | Resolved v4 | — |
@@ -1831,6 +1871,8 @@ review clean — a first.
 | 75 | Earth clouds fade out above ~40,000 km (blend 0.11) and vanish at 50,000+ — no Blue Marble from high altitude. detail.activationKm 50,000→2,000,000, fullKm 500→100,000. | Resolved v10.0.4 | — |
 | 76 | False city-light glow over dark Africa (Sahara/Congo/Kalahari) — ungated rural term in earth-lights.glsl. Gated by region density; South Africa (Gauteng/Cape Town) population entries added. nightlights.mjs now asserts dark land ≤ 5%. | Resolved v10.0.4 | — |
 | 77 | Earth terrain normal map disabled in v10.0.8 — caused universal cloud banding (horizontal stripe artifacts across disc) on real hardware, all browsers; headless SwiftShader does not reproduce. Root cause undiagnosed. To revisit: restore textures-src/earth/normal_gl_8k.jpg → public/textures/earth/normal.jpg, re-add `normal:` to earth.js, start with normalMapScale 0.1 and measure disc appearance before increasing. Suspect interaction between terrain ridge normals and the cloud relief shader path (dtlPerturbNormal stacks on the map-perturbed normal); also candidate: JPEG q95 row artifacts amplified ×1.5. normalcal.mjs is the calibration tool (flip EXPECT_NORMAL_MAP); tex8kprobe normal.jpg assertion must flip back to 200. | Open — hardware eyeball pass needed | — |
+| 78 | Orbit lines "visible through globe". NOT a depth-test failure — far arc correctly occluded (bug78far.mjs, zero pixels inside disc with camera exactly in the orbit plane). Near arc crossing IN FRONT of the disc is correct geometry. Shipped depthWrite:false hygiene on orbit line material. If the hardware sighting persists, capture screenshot + altitude. | Resolved v10.0.9 (measured; hygiene only) | — |
+| 79 | TIME panel "pointer capture" — speed slider "pans camera", presets "jump time". NOT pointer events (panel event flow measured clean). Root cause: LIVE mode forced 1× every frame + paused-skip resync drift-snapped the clock forward by the pause duration on the first speed interaction. Fix: ui.userSetTimeIndex() drops LIVE before any non-1× speed change; TIME panel, tray ⏸, Space/Comma/Period all routed through it. Guard: bug79live.mjs. | Resolved v10.0.9 | — |
 
 ---
 

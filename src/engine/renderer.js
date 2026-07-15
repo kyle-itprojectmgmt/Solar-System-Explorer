@@ -1042,9 +1042,16 @@ export class SceneRenderer {
         const z = -a * Math.sin(t);
         pts.push(new THREE.Vector3(a * Math.cos(t), -z * sinI, z * cosI));
       }
+      // depthTest stays TRUE (bug #78 report "lines through the globe":
+      // NOT reproduced — tests/bug78far.mjs proves the far arc is occluded
+      // pixel-perfect; the visible crossing is the NEAR arc legitimately
+      // passing in front of the disc). depthWrite off is transparent-object
+      // hygiene: a nearer ring must not clip a farther one.
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
-        new THREE.LineBasicMaterial({ color: 0x66b2ff, transparent: true, opacity: 0.28 })
+        new THREE.LineBasicMaterial({
+          color: 0x66b2ff, transparent: true, opacity: 0.28, depthWrite: false,
+        })
       );
       this.orbitLines.add(line);
     }
