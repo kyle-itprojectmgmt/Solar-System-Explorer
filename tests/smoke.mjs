@@ -27,7 +27,9 @@ const consoleErrors = [];
 page.on('pageerror', (e) => consoleErrors.push(String(e)));
 page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 
-await page.goto(URL, { waitUntil: 'domcontentloaded' });
+// Explicit ?system=: since v10.0.14 bare "/" serves the solar map landing
+// page (worker.js in prod, the solar-map-root plugin in dev/preview).
+await page.goto(`${URL}/?system=jupiter`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction('window.__sse && window.__sse.physics', { timeout: 60000 });
 await page.waitForFunction(
   'document.getElementById("loading-screen").classList.contains("done")',

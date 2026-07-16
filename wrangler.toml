@@ -1,6 +1,12 @@
 name = "solar-system-explorer"
 compatibility_date = "2026-01-01"
 
+# Routing only (v10.0.14) — serves the solar map at bare "/" while "/?system=X"
+# stays on the simulator. Static Assets can't branch on a query string, so the
+# decision has to happen at request time. Security headers stay in
+# public/_headers — never in the Worker.
+main = "worker.js"
+
 # Custom domain (primary URL). The workers.dev URL remains as a legacy alias —
 # adding a route disables it by default, so it must be re-enabled explicitly.
 workers_dev = true
@@ -11,3 +17,8 @@ routes = [
 [assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
+binding = "ASSETS"
+# Assets normally win before the Worker runs — index.html would answer "/" and
+# worker.js would never see the request. Scoped to "/" so every other path keeps
+# being served directly by the asset layer at zero Worker cost.
+run_worker_first = ["/"]

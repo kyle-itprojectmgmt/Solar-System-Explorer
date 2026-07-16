@@ -181,6 +181,27 @@ Verify headers are active via browser DevTools → Network →
 response headers, or run Mozilla Observatory after deploy.
 Current Observatory score: A+ (130, 10/10 tests) — maintain this.
 
+### Query-Param Routing — Requires a Worker (v10.0.14 discovery)
+Workers Static Assets match on PATH ONLY; the query string is ignored.
+`/` and `/?system=mars` therefore resolve to the SAME asset. Any behavior
+that must differ between them cannot be done in _headers, _redirects, or
+asset config — it needs a request-time Worker (worker.js, `main` in
+wrangler.toml). This is the ONLY reason worker.js exists.
+
+Two rules that are easy to get wrong:
+1. `run_worker_first = ["/"]` is REQUIRED. By default an asset that exists
+   at the requested path is served WITHOUT invoking the Worker — index.html
+   answers `/` and the Worker never runs. Scope the list; a bare `true`
+   would route every request through the Worker for no benefit.
+2. Security headers still live in public/_headers ONLY — the v7 rule is
+   unchanged. worker.js returns env.ASSETS responses, and the asset layer
+   applies _headers to them (measured through the binding). NEVER set a
+   header in worker.js.
+
+vite dev / vite preview do NOT run the Worker. The `solar-map-root` plugin
+in vite.config.js mirrors the rule so dev, preview and production agree —
+change one, change the other, or routing bugs will only appear post-deploy.
+
 
 ### Normal Map Conventions — CRITICAL (v10.0.6 discovery)
 Three.js expects OpenGL convention: +G = north (up). Many downloaded
@@ -2018,6 +2039,79 @@ review clean — a first.
 - Suites (all PASS): smoke, orbitdir, bands, v5b, presets, toast,
   v10010probe, v10011probe, v10012probe, v10013probe NEW, presetspeed
   NEW, v801 18/18, v4d 13/13, about 27/27.
+
+### v10.0.14 — solar map landing page at root, NAV cross-links (2026-07-16)
+First routing layer in the project's history. Bare `/` now serves a solar
+map landing page; `/?system=X` still boots the simulator unchanged.
+
+**MEASURED FIRST — three brief premises were false; see Architecture note
+"Query-Param Routing" below before touching any of this:**
+- There was no routing logic anywhere to extend. wrangler.toml had NO
+  `main` — the project was assets-only, and `?system=` is parsed
+  CLIENT-side (src/config.js:28). Static Assets match on PATH ONLY and
+  ignore the query string, so `/` and `/?system=mars` are the same asset:
+  branching between them is IMPOSSIBLE without a Worker. Kyle approved
+  adding one (routing only — headers stay in public/_headers).
+- The CSP would have blanked the page. `style-src`/`script-src` carry no
+  `'unsafe-inline'`, and Docs/solar-map.html shipped a 350-line inline
+  `<style>` plus an inline starfield `<script>` — both blocked, leaving
+  unstyled text and no stars. Split verbatim into public/solar-map.css +
+  public/solar-map.js (same reason ga-init.js is external, v10.0.2).
+  Approved over adding 'unsafe-inline', which would have regressed A+ and
+  weakened the SIMULATOR too.
+- security.mjs could not have stayed 28/28 unchanged: Group 3 did
+  `goto('/')` then waited on `#loading-screen` / `.af-stream-body` —
+  simulator internals the map does not have. Re-pointed to
+  `/?system=jupiter`; count still 28.
+- Part 3 was a NO-OP: fonts.googleapis.com (style-src) and
+  fonts.gstatic.com (font-src) were ALREADY present, as were all six v7
+  headers. CSP was not touched. `_headers` was NOT duplicated anywhere.
+
+**Implementation:**
+- `worker.js` (NEW, routing only): bare `/` without a `system` param →
+  `env.ASSETS.fetch('/solar-map.html')`; everything else passes through.
+  Never sets a header — responses come from ASSETS, which applies
+  `_headers` on the way out (MEASURED: CSP/XFO/HSTS all present on the
+  map route through the binding).
+- `wrangler.toml`: `main = "worker.js"`, `[assets] binding = "ASSETS"`,
+  and **`run_worker_first = ["/"]`** — the non-obvious one. Assets
+  normally win BEFORE the Worker runs, so index.html would have answered
+  `/` and worker.js would never have executed. Scoped to `/` so every
+  other path stays on the zero-Worker-cost asset path.
+- `vite.config.js`: `solar-map-root` plugin mirrors the same rule via
+  configureServer + configurePreviewServer. Neither `vite dev` nor `vite
+  preview` runs the Worker, so without it the routing would exist only in
+  production and go unverified until deploy. Keep it in step with
+  worker.js. (Gotcha: the hooks need BLOCK bodies — `middlewares.use()`
+  returns the connect app, and an arrow returning it is mistaken for a
+  post-configure hook: "Cannot read properties of undefined (reading
+  'url')" at startup.)
+- solar-map.html corrections per brief: 4 `<meta http-equiv>` tags removed
+  (browsers ignore them; real headers come from `_headers`), header link
+  `target="_blank"` removed. Footer `target="_blank"` links left alone —
+  brief scoped the change to the header.
+- NAV panel (ui.js `_buildBodiesPanel`): divider + Solar System Map / Solar
+  Explorer Home rows. The brief's snippet referenced `navPanel` and a
+  `nav-body-link` class that DO NOT EXIST — real rows are
+  `<button class="body-row">` in `.bodies-list` with a
+  `<span class="body-chev">→</span>`. Matched that pattern per the brief's
+  own "match exactly, invent no CSS" clause; `<a class="body-row">` would
+  arrive underlined since .body-row never sets text-decoration. Map link
+  uses a RELATIVE `/` (not the APP_URL absolute) so it works in dev and
+  preview and stays same-origin; Home uses the existing `SITE_URL` export.
+
+**Testing** — tests/solarmap.mjs (11) + tests/navlinks.mjs (12) NEW.
+Both need a wrangler-served PRODUCTION build (`wrangler dev --port 8788`):
+vite dev runs the plugin but `window.__sse` is DEV-only, so navlinks opens
+the panel by clicking `button.stack-btn[data-panel="bodies"]` instead.
+solarmap asserts computed body background ≠ UA default and canvas.width > 0
+— i.e. the external CSS/JS actually applied, which is what catches anyone
+re-inlining them. Suites: security 28/28, smoke 22/22 (goto re-pointed to
+?system=jupiter — bare / is the map in dev now too), prodboot 10/10 all
+reading v10.0.14, solarmap 11/11, navlinks 12/12.
+PROBE TRAP: running 3 puppeteer suites back-to-back timed Earth out of
+security's 90 s CSP wait (25/1, catch branch) — it passed 28/28 alone
+both before and after. Re-run a suite solo before believing a load failure.
 
 | # | Issue | Status | Prompt File |
 |---|-------|--------|-------------|

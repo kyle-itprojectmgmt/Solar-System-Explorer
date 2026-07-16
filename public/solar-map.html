@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solar Explorer — Choose Your Destination</title>
+  <meta name="description" content="Explore the solar system in first-person. Choose a planet or system to begin." />
+
+  <!-- No cookies set or used by this page -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Lato:wght@300;400;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+
+  <link rel="stylesheet" href="/solar-map.css">
+</head>
+<body>
+
+<div class="page">
+
+  <!-- STAR FIELD -->
+  <div class="stars"><canvas id="starCanvas"></canvas></div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header__logo">Solar<span>Explorer</span></div>
+    <a href="https://solarexplorer.co" rel="noopener noreferrer" class="header__link">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      solarexplorer.co
+    </a>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="intro">
+      <p class="intro__eyebrow">Choose Your Destination</p>
+      <h1 class="intro__title">Where would you like to explore?</h1>
+      <p class="intro__sub">Click any body to launch the simulator</p>
+    </div>
+
+    <!-- DESKTOP — Orbital Map -->
+    <div class="orbital-map">
+      <div class="orbital-track"></div>
+      <div class="planets-row">
+
+        <a href="https://app.solarexplorer.co/?system=sun" class="planet planet--sun">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Sun</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=mercury" class="planet planet--mercury">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Mercury</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=venus" class="planet planet--venus">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Venus</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=earth" class="planet planet--earth">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Earth</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=mars" class="planet planet--mars">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Mars</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=jupiter" class="planet planet--jupiter">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Jupiter</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=saturn" class="planet planet--saturn">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Saturn</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=uranus" class="planet planet--uranus">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Uranus</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=neptune" class="planet planet--neptune">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Neptune</span>
+        </a>
+
+        <a href="https://app.solarexplorer.co/?system=pluto" class="planet planet--pluto">
+          <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+          <span class="planet__name">Pluto</span>
+        </a>
+
+      </div>
+    </div>
+
+    <!-- MOBILE — Grid -->
+    <div class="planet-grid">
+
+      <a href="https://app.solarexplorer.co/?system=sun" class="planet planet--sun">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Sun</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=mercury" class="planet planet--mercury">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Mercury</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=venus" class="planet planet--venus">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Venus</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=earth" class="planet planet--earth">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Earth</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=mars" class="planet planet--mars">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Mars</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=jupiter" class="planet planet--jupiter">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Jupiter</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=saturn" class="planet planet--saturn">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Saturn</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=uranus" class="planet planet--uranus">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Uranus</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=neptune" class="planet planet--neptune">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Neptune</span>
+      </a>
+      <a href="https://app.solarexplorer.co/?system=pluto" class="planet planet--pluto">
+        <div class="planet__orb-wrap"><div class="planet__orb"></div></div>
+        <span class="planet__name">Pluto</span>
+      </a>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span class="footer__copy">© 2026 Kyle Ewing · IT PROJECT MGMT, LLC</span>
+    <div class="footer__links">
+      <a href="https://solarexplorer.co/credits.html" target="_blank" rel="noopener noreferrer">Credits</a>
+      <a href="https://solarexplorer.co" target="_blank" rel="noopener noreferrer">SolarExplorer.co</a>
+    </div>
+  </footer>
+
+</div><!-- /page -->
+
+<script src="/solar-map.js"></script>
+
+</body>
+</html>

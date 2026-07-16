@@ -3,9 +3,36 @@ import { readFileSync } from 'fs'
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
+/**
+ * Dev/preview mirror of worker.js (v10.0.14): bare "/" serves the solar map,
+ * "/?system=X" stays on the simulator.
+ *
+ * Neither `vite dev` nor `vite preview` runs the Worker, so without this the
+ * routing would only exist in production — `localhost:5173/` would serve the
+ * simulator while the live site served the map, and the split would go
+ * unverified until deploy. Keep this rule and worker.js in step.
+ */
+const solarMapRoot = () => {
+  const middleware = (req, _res, next) => {
+    const [path, query] = req.url.split('?');
+    if (path === '/' && !new URLSearchParams(query || '').has('system')) {
+      req.url = '/solar-map.html';
+    }
+    next();
+  };
+  // Block bodies on purpose: middlewares.use() returns the connect app, and an
+  // arrow that returned it would be mistaken for a post-configure hook.
+  return {
+    name: 'solar-map-root',
+    configureServer(s) { s.middlewares.use(middleware); },
+    configurePreviewServer(s) { s.middlewares.use(middleware); },
+  };
+};
+
 export default defineConfig({
   root: '.',
   base: '/',
+  plugins: [solarMapRoot()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },

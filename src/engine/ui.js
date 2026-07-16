@@ -739,6 +739,24 @@ export class UI {
         }
       }
     }
+
+    // Cross-links out of the simulator (v10.0.14). Deliberately reuse the
+    // body-row / body-chev pattern above rather than a new class: type, colour,
+    // hover and spacing then track the travel rows for free. These are <button>
+    // like every other row here — an <a class="body-row"> would arrive
+    // underlined, since .body-row never sets text-decoration.
+    const divider = el('div', '', list);
+    divider.style.cssText = 'border-top: 1px solid rgba(255,255,255,0.12); margin: 8px 0 4px;';
+
+    // Relative "/" (not the APP_URL absolute) so the map is reachable from the
+    // dev server and preview build too, and so the hop stays same-origin.
+    const mapRow = el('button', 'body-row', list);
+    mapRow.innerHTML = '<span>🗺️ Solar System Map</span><span class="body-chev">→</span>';
+    mapRow.onclick = () => { window.location.href = '/'; };
+
+    const homeRow = el('button', 'body-row', list);
+    homeRow.innerHTML = '<span>🌐 Solar Explorer Home</span><span class="body-chev">→</span>';
+    homeRow.onclick = () => { window.location.href = SITE_URL; };
   }
 
   // -- 6d Presets panel — curated + saved views ------------------------------------------

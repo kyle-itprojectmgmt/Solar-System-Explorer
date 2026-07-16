@@ -75,8 +75,10 @@ for (const system of ['jupiter', 'earth', 'mars', 'saturn']) {
 }
 
 // -- Group 3: embed URL sanitization (DOM-level, fresh page) -------------------
+// Must be an explicit ?system= URL: since v10.0.14 bare "/" serves the solar
+// map landing page, which has no simulator DOM to drive.
 const page = await browser.newPage();
-await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
+await page.goto(`${URL_BASE}/?system=jupiter`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(
   'document.getElementById("loading-screen").classList.contains("done")',
   { timeout: 90000 },
